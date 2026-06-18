@@ -4,150 +4,762 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Catering · Gestión operativa</title>
-  <link rel="stylesheet" href="css/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+:root {
+  --bg:#F7F6F3;--bg-card:#FFFFFF;--bg-hover:#F0EFEb;--border:#E4E2DC;--border-soft:#EDEBE6;
+  --text-primary:#1A1915;--text-secondary:#6B6860;--text-tertiary:#9E9B93;
+  --coffee-bg:#FEF3E2;--coffee-fg:#7A4410;--lunch-bg:#E8F5EE;--lunch-fg:#1A5C38;
+  --break-bg:#E8F0FC;--break-fg:#1E3A7A;--other-bg:#EDEBE6;--other-fg:#4A4840;
+  --ok-bg:#EBF5E0;--ok-fg:#2D6A0A;--cancel-bg:#FDEDED;--cancel-fg:#8B1F1F;
+  --pending-bg:#FEF3E2;--pending-fg:#7A4410;
+  --alert-red-bg:#FDEDED;--alert-red-border:#F5A5A5;--alert-red-fg:#7A1F1F;
+  --alert-amber-bg:#FEF3E2;--alert-amber-border:#FAC97A;--alert-amber-fg:#7A4410;
+  --radius-sm:4px;--radius-md:8px;--radius-lg:12px;
+  --font-sans:'Inter',system-ui,sans-serif;--font-mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary);font-size:14px;line-height:1.5;min-height:100vh}
+.topbar{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 24px;height:52px}
+.topbar-left{display:flex;align-items:baseline;gap:12px}
+.logo{font-size:15px;font-weight:600;letter-spacing:-.02em;color:var(--text-primary)}
+.topbar-date{font-size:12px;color:var(--text-tertiary);font-family:var(--font-mono)}
+.tabs{display:flex;gap:2px}
+.tab{font-size:13px;font-family:var(--font-sans);padding:5px 14px;border-radius:var(--radius-md);border:none;background:transparent;color:var(--text-secondary);cursor:pointer;transition:background .15s,color .15s}
+.tab:hover{background:var(--bg-hover);color:var(--text-primary)}
+.tab.active{background:var(--text-primary);color:#fff}
+.topbar-actions{display:flex;gap:8px}
+.btn-action{display:flex;align-items:center;gap:6px;font-size:13px;font-family:var(--font-sans);padding:6px 14px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg-card);color:var(--text-secondary);cursor:pointer;transition:all .15s}
+.btn-action:hover{border-color:var(--text-primary);color:var(--text-primary)}
+.main{max-width:1100px;margin:0 auto;padding:24px}
+.loading-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:80px;color:var(--text-tertiary);font-size:13px}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--text-primary);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.kpi-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:14px 16px}
+.kpi-label{font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.kpi-value{font-size:26px;font-weight:600;line-height:1;font-family:var(--font-mono)}
+.kpi-sub{font-size:11px;color:var(--text-tertiary);margin-top:4px}
+.kpi-value.warn{color:#C45A00}.kpi-value.alert{color:#8B1F1F}
+.alerts{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.alert{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:var(--radius-md);font-size:12.5px;border:1px solid}
+.alert svg{flex-shrink:0;margin-top:1px}
+.alert-red{background:var(--alert-red-bg);border-color:var(--alert-red-border);color:var(--alert-red-fg)}
+.alert-amber{background:var(--alert-amber-bg);border-color:var(--alert-amber-border);color:var(--alert-amber-fg)}
+.alert-new{background:var(--ok-bg);border-color:#A3D977;color:#2D6A0A}
+.section-label{font-size:11px;font-weight:500;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+.timeline-wrap{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px;overflow-x:auto}
+.tl-axis{display:flex;border-top:1px solid var(--border);padding-top:6px;margin-top:8px}
+.tl-hour{font-size:10px;color:var(--text-tertiary);font-family:var(--font-mono);flex:1;text-align:left}
+.tl-rows{display:flex;flex-direction:column;gap:5px;padding-bottom:4px}
+.tl-row{display:flex;align-items:center;gap:8px;font-size:12px}
+.tl-time{font-family:var(--font-mono);font-size:11px;color:var(--text-tertiary);width:40px;flex-shrink:0}
+.tl-track{flex:1;position:relative;height:28px}
+.tl-bar{position:absolute;height:100%;border-radius:var(--radius-sm);display:flex;align-items:center;padding:0 10px;font-size:11.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default;transition:opacity .15s;min-width:80px}
+.tl-bar:hover{opacity:.85}
+.tl-bar.coffee{background:var(--coffee-bg);color:var(--coffee-fg)}
+.tl-bar.lunch{background:var(--lunch-bg);color:var(--lunch-fg)}
+.tl-bar.break{background:var(--break-bg);color:var(--break-fg)}
+.tl-bar.other{background:var(--other-bg);color:var(--other-fg)}
+.tl-bar.cancelled{opacity:.35}
+.tl-bar.overlap{outline:1.5px solid var(--alert-red-border)}
+.orders{display:flex;flex-direction:column;gap:8px}
+.order-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:14px 16px;transition:border-color .15s}
+.order-card:hover{border-color:var(--border)}
+.order-card.has-comment{border-left:3px solid #F5A940}
+.order-card.cancelled{opacity:.5}
+.order-card.is-new{border-left:3px solid #6DBF40}
+.order-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
+.order-who{display:flex;flex-direction:column;gap:2px}
+.order-name{font-size:13.5px;font-weight:500}
+.order-loc{font-size:12px;color:var(--text-secondary)}
+.order-pills{display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.pill{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+.pill-coffee{background:var(--coffee-bg);color:var(--coffee-fg)}
+.pill-lunch{background:var(--lunch-bg);color:var(--lunch-fg)}
+.pill-break{background:var(--break-bg);color:var(--break-fg)}
+.pill-other{background:var(--other-bg);color:var(--other-fg)}
+.pill-ok{background:var(--ok-bg);color:var(--ok-fg)}
+.pill-cancel{background:var(--cancel-bg);color:var(--cancel-fg)}
+.pill-pending{background:var(--pending-bg);color:var(--pending-fg)}
+.pill-pax-red{background:var(--alert-red-bg);color:var(--alert-red-fg)}
+.pill-pax-amber{background:var(--alert-amber-bg);color:var(--alert-amber-fg)}
+.pill-new{background:var(--ok-bg);color:var(--ok-fg)}
+.pill-overlap{background:var(--alert-red-bg);color:var(--alert-red-fg)}
+.order-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary)}
+.meta-item{display:flex;align-items:center;gap:4px}
+.photo-dot{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-tertiary)}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-yes{background:#5DA832}.dot-no{background:#C8C5BC}
+.comment-box{margin-top:10px;font-size:12px;color:#7A4410;background:var(--coffee-bg);border-radius:var(--radius-sm);padding:8px 12px;display:flex;gap:8px}
+.comment-internal{margin-top:6px;font-size:12px;color:var(--text-secondary);background:var(--bg);border-radius:var(--radius-sm);padding:8px 12px;display:flex;gap:8px;font-style:italic}
+.period-grid{display:grid;gap:10px}
+.period-day{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);overflow:hidden}
+.period-day-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border-soft);cursor:pointer}
+.period-day-header:hover{background:var(--bg-hover)}
+.period-day-title{font-size:13px;font-weight:500}
+.period-day-meta{font-size:12px;color:var(--text-tertiary);display:flex;gap:12px}
+.period-day-body{padding:10px 16px;display:flex;flex-direction:column;gap:6px}
+.period-day-body.collapsed{display:none}
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:16px}
+.stat-card h3{font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.bar-chart{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:flex;align-items:center;gap:10px;font-size:12px}
+.bar-label{width:130px;flex-shrink:0;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-fill-wrap{flex:1;background:var(--bg);border-radius:3px;height:8px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:var(--text-primary);transition:width .4s ease}
+.bar-val{width:60px;text-align:right;color:var(--text-secondary);font-family:var(--font-mono);font-size:11px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-tertiary)}
+.empty-state p{font-size:13px;margin-top:8px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal-overlay[hidden]{display:none}
+.modal{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--border);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.modal-wide{max-width:680px}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border-soft)}
+.modal-title{font-size:15px;font-weight:600}
+.modal-close{background:none;border:none;cursor:pointer;color:var(--text-tertiary);font-size:16px;line-height:1;padding:4px 8px;border-radius:var(--radius-sm)}
+.modal-close:hover{background:var(--bg-hover);color:var(--text-primary)}
+.modal-body{padding:20px}
+.drop-zone{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:40px 20px;text-align:center;color:var(--text-secondary);transition:border-color .15s,background .15s;cursor:default}
+.drop-zone.dragover{border-color:var(--text-primary);background:var(--bg)}
+.drop-zone svg{color:var(--text-tertiary);margin-bottom:12px}
+.drop-zone p{font-size:13px;margin-bottom:4px}
+.drop-hint{font-size:12px;color:var(--text-tertiary)!important}
+.file-link{color:var(--text-primary);text-decoration:underline;cursor:pointer}
+.import-summary{background:var(--bg);border-radius:var(--radius-md);padding:12px 16px;font-size:13px;margin-bottom:12px;line-height:1.8}
+.import-new-list{max-height:200px;overflow-y:auto;margin-bottom:16px;display:flex;flex-direction:column;gap:4px}
+.import-new-item{font-size:12px;padding:6px 10px;background:var(--ok-bg);border-radius:var(--radius-sm);color:var(--ok-fg);display:flex;justify-content:space-between}
+.import-progress{text-align:center;padding:20px 0}
+.progress-bar{background:var(--bg);border-radius:4px;height:6px;margin-bottom:10px;overflow:hidden}
+.progress-fill{height:100%;background:var(--text-primary);border-radius:4px;transition:width .3s}
+#progressText{font-size:12px;color:var(--text-secondary)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group-full{grid-column:1/-1}
+.form-group label{font-size:12px;color:var(--text-secondary);font-weight:500}
+.form-group input,.form-group select,.form-group textarea{font-family:var(--font-sans);font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg);color:var(--text-primary);outline:none;transition:border-color .15s;resize:vertical}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--text-primary);background:#fff}
+.btn-primary{width:100%;padding:10px;background:var(--text-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:13px;font-weight:500;font-family:var(--font-sans);cursor:pointer;transition:opacity .15s}
+.btn-primary:hover{opacity:.85}
+.btn-primary:disabled{opacity:.45;cursor:default}
+@media(max-width:768px){.topbar{flex-wrap:wrap;height:auto;padding:10px 16px;gap:10px}.tabs{order:3;width:100%;overflow-x:auto}.kpi-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr}.main{padding:16px}}
+  </style>
 </head>
 <body>
-  <div id="app">
+<div id="app">
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="logo">Catering</span>
+      <span class="topbar-date" id="currentDate"></span>
+    </div>
+    <nav class="tabs" id="mainTabs">
+      <button class="tab active" data-view="today">Hoy</button>
+      <button class="tab" data-view="week">Semana</button>
+      <button class="tab" data-view="month">Mes</button>
+      <button class="tab" data-view="cumulative">Acumulado</button>
+    </nav>
+    <div class="topbar-actions">
+      <button class="btn-action" id="btnImport">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Importar CSV
+      </button>
+      <button class="btn-action" id="btnAdd">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Añadir
+      </button>
+    </div>
+  </header>
+  <main class="main" id="mainContent">
+    <div class="loading-state" id="loadingState">
+      <div class="spinner"></div>
+      <span>Cargando pedidos…</span>
+    </div>
+  </main>
+</div>
 
-    <!-- TOPBAR -->
-    <header class="topbar">
-      <div class="topbar-left">
-        <span class="logo">Catering</span>
-        <span class="topbar-date" id="currentDate"></span>
+<!-- MODAL IMPORTAR -->
+<div class="modal-overlay" id="importModal" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Importar CSV</h2>
+      <button class="modal-close" id="closeImport">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="drop-zone" id="dropZone">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p>Arrastra el CSV aquí o <label class="file-link" for="fileInput">selecciona el archivo</label></p>
+        <p class="drop-hint">Exportación directa del sistema de catering</p>
+        <input type="file" id="fileInput" accept=".csv" hidden />
       </div>
-      <nav class="tabs" id="mainTabs">
-        <button class="tab active" data-view="today">Hoy</button>
-        <button class="tab" data-view="week">Semana</button>
-        <button class="tab" data-view="month">Mes</button>
-        <button class="tab" data-view="cumulative">Acumulado</button>
-      </nav>
-      <div class="topbar-actions">
-        <button class="btn-action" id="btnImport">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Importar CSV
-        </button>
-        <button class="btn-action" id="btnAdd">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Añadir
-        </button>
+      <div class="import-preview" id="importPreview" hidden>
+        <div class="import-summary" id="importSummary"></div>
+        <div class="import-new-list" id="importNewList"></div>
+        <button class="btn-primary" id="btnConfirmImport">Confirmar importación</button>
       </div>
-    </header>
-
-    <!-- MAIN CONTENT -->
-    <main class="main" id="mainContent">
-      <div class="loading-state" id="loadingState">
-        <div class="spinner"></div>
-        <span>Cargando pedidos…</span>
-      </div>
-    </main>
-
-  </div>
-
-  <!-- IMPORT MODAL -->
-  <div class="modal-overlay" id="importModal" hidden>
-    <div class="modal">
-      <div class="modal-header">
-        <h2 class="modal-title">Importar CSV</h2>
-        <button class="modal-close" id="closeImport">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="drop-zone" id="dropZone">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <p>Arrastrá el CSV aquí o <label class="file-link" for="fileInput">seleccioná el archivo</label></p>
-          <p class="drop-hint">Exportación directa del sistema de catering</p>
-          <input type="file" id="fileInput" accept=".csv" hidden />
-        </div>
-        <div class="import-preview" id="importPreview" hidden>
-          <div class="import-summary" id="importSummary"></div>
-          <div class="import-new-list" id="importNewList"></div>
-          <button class="btn-primary" id="btnConfirmImport">Confirmar importación</button>
-        </div>
-        <div class="import-progress" id="importProgress" hidden>
-          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-          <span id="progressText">Procesando…</span>
-        </div>
+      <div class="import-progress" id="importProgress" hidden>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <span id="progressText">Procesando…</span>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- ADD MANUAL MODAL -->
-  <div class="modal-overlay" id="addModal" hidden>
-    <div class="modal modal-wide">
-      <div class="modal-header">
-        <h2 class="modal-title">Añadir pedido manual</h2>
-        <button class="modal-close" id="closeAdd">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Nombre cliente</label>
-            <input type="text" id="fName" placeholder="Nombre completo" />
-          </div>
-          <div class="form-group">
-            <label>Empresa</label>
-            <input type="text" id="fCompany" placeholder="Empresa" />
-          </div>
-          <div class="form-group">
-            <label>Email</label>
-            <input type="email" id="fEmail" placeholder="email@empresa.com" />
-          </div>
-          <div class="form-group">
-            <label>Teléfono</label>
-            <input type="text" id="fPhone" placeholder="6XX XXX XXX" />
-          </div>
-          <div class="form-group">
-            <label>Edificio</label>
-            <input type="text" id="fBuilding" placeholder="Edificio 1" />
-          </div>
-          <div class="form-group">
-            <label>Planta y sala</label>
-            <input type="text" id="fRoom" placeholder="Planta 0 · Sala Sebares" />
-          </div>
-          <div class="form-group">
-            <label>Fecha entrega</label>
-            <input type="datetime-local" id="fDelivery" />
-          </div>
-          <div class="form-group">
-            <label>Hora desmontaje</label>
-            <input type="time" id="fTeardown" />
-          </div>
-          <div class="form-group">
-            <label>Pax</label>
-            <input type="number" id="fPax" placeholder="0" min="1" />
-          </div>
-          <div class="form-group">
-            <label>Tipo de catering</label>
-            <select id="fType">
-              <option value="">Seleccionar…</option>
-              <option>A la carta Desayunos</option>
-              <option>Coffee Break</option>
-              <option>Finger Lunch</option>
-              <option>A la carta Comidas</option>
-              <option>Cóctel</option>
-              <option>Otros</option>
-            </select>
-          </div>
-          <div class="form-group form-group-full">
-            <label>Comentario usuario</label>
-            <textarea id="fComment" rows="2" placeholder="Indicaciones especiales…"></textarea>
-          </div>
-          <div class="form-group form-group-full">
-            <label>Comentario interno</label>
-            <textarea id="fInternal" rows="2" placeholder="Notas del equipo…"></textarea>
-          </div>
+<!-- MODAL AÑADIR -->
+<div class="modal-overlay" id="addModal" hidden>
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 class="modal-title">Añadir pedido manual</h2>
+      <button class="modal-close" id="closeAdd">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Nombre cliente</label><input type="text" id="fName" placeholder="Nombre completo" /></div>
+        <div class="form-group"><label>Empresa</label><input type="text" id="fCompany" placeholder="Empresa" /></div>
+        <div class="form-group"><label>Email</label><input type="email" id="fEmail" placeholder="email@empresa.com" /></div>
+        <div class="form-group"><label>Teléfono</label><input type="text" id="fPhone" placeholder="6XX XXX XXX" /></div>
+        <div class="form-group"><label>Edificio</label><input type="text" id="fBuilding" placeholder="Edificio 1" /></div>
+        <div class="form-group"><label>Planta y sala</label><input type="text" id="fRoom" placeholder="Planta 0 · Sala Sebares" /></div>
+        <div class="form-group"><label>Fecha y hora de entrega</label><input type="datetime-local" id="fDelivery" /></div>
+        <div class="form-group"><label>Hora de desmontaje</label><input type="time" id="fTeardown" /></div>
+        <div class="form-group"><label>Pax</label><input type="number" id="fPax" placeholder="0" min="1" /></div>
+        <div class="form-group"><label>Tipo de catering</label>
+          <select id="fType">
+            <option value="">Seleccionar…</option>
+            <option>A la carta Desayunos</option>
+            <option>Coffee Break</option>
+            <option>Finger Lunch</option>
+            <option>A la carta Comidas</option>
+            <option>Cóctel</option>
+            <option>Otros</option>
+          </select>
         </div>
-        <button class="btn-primary" id="btnSaveManual">Guardar pedido</button>
+        <div class="form-group form-group-full"><label>Comentario usuario</label><textarea id="fComment" rows="2" placeholder="Indicaciones especiales…"></textarea></div>
+        <div class="form-group form-group-full"><label>Comentario interno</label><textarea id="fInternal" rows="2" placeholder="Notas del equipo…"></textarea></div>
       </div>
+      <button class="btn-primary" id="btnSaveManual">Guardar pedido</button>
     </div>
   </div>
+</div>
 
-  <!-- Firebase SDKs -->
-  <script type="module" src="js/firebase.js"></script>
-  <script type="module" src="js/importer.js"></script>
-  <script type="module" src="js/dashboard.js"></script>
-  <script type="module" src="js/app.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, enableIndexedDbPersistence, collection, doc, setDoc, getDocs, getDoc, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── FIREBASE ──────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:"AIzaSyBdvSI91-ZTnUAn1kYcsE8le6bYq3L4WdQ",
+  authDomain:"taska-1f681.firebaseapp.com",
+  projectId:"taska-1f681",
+  storageBucket:"taska-1f681.firebasestorage.app",
+  messagingSenderId:"662084572571",
+  appId:"1:662084572571:web:b5b4a03ae3d7ae3835fd3e"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+enableIndexedDbPersistence(db).catch(()=>{});
+
+async function saveOrder(order) {
+  await setDoc(doc(db,'catering_orders',order.orderId),{...order,updatedAt:Timestamp.now()},{merge:true});
+}
+async function getOrders({from,to}={}) {
+  const col = collection(db,'catering_orders');
+  let q;
+  if(from&&to){
+    q=query(col,where('deliveryAt','>=',Timestamp.fromDate(from)),where('deliveryAt','<=',Timestamp.fromDate(to)),orderBy('deliveryAt','asc'));
+  } else {
+    q=query(col,orderBy('deliveryAt','asc'));
+  }
+  const snap=await getDocs(q);
+  return snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+async function getExistingOrderIds() {
+  const snap=await getDocs(collection(db,'catering_orders'));
+  return new Set(snap.docs.map(d=>d.id));
+}
+async function getConfig() {
+  try{
+    const snap=await getDoc(doc(db,'catering_config','settings'));
+    return snap.exists()?snap.data():{paxAlertIndividual:30,paxAlertHigh:50,paxAlertDayTotal:100};
+  }catch(e){return {paxAlertIndividual:30,paxAlertHigh:50,paxAlertDayTotal:100};}
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────
+function toDate(ts){if(!ts)return null;if(ts instanceof Date)return ts;if(ts.seconds)return new Date(ts.seconds*1000);return new Date(ts);}
+function fmtTime(ts){const d=toDate(ts);if(!d)return'--';return d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});}
+function fmtDateShort(ts){const d=toDate(ts);if(!d)return'--';return d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});}
+function fmtMoney(n){return n?n.toLocaleString('es-ES',{minimumFractionDigits:0,maximumFractionDigits:0})+'€':'—';}
+function startOfDay(d){const r=new Date(d);r.setHours(0,0,0,0);return r;}
+function endOfDay(d){const r=new Date(d);r.setHours(23,59,59,999);return r;}
+function startOfWeek(d){const r=new Date(d);const day=r.getDay();r.setDate(r.getDate()-(day===0?6:day-1));r.setHours(0,0,0,0);return r;}
+function endOfWeek(d){const r=startOfWeek(d);r.setDate(r.getDate()+6);r.setHours(23,59,59,999);return r;}
+function startOfMonth(d){return new Date(d.getFullYear(),d.getMonth(),1);}
+function endOfMonth(d){return new Date(d.getFullYear(),d.getMonth()+1,0,23,59,59,999);}
+
+function typeClass(o){const c=o.cateringCategory||'other';return c;}
+function typePill(o){const cls=typeClass(o);return`<span class="pill pill-${cls}">${o.cateringType||'Otros'}</span>`;}
+function statusPill(o){const s=o.orderStatus||'';if(s==='CANCELADO')return`<span class="pill pill-cancel">Cancelado</span>`;if(s==='ENTREGADO'||s==='CONFIRMADO')return`<span class="pill pill-ok">${s==='ENTREGADO'?'Entregado':'Confirmado'}</span>`;return`<span class="pill pill-pending">Pendiente</span>`;}
+
+// ── IMPORTER ──────────────────────────────────────────────────────
+function parseCSV(text){
+  const lines=text.trim().split('\n').map(l=>l.trim()).filter(Boolean);
+  if(lines.length<2)throw new Error('CSV vacío');
+  const sep=lines[0].includes(';')?';':',';
+  const rawHeaders=lines[0].split(sep).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const cells=splitLine(lines[i],sep);
+    if(cells.every(c=>!c.trim()))continue;
+    const raw={};
+    rawHeaders.forEach((h,idx)=>{raw[h]=cells[idx]?.replace(/"/g,'').trim()??'';});
+    const order=mapRow(raw);
+    if(order)rows.push(order);
+  }
+  return rows;
+}
+function splitLine(line,sep){
+  const result=[];let current='';let inQ=false;
+  for(const ch of line){if(ch==='"'){inQ=!inQ;continue;}if(ch===sep&&!inQ){result.push(current);current='';continue;}current+=ch;}
+  result.push(current);return result;
+}
+function mapRow(raw){
+  const orderId=raw['id de pedido']||'';
+  if(!orderId)return null;
+  const deliveryAt=parseDate(raw['fecha entrega / hora']||raw['fecha entrega']||'');
+  const {building,floor,room}=parseBR(raw['edificio y sala']||'');
+  const pax=parseInt(raw['cantidad personas']||'0',10)||0;
+  const priceFood=parseFloat((raw['precio alimentos']||'0').replace(',','.'))||0;
+  const priceDrinks=parseFloat((raw['precio bebidas']||'0').replace(',','.'))||0;
+  const priceTransport=parseFloat((raw['precio transporte']||'0').replace(',','.'))||0;
+  const priceStaff=parseFloat((raw['precio camareros']||'0').replace(',','.'))||0;
+  const priceTotal=parseFloat((raw['precio total sin iva']||'0').replace(',','.'))||0;
+  const hasDeliveryPhoto=!!(raw['imagen entrega']&&raw['imagen entrega']!=='--'&&raw['imagen entrega'].trim());
+  const hasPickupPhoto=!!(raw['imagen recogida']&&raw['imagen recogida']!=='--'&&raw['imagen recogida'].trim());
+  const isLate=(raw['tarde?']||'').toLowerCase().startsWith('s');
+  const lateMinutes=parseInt(raw['cuanto de tarde']||'0',10)||0;
+  const orderStatus=normalizeStatus(raw['estado pedido']||'');
+  const createdAt=parseDate(raw['fecha de creación']||'');
+  return{
+    orderId:orderId.trim(),customerId:raw['id']||'',center:raw['centro']||'',
+    buildingRoom:raw['edificio y sala']||'',building,floor,room,
+    customerName:raw['customer']||'',company:raw['empresa']||'',
+    email:raw['email']||'',phone:raw['teléfono catering']||'',
+    deliveryAt:deliveryAt?{seconds:deliveryAt.getTime()/1000}:null,
+    deliveryAtISO:deliveryAt?deliveryAt.toISOString():null,
+    setupTime:raw['hora de montaje']||'',startTime:raw['hora de inicio']||'',
+    teardownTime:raw['hora de desmontaje']||'',pax,
+    cateringType:raw['tipo de catering']||'',
+    cateringCategory:categorizeCatering(raw['tipo de catering']||''),
+    orderStatus,statusCode:raw['estado']||'',
+    userComment:raw['comentario usuario']||'',internalComment:raw['comentario interno']||'',
+    hasDeliveryPhoto,hasPickupPhoto,isLate,lateMinutes,
+    costCenter:raw['centro de coste']||'',department:raw['departamento']||'',
+    priceFood,priceDrinks,priceTransport,priceStaff,priceTotal,
+    isManual:false,source:'csv',
+    createdAt:createdAt?{seconds:createdAt.getTime()/1000}:null,
+  };
+}
+function parseDate(str){
+  if(!str||str==='--')return null;
+  const m=str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(!m)return null;
+  const[,d,mo,y,h,mi,s]=m;
+  return new Date(+y,+mo-1,+d,+h,+mi,+(s||0));
+}
+function parseBR(str){
+  if(!str)return{building:'',floor:'',room:''};
+  const parts=str.split('-').map(s=>s.trim());
+  let building='',floor='',room='';
+  parts.forEach(p=>{if(/planta/i.test(p))floor=p;else if(/sala/i.test(p))room=p.replace(/sala\s*/i,'').trim();else building=p;});
+  return{building,floor,room};
+}
+function normalizeStatus(raw){
+  const r=raw.toLowerCase();
+  if(r.includes('cancel'))return'CANCELADO';
+  if(r.includes('entregado')||r.includes('completado'))return'ENTREGADO';
+  if(r.includes('empresa')||r.includes('pago'))return'CONFIRMADO';
+  if(r.includes('pendiente'))return'PENDIENTE';
+  return raw||'PENDIENTE';
+}
+function categorizeCatering(type){
+  const t=type.toLowerCase();
+  if(t.includes('desayuno')||t.includes('coffee')||t.includes('break'))return'coffee';
+  if(t.includes('comida')||t.includes('lunch')||t.includes('finger')||t.includes('carta'))return'lunch';
+  return'other';
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────
+const ICON_WARN=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+const ICON_INFO=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+const ICON_OK=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+function buildAlerts(orders,config){
+  const alerts=[];
+  const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
+  const newOnes=active.filter(o=>o.isNew);
+  if(newOnes.length>0)alerts.push({type:'new',msg:`${newOnes.length} pedido${newOnes.length>1?'s':''} nuevo${newOnes.length>1?'s':''} en esta importación`});
+  active.forEach(o=>{
+    if(o.pax>=config.paxAlertHigh)alerts.push({type:'red',msg:`Carga alta · ${o.customerName} (${fmtTime(o.deliveryAt)}) — ${o.pax} pax · valorar refuerzo de producción`});
+    else if(o.pax>=config.paxAlertIndividual)alerts.push({type:'amber',msg:`Volumen elevado · ${o.customerName} (${fmtTime(o.deliveryAt)}) — ${o.pax} pax`});
+  });
+  const totalPax=active.reduce((s,o)=>s+(o.pax||0),0);
+  if(totalPax>=config.paxAlertDayTotal)alerts.push({type:'red',msg:`Producción total del día: ${totalPax} pax — carga elevada acumulada`});
+  const byRoom={};
+  active.forEach(o=>{const key=`${o.building}|${o.room}`.toLowerCase();if(!byRoom[key])byRoom[key]=[];byRoom[key].push(o);});
+  Object.entries(byRoom).forEach(([,group])=>{
+    if(group.length<2)return;
+    for(let i=0;i<group.length;i++){for(let j=i+1;j<group.length;j++){
+      const a=group[i],b=group[j];
+      const aS=toDate(a.deliveryAt),bS=toDate(b.deliveryAt);
+      if(aS&&bS&&Math.abs(aS-bS)<60*60*1000){
+        alerts.push({type:'red',msg:`Solapamiento · ${fmtTime(a.deliveryAt)} — 2 servicios en ${a.building} · ${a.room} al mismo tiempo`});return;
+      }
+    }}
+  });
+  return alerts;
+}
+
+function renderAlerts(alerts){
+  if(!alerts.length)return'';
+  return`<div class="alerts">${alerts.map(a=>`<div class="alert alert-${a.type==='new'?'new':a.type==='red'?'red':'amber'}">${a.type==='new'?ICON_OK:a.type==='red'?ICON_WARN:ICON_INFO}<span>${a.msg}</span></div>`).join('')}</div>`;
+}
+
+function renderKPIs(orders,config){
+  const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
+  const cancelled=orders.filter(o=>o.orderStatus==='CANCELADO');
+  const totalPax=active.reduce((s,o)=>s+(o.pax||0),0);
+  const totalPrice=active.reduce((s,o)=>s+(o.priceTotal||0),0);
+  const withComment=active.filter(o=>o.userComment||o.internalComment);
+  const paxClass=totalPax>=config.paxAlertDayTotal?'alert':totalPax>=config.paxAlertDayTotal*.75?'warn':'';
+  return`<div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Servicios</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${cancelled.length>0?cancelled.length+' cancelado'+(cancelled.length>1?'s':''):'ninguno cancelado'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value ${paxClass}">${totalPax}</div><div class="kpi-sub">${active.length?Math.round(totalPax/active.length)+' media por servicio':'—'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Importe sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div><div class="kpi-sub">servicios activos</div></div>
+    <div class="kpi-card"><div class="kpi-label">Con comentario</div><div class="kpi-value ${withComment.length>0?'warn':''}">${withComment.length}</div><div class="kpi-sub">${withComment.length>0?'revisar antes de entregar':'sin incidencias'}</div></div>
+  </div>`;
+}
+
+function renderTimeline(orders){
+  const active=orders.filter(o=>o.orderStatus!=='CANCELADO'&&toDate(o.deliveryAt));
+  if(!active.length)return'';
+  const hours=active.map(o=>toDate(o.deliveryAt).getHours());
+  const minH=Math.max(0,Math.min(...hours));
+  const maxH=Math.min(23,Math.max(...hours)+2);
+  const span=maxH-minH||1;
+  const overlapIds=new Set();
+  for(let i=0;i<active.length;i++){for(let j=i+1;j<active.length;j++){
+    const a=active[i],b=active[j];
+    if(a.room&&b.room&&a.room.toLowerCase()===b.room.toLowerCase()&&a.building?.toLowerCase()===b.building?.toLowerCase()){
+      const aT=toDate(a.deliveryAt),bT=toDate(b.deliveryAt);
+      if(Math.abs(aT-bT)<60*60*1000){overlapIds.add(a.orderId);overlapIds.add(b.orderId);}
+    }
+  }}
+  const rows=active.map(o=>{
+    const d=toDate(o.deliveryAt);
+    const hPos=((d.getHours()+d.getMinutes()/60)-minH)/span*100;
+    const cls=[typeClass(o),overlapIds.has(o.orderId)?'overlap':''].filter(Boolean).join(' ');
+    const label=`${o.customerName} · ${o.room||o.buildingRoom} · ${o.pax} pax`;
+    return`<div class="tl-row"><span class="tl-time">${fmtTime(o.deliveryAt)}</span><div class="tl-track"><div class="tl-bar ${cls}" style="left:${hPos.toFixed(1)}%;width:${Math.max(15,60-hPos*.3)}%" title="${label}">${label}</div></div></div>`;
+  }).join('');
+  let axisTicks='';
+  for(let h=minH;h<=maxH;h++)axisTicks+=`<span class="tl-hour">${String(h).padStart(2,'0')}:00</span>`;
+  return`<p class="section-label">Línea de tiempo</p><div class="timeline-wrap"><div class="tl-rows">${rows}</div><div class="tl-axis">${axisTicks}</div></div>`;
+}
+
+function renderOrderCard(o,showNew=true){
+  const isCancelled=o.orderStatus==='CANCELADO';
+  const hasComment=!!(o.userComment||o.internalComment);
+  const classes=['order-card'];
+  if(isCancelled)classes.push('cancelled');
+  if(hasComment)classes.push('has-comment');
+  if(o.isNew&&showNew)classes.push('is-new');
+  let paxPill='';
+  if(!isCancelled&&o.pax){
+    if(o.pax>=50)paxPill=`<span class="pill pill-pax-red">${o.pax} pax</span>`;
+    else if(o.pax>=30)paxPill=`<span class="pill pill-pax-amber">${o.pax} pax</span>`;
+  }
+  const newBadge=(o.isNew&&showNew)?`<span class="pill pill-new">Nuevo</span>`:'';
+  const loc=[o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'—';
+  const teardown=o.teardownTime?` – ${o.teardownTime}`:'';
+  const prices=[];
+  if(o.priceFood)prices.push(`Alim. ${fmtMoney(o.priceFood)}`);
+  if(o.priceDrinks)prices.push(`Beb. ${fmtMoney(o.priceDrinks)}`);
+  if(o.priceTransport)prices.push(`Transp. ${fmtMoney(o.priceTransport)}`);
+  if(o.priceStaff)prices.push(`Cam. ${fmtMoney(o.priceStaff)}`);
+  const priceDetail=prices.length?`<span class="meta-item" title="${prices.join(' | ')}">${fmtMoney(o.priceTotal)}</span>`:'';
+  return`<div class="${classes.join(' ')}">
+    <div class="order-top">
+      <div class="order-who"><span class="order-name">${o.customerName||'—'}</span><span class="order-loc">${loc}</span></div>
+      <div class="order-pills">${newBadge}${typePill(o)}${paxPill}${statusPill(o)}${o.isLate?`<span class="pill pill-pax-red">⚑ ${o.lateMinutes?o.lateMinutes+' min':'Tarde'}</span>`:''}</div>
+    </div>
+    <div class="order-meta">
+      ${o.deliveryAt?`<span class="meta-item">🕐 ${fmtTime(o.deliveryAt)}${teardown}</span>`:''}
+      ${o.pax&&!paxPill?`<span class="meta-item">👥 ${o.pax} pax</span>`:''}
+      ${priceDetail}
+      ${o.company?`<span class="meta-item" style="color:var(--text-tertiary)">${o.company}</span>`:''}
+      <span class="photo-dot"><span class="dot ${o.hasDeliveryPhoto?'dot-yes':'dot-no'}"></span> foto entrega</span>
+      <span class="photo-dot"><span class="dot ${o.hasPickupPhoto?'dot-yes':'dot-no'}"></span> foto recogida</span>
+    </div>
+    ${o.userComment?`<div class="comment-box">💬 ${o.userComment}</div>`:''}
+    ${o.internalComment?`<div class="comment-internal">📋 ${o.internalComment}</div>`:''}
+  </div>`;
+}
+
+async function renderToday(container){
+  const now=new Date();
+  const[orders,config]=await Promise.all([getOrders({from:startOfDay(now),to:endOfDay(now)}),getConfig()]);
+  if(!orders.length){container.innerHTML=`<div class="empty-state"><p>Sin pedidos para hoy</p></div>`;return;}
+  const alerts=buildAlerts(orders,config);
+  container.innerHTML=renderKPIs(orders,config)+renderAlerts(alerts)+renderTimeline(orders)+`<p class="section-label">Pedidos</p><div class="orders">${orders.map(o=>renderOrderCard(o)).join('')}</div>`;
+}
+
+async function renderWeek(container){
+  const now=new Date();
+  const[orders,config]=await Promise.all([getOrders({from:startOfWeek(now),to:endOfWeek(now)}),getConfig()]);
+  if(!orders.length){container.innerHTML=`<div class="empty-state"><p>Sin pedidos esta semana</p></div>`;return;}
+  const byDay={};
+  orders.forEach(o=>{const d=toDate(o.deliveryAt);if(!d)return;const key=d.toISOString().slice(0,10);if(!byDay[key])byDay[key]=[];byDay[key].push(o);});
+  const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
+  const totalPax=active.reduce((s,o)=>s+(o.pax||0),0);
+  const totalPrice=active.reduce((s,o)=>s+(o.priceTotal||0),0);
+  let html=`<div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Servicios semana</div><div class="kpi-value">${active.length}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Importe sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Días con servicio</div><div class="kpi-value">${Object.keys(byDay).length}</div></div>
+  </div><div class="period-grid">`;
+  const todayKey=now.toISOString().slice(0,10);
+  Object.keys(byDay).sort().forEach(key=>{
+    const dayOrders=byDay[key];
+    const dayActive=dayOrders.filter(o=>o.orderStatus!=='CANCELADO');
+    const dayPax=dayActive.reduce((s,o)=>s+(o.pax||0),0);
+    const dayPrice=dayActive.reduce((s,o)=>s+(o.priceTotal||0),0);
+    const label=fmtDateShort(new Date(key+'T12:00:00'));
+    const isToday=key===todayKey;
+    html+=`<div class="period-day">
+      <div class="period-day-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+        <span class="period-day-title">${label}${isToday?' <span style="color:var(--text-tertiary);font-weight:400;font-size:12px">· hoy</span>':''}</span>
+        <span class="period-day-meta"><span>${dayActive.length} servicios</span><span>${dayPax} pax</span><span>${fmtMoney(dayPrice)}</span></span>
+      </div>
+      <div class="period-day-body ${isToday?'':'collapsed'}">${dayOrders.map(o=>renderOrderCard(o,false)).join('')}</div>
+    </div>`;
+  });
+  html+='</div>';
+  container.innerHTML=html;
+}
+
+async function renderMonth(container){
+  const now=new Date();
+  const[orders,config]=await Promise.all([getOrders({from:startOfMonth(now),to:endOfMonth(now)}),getConfig()]);
+  if(!orders.length){container.innerHTML=`<div class="empty-state"><p>Sin pedidos este mes</p></div>`;return;}
+  const byDay={};
+  orders.forEach(o=>{const d=toDate(o.deliveryAt);if(!d)return;const key=d.toISOString().slice(0,10);if(!byDay[key])byDay[key]=[];byDay[key].push(o);});
+  const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
+  const cancelled=orders.filter(o=>o.orderStatus==='CANCELADO');
+  const totalPax=active.reduce((s,o)=>s+(o.pax||0),0);
+  const totalPrice=active.reduce((s,o)=>s+(o.priceTotal||0),0);
+  let html=`<div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Servicios mes</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${cancelled.length} cancelados</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Importe sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Días con servicio</div><div class="kpi-value">${Object.keys(byDay).length}</div></div>
+  </div><div class="period-grid">`;
+  Object.keys(byDay).sort().forEach(key=>{
+    const dayOrders=byDay[key];
+    const dayActive=dayOrders.filter(o=>o.orderStatus!=='CANCELADO');
+    const dayPax=dayActive.reduce((s,o)=>s+(o.pax||0),0);
+    const dayPrice=dayActive.reduce((s,o)=>s+(o.priceTotal||0),0);
+    const label=fmtDateShort(new Date(key+'T12:00:00'));
+    html+=`<div class="period-day">
+      <div class="period-day-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+        <span class="period-day-title">${label}</span>
+        <span class="period-day-meta"><span>${dayActive.length} servicios</span><span>${dayPax} pax</span><span>${fmtMoney(dayPrice)}</span></span>
+      </div>
+      <div class="period-day-body collapsed">${dayOrders.map(o=>renderOrderCard(o,false)).join('')}</div>
+    </div>`;
+  });
+  html+='</div>';
+  container.innerHTML=html;
+}
+
+async function renderCumulative(container){
+  const[orders,config]=await Promise.all([getOrders(),getConfig()]);
+  const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
+  if(!active.length){container.innerHTML=`<div class="empty-state"><p>Sin datos acumulados</p></div>`;return;}
+  const totalPax=active.reduce((s,o)=>s+(o.pax||0),0);
+  const totalPrice=active.reduce((s,o)=>s+(o.priceTotal||0),0);
+  const totalFood=active.reduce((s,o)=>s+(o.priceFood||0),0);
+  const totalDrink=active.reduce((s,o)=>s+(o.priceDrinks||0),0);
+  const totalTrans=active.reduce((s,o)=>s+(o.priceTransport||0),0);
+  const totalStaff=active.reduce((s,o)=>s+(o.priceStaff||0),0);
+  const byType={};
+  active.forEach(o=>{const t=o.cateringType||'Otros';if(!byType[t])byType[t]={count:0,pax:0,price:0};byType[t].count++;byType[t].pax+=o.pax||0;byType[t].price+=o.priceTotal||0;});
+  const byCompany={};
+  active.forEach(o=>{const c=o.company||'Sin empresa';if(!byCompany[c])byCompany[c]={count:0,pax:0,price:0};byCompany[c].count++;byCompany[c].pax+=o.pax||0;byCompany[c].price+=o.priceTotal||0;});
+  const maxTP=Math.max(...Object.values(byType).map(v=>v.pax))||1;
+  const maxCP=Math.max(...Object.values(byCompany).map(v=>v.price))||1;
+  const typeRows=Object.entries(byType).sort((a,b)=>b[1].pax-a[1].pax).map(([t,v])=>`<div class="bar-row"><span class="bar-label" title="${t}">${t}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.pax/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.pax} pax</span></div>`).join('');
+  const compRows=Object.entries(byCompany).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCP*100).toFixed(0)}%"></div></div><span class="bar-val">${fmtMoney(v.price)}</span></div>`).join('');
+  container.innerHTML=`<div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Importe total sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Media pax / servicio</div><div class="kpi-value">${Math.round(totalPax/active.length)}</div></div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card"><h3>Pax por tipo de servicio</h3><div class="bar-chart">${typeRows}</div></div>
+    <div class="stat-card"><h3>Importe por empresa (top 10)</h3><div class="bar-chart">${compRows}</div></div>
+    <div class="stat-card"><h3>Desglose de importes</h3><div class="bar-chart">
+      <div class="bar-row"><span class="bar-label">Alimentos</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${totalPrice?(totalFood/totalPrice*100).toFixed(0):0}%"></div></div><span class="bar-val">${fmtMoney(totalFood)}</span></div>
+      <div class="bar-row"><span class="bar-label">Bebidas</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${totalPrice?(totalDrink/totalPrice*100).toFixed(0):0}%"></div></div><span class="bar-val">${fmtMoney(totalDrink)}</span></div>
+      <div class="bar-row"><span class="bar-label">Transporte</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${totalPrice?(totalTrans/totalPrice*100).toFixed(0):0}%"></div></div><span class="bar-val">${fmtMoney(totalTrans)}</span></div>
+      <div class="bar-row"><span class="bar-label">Camareros</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${totalPrice?(totalStaff/totalPrice*100).toFixed(0):0}%"></div></div><span class="bar-val">${fmtMoney(totalStaff)}</span></div>
+    </div></div>
+    <div class="stat-card"><h3>Resumen operativo</h3><div class="bar-chart">
+      <div class="bar-row"><span class="bar-label">Con foto entrega</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(active.filter(o=>o.hasDeliveryPhoto).length/active.length*100).toFixed(0)}%"></div></div><span class="bar-val">${active.filter(o=>o.hasDeliveryPhoto).length}</span></div>
+      <div class="bar-row"><span class="bar-label">Con foto recogida</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(active.filter(o=>o.hasPickupPhoto).length/active.length*100).toFixed(0)}%"></div></div><span class="bar-val">${active.filter(o=>o.hasPickupPhoto).length}</span></div>
+      <div class="bar-row"><span class="bar-label">Con retraso</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(active.filter(o=>o.isLate).length/active.length*100).toFixed(0)}%"></div></div><span class="bar-val">${active.filter(o=>o.isLate).length}</span></div>
+      <div class="bar-row"><span class="bar-label">Con comentario</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(active.filter(o=>o.userComment||o.internalComment).length/active.length*100).toFixed(0)}%"></div></div><span class="bar-val">${active.filter(o=>o.userComment||o.internalComment).length}</span></div>
+    </div></div>
+  </div>`;
+}
+
+async function renderView(view,container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando…</span></div>`;
+  try{
+    if(view==='today')await renderToday(container);
+    else if(view==='week')await renderWeek(container);
+    else if(view==='month')await renderMonth(container);
+    else await renderCumulative(container);
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${e.message}</p></div>`;
+    console.error(e);
+  }
+}
+
+// ── APP ───────────────────────────────────────────────────────────
+const mainContent=document.getElementById('mainContent');
+const currentDate=document.getElementById('currentDate');
+const mainTabs=document.getElementById('mainTabs');
+let currentView='today';
+
+currentDate.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+renderView(currentView,mainContent);
+
+mainTabs.addEventListener('click',e=>{
+  const tab=e.target.closest('.tab');
+  if(!tab)return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  currentView=tab.dataset.view;
+  renderView(currentView,mainContent);
+});
+
+// Modales
+const importModal=document.getElementById('importModal');
+const addModal=document.getElementById('addModal');
+document.getElementById('btnImport').addEventListener('click',()=>{importModal.hidden=false;resetImport();});
+document.getElementById('closeImport').addEventListener('click',()=>{importModal.hidden=true;});
+importModal.addEventListener('click',e=>{if(e.target===importModal)importModal.hidden=true;});
+document.getElementById('btnAdd').addEventListener('click',()=>{addModal.hidden=false;});
+document.getElementById('closeAdd').addEventListener('click',()=>{addModal.hidden=true;});
+addModal.addEventListener('click',e=>{if(e.target===addModal)addModal.hidden=true;});
+
+// Import
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+const importPreview=document.getElementById('importPreview');
+const importSummary=document.getElementById('importSummary');
+const importNewList=document.getElementById('importNewList');
+const importProgress=document.getElementById('importProgress');
+const progressFill=document.getElementById('progressFill');
+const progressText=document.getElementById('progressText');
+const btnConfirm=document.getElementById('btnConfirmImport');
+let pendingImport=null;
+
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+fileInput.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
+
+async function handleFile(file){
+  try{
+    const text=await file.text();
+    const orders=parseCSV(text);
+    const existingIds=await getExistingOrderIds();
+    const newOrders=orders.filter(o=>!existingIds.has(o.orderId));
+    const updatedOrders=orders.filter(o=>existingIds.has(o.orderId));
+    pendingImport={orders,newOrders,updatedOrders};
+    importSummary.innerHTML=`<strong>${orders.length}</strong> pedidos en el archivo<br><span style="color:var(--ok-fg)">✓ ${newOrders.length} nuevos</span> &nbsp;·&nbsp; <span style="color:var(--text-secondary)">${updatedOrders.length} ya existentes (se actualizarán)</span>`;
+    importNewList.innerHTML=newOrders.length>0?newOrders.map(o=>`<div class="import-new-item"><span>${o.customerName} · ${o.buildingRoom}</span><span>${o.deliveryAtISO?new Date(o.deliveryAtISO).toLocaleDateString('es-ES'):'—'}</span></div>`).join(''):'<div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">No hay pedidos nuevos — solo actualizaciones</div>';
+    importPreview.hidden=false;
+  }catch(e){alert('Error al procesar el archivo: '+e.message);}
+}
+
+btnConfirm.addEventListener('click',async()=>{
+  if(!pendingImport)return;
+  btnConfirm.disabled=true;
+  importPreview.hidden=true;
+  importProgress.hidden=false;
+  const newIds=new Set(pendingImport.newOrders.map(o=>o.orderId));
+  let done=0;
+  for(const order of pendingImport.orders){
+    await saveOrder({...order,isNew:newIds.has(order.orderId)});
+    done++;
+    const pct=Math.round(done/pendingImport.orders.length*100);
+    progressFill.style.width=pct+'%';
+    progressText.textContent=`Guardando… ${done} de ${pendingImport.orders.length}`;
+  }
+  progressText.textContent='✓ Importación completada';
+  setTimeout(()=>{importModal.hidden=true;resetImport();renderView(currentView,mainContent);},1200);
+});
+
+function resetImport(){
+  pendingImport=null;importPreview.hidden=true;importProgress.hidden=true;
+  progressFill.style.width='0%';progressText.textContent='Procesando…';
+  btnConfirm.disabled=false;fileInput.value='';importNewList.innerHTML='';importSummary.innerHTML='';
+}
+
+// Añadir manual
+document.getElementById('btnSaveManual').addEventListener('click',async()=>{
+  const deliveryVal=document.getElementById('fDelivery').value;
+  const order={
+    orderId:'MANUAL-'+Date.now(),customerId:'',
+    customerName:document.getElementById('fName').value.trim(),
+    company:document.getElementById('fCompany').value.trim(),
+    email:document.getElementById('fEmail').value.trim(),
+    phone:document.getElementById('fPhone').value.trim(),
+    buildingRoom:`${document.getElementById('fBuilding').value} - ${document.getElementById('fRoom').value}`,
+    building:document.getElementById('fBuilding').value.trim(),
+    floor:'',room:document.getElementById('fRoom').value.trim(),
+    deliveryAt:deliveryVal?{seconds:new Date(deliveryVal).getTime()/1000}:null,
+    deliveryAtISO:deliveryVal?new Date(deliveryVal).toISOString():null,
+    teardownTime:document.getElementById('fTeardown').value,
+    setupTime:'',startTime:'',
+    pax:parseInt(document.getElementById('fPax').value||'0',10),
+    cateringType:document.getElementById('fType').value,
+    cateringCategory:categorizeCatering(document.getElementById('fType').value),
+    orderStatus:'CONFIRMADO',statusCode:'',
+    userComment:document.getElementById('fComment').value.trim(),
+    internalComment:document.getElementById('fInternal').value.trim(),
+    hasDeliveryPhoto:false,hasPickupPhoto:false,isLate:false,lateMinutes:0,
+    costCenter:'',department:'',priceFood:0,priceDrinks:0,priceTransport:0,priceStaff:0,priceTotal:0,
+    isManual:true,isNew:true,source:'manual',center:'',
+    createdAt:{seconds:Date.now()/1000},
+  };
+  const btn=document.getElementById('btnSaveManual');
+  btn.disabled=true;btn.textContent='Guardando…';
+  try{
+    await saveOrder(order);
+    addModal.hidden=true;
+    ['fName','fCompany','fEmail','fPhone','fBuilding','fRoom','fDelivery','fTeardown','fPax','fComment','fInternal'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('fType').value='';
+    renderView(currentView,mainContent);
+  }catch(e){alert('Error al guardar: '+e.message);}
+  btn.disabled=false;btn.textContent='Guardar pedido';
+});
+</script>
 </body>
 </html>
