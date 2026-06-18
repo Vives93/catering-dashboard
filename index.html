@@ -360,7 +360,7 @@ function mapRow(raw){
     buildingRoom:raw['edificio y sala']||'',building,floor,room,
     customerName:raw['customer']||'',company:raw['empresa']||'',
     email:raw['email']||'',phone:raw['teléfono catering']||'',
-    deliveryAt:deliveryAt?{seconds:deliveryAt.getTime()/1000}:null,
+    deliveryAt:deliveryAt?Timestamp.fromDate(deliveryAt):null,
     deliveryAtISO:deliveryAt?deliveryAt.toISOString():null,
     setupTime:raw['hora de montaje']||'',startTime:raw['hora de inicio']||'',
     teardownTime:raw['hora de desmontaje']||'',pax,
@@ -372,7 +372,7 @@ function mapRow(raw){
     costCenter,department:raw['departamento']||'',
     priceFood,priceDrinks,priceTransport,priceStaff,priceTotal,
     isManual:false,source:'csv',
-    createdAt:createdAt?{seconds:createdAt.getTime()/1000}:null,
+    createdAt:createdAt?Timestamp.fromDate(createdAt):null,
   };
 }
 function parseDate(str){
@@ -805,7 +805,7 @@ document.getElementById('btnSaveManual').addEventListener('click',async()=>{
     buildingRoom:`${document.getElementById('fBuilding').value} - ${document.getElementById('fRoom').value}`,
     building:document.getElementById('fBuilding').value.trim(),
     floor:'',room:document.getElementById('fRoom').value.trim(),
-    deliveryAt:deliveryVal?{seconds:new Date(deliveryVal).getTime()/1000}:null,
+    deliveryAt:deliveryVal?Timestamp.fromDate(new Date(deliveryVal)):null,
     deliveryAtISO:deliveryVal?new Date(deliveryVal).toISOString():null,
     teardownTime:document.getElementById('fTeardown').value,
     setupTime:'',startTime:'',
@@ -818,7 +818,7 @@ document.getElementById('btnSaveManual').addEventListener('click',async()=>{
     hasDeliveryPhoto:false,hasPickupPhoto:false,isLate:false,lateMinutes:0,
     costCenter:'',department:'',priceFood:0,priceDrinks:0,priceTransport:0,priceStaff:0,priceTotal:0,
     isManual:true,isNew:true,source:'manual',center:'',
-    createdAt:{seconds:Date.now()/1000},
+    createdAt:Timestamp.now(),
   };
   const btn=document.getElementById('btnSaveManual');
   btn.disabled=true;btn.textContent='Guardando…';
