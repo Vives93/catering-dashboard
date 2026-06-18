@@ -292,11 +292,15 @@ async function getOrders({from,to}={}) {
   const q=query(col,orderBy('updatedAt','asc'));
   const snap=await getDocs(q);
   const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+  console.log('Total docs:',all.length,'from:',from,'to:',to);
+  if(all.length>0)console.log('Primer deliveryAt:',JSON.stringify(all[0].deliveryAt),'ISO:',all[0].deliveryAtISO);
   if(!from||!to)return all;
-  return all.filter(o=>{
+  const filtered=all.filter(o=>{
     const d=toDate(o.deliveryAt);
     return d&&d>=from&&d<=to;
   });
+  console.log('Filtrados:',filtered.length);
+  return filtered;
 }
 async function getExistingOrderIds() {
   const snap=await getDocs(collection(db,'catering_orders'));
