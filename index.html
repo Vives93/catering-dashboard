@@ -343,17 +343,18 @@ function mapRow(raw){
   const deliveryAt=parseDate(raw['fecha entrega / hora']||raw['fecha entrega']||'');
   const {building,floor,room}=parseBR(raw['edificio y sala']||'');
   const pax=parseInt(raw['cantidad personas']||'0',10)||0;
-  const priceFood=parseFloat((raw['precio alimentos']||'0').replace(',','.'))||0;
-  const priceDrinks=parseFloat((raw['precio bebidas']||'0').replace(',','.'))||0;
-  const priceTransport=parseFloat((raw['precio transporte']||'0').replace(',','.'))||0;
-  const priceStaff=parseFloat((raw['precio camareros']||'0').replace(',','.'))||0;
-  const priceTotal=parseFloat((raw['precio total sin iva']||'0').replace(',','.'))||0;
-  const hasDeliveryPhoto=!!(raw['imagen entrega']&&raw['imagen entrega']!=='--'&&raw['imagen entrega'].trim());
-  const hasPickupPhoto=!!(raw['imagen recogida']&&raw['imagen recogida']!=='--'&&raw['imagen recogida'].trim());
+  const priceFood=parseFloat((raw['importe alimentos']||raw['precio alimentos']||'0').replace(',','.'))||0;
+  const priceDrinks=parseFloat((raw['importe de bebidas']||raw['precio bebidas']||'0').replace(',','.'))||0;
+  const priceTransport=parseFloat((raw['importe de transporte y servicio']||raw['precio transporte']||'0').replace(',','.'))||0;
+  const priceStaff=parseFloat((raw['importe de camareros']||raw['precio camareros']||'0').replace(',','.'))||0;
+  const priceTotal=parseFloat((raw['total importe sin iva']||raw['precio total sin iva']||'0').replace(',','.'))||0;
+  const hasDeliveryPhoto=!!(raw['fecha de la imagen de entrega']&&raw['fecha de la imagen de entrega']!=='--'&&raw['fecha de la imagen de entrega'].trim());
+  const hasPickupPhoto=!!(raw['fecha de la imagen de recogida']&&raw['fecha de la imagen de recogida']!=='--'&&raw['fecha de la imagen de recogida'].trim());
   const isLate=(raw['tarde?']||'').toLowerCase().startsWith('s');
   const lateMinutes=parseInt(raw['cuanto de tarde']||'0',10)||0;
   const orderStatus=normalizeStatus(raw['estado pedido']||'');
-  const createdAt=parseDate(raw['fecha de creación']||'');
+  const createdAt=parseDate(raw['fecha de creación']||raw['fecha de creacion']||'');
+  const costCenter=raw['centro de coste / departamento']||raw['centro de coste']||'';
   return{
     orderId:orderId.trim(),customerId:raw['id']||'',center:raw['centro']||'',
     buildingRoom:raw['edificio y sala']||'',building,floor,room,
@@ -368,19 +369,22 @@ function mapRow(raw){
     orderStatus,statusCode:raw['estado']||'',
     userComment:raw['comentario usuario']||'',internalComment:raw['comentario interno']||'',
     hasDeliveryPhoto,hasPickupPhoto,isLate,lateMinutes,
-    costCenter:raw['centro de coste']||'',department:raw['departamento']||'',
+    costCenter,department:raw['departamento']||'',
     priceFood,priceDrinks,priceTransport,priceStaff,priceTotal,
     isManual:false,source:'csv',
     createdAt:createdAt?{seconds:createdAt.getTime()/1000}:null,
   };
 }
 function parseDate(str){
-  if(!str||str==='--')return null;
-  const m=str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if(!m)return null;
-  const[,d,mo,y,h,mi,s]=m;
-  const date=new Date(+y,+mo-1,+d,+h,+mi,+(s||0));
-  return isNaN(date.getTime())?null:date;
+  if(!str||str==='--'||str==='null')return null;
+  str=str.replace(/"/g,'').trim();
+  // Format: YYYY-MM-DD HH:MM:SS
+  let m=str.match(/^(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(m){const[,y,mo,d,h,mi,s]=m;const date=new Date(+y,+mo-1,+d,+h,+mi,+(s||0));return isNaN(date.getTime())?null:date;}
+  // Format: DD/MM/YYYY HH:MM:SS
+  m=str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(m){const[,d,mo,y,h,mi,s]=m;const date=new Date(+y,+mo-1,+d,+h,+mi,+(s||0));return isNaN(date.getTime())?null:date;}
+  return null;
 }
 function parseBR(str){
   if(!str)return{building:'',floor:'',room:''};
