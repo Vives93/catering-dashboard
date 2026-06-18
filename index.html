@@ -822,6 +822,7 @@ document.getElementById('btnSaveManual').addEventListener('click',async()=>{
     ['fName','fCompany','fEmail','fPhone','fBuilding','fRoom','fDelivery','fTeardown','fPax','fComment','fInternal'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('fType').value='';
     renderView(currentView,mainContent,selectedDate);
+  }catch(e){alert('Error al guardar: '+e.message);}
   btn.disabled=false;btn.textContent='Guardar pedido';
 });
 </script>
