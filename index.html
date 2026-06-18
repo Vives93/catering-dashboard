@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-:root {
+:root{
   --bg:#F7F6F3;--bg-card:#FFFFFF;--bg-hover:#F0EFEb;--border:#E4E2DC;--border-soft:#EDEBE6;
   --text-primary:#1A1915;--text-secondary:#6B6860;--text-tertiary:#9E9B93;
   --coffee-bg:#FEF3E2;--coffee-fg:#7A4410;--lunch-bg:#E8F5EE;--lunch-fg:#1A5C38;
@@ -20,6 +20,18 @@
   --radius-sm:4px;--radius-md:8px;--radius-lg:12px;
   --font-sans:'Inter',system-ui,sans-serif;--font-mono:'JetBrains Mono',monospace;
 }
+.dark{
+  --bg:#141412;--bg-card:#1E1D1B;--bg-hover:#2A2926;--border:#333230;--border-soft:#2A2926;
+  --text-primary:#F0EDE8;--text-secondary:#9E9B93;--text-tertiary:#6B6860;
+  --coffee-bg:#2A1F0E;--coffee-fg:#FAC97A;--lunch-bg:#0E2018;--lunch-fg:#6DBF95;
+  --break-bg:#0E1828;--break-fg:#7AAFF5;--other-bg:#222220;--other-fg:#C8C5BC;
+  --ok-bg:#122008;--ok-fg:#8FD455;--cancel-bg:#220E0E;--cancel-fg:#F5A5A5;
+  --pending-bg:#2A1F0E;--pending-fg:#FAC97A;
+  --alert-red-bg:#220E0E;--alert-red-border:#8B3030;--alert-red-fg:#F5A5A5;
+  --alert-amber-bg:#2A1F0E;--alert-amber-border:#8B6020;--alert-amber-fg:#FAC97A;
+}
+.btn-theme{background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:6px 10px;cursor:pointer;font-size:15px;color:var(--text-secondary);transition:all .15s}
+.btn-theme:hover{border-color:var(--text-primary);color:var(--text-primary)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary);font-size:14px;line-height:1.5;min-height:100vh}
 .topbar{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 24px;height:52px}
@@ -174,7 +186,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
         <input type="date" id="datePickerInput" />
         <button class="date-nav-btn" id="btnNext">▶</button>
       </div>
-      <button class="btn-action" id="btnImport">
+      <button class="btn-theme" id="btnTheme" title="Modo noche">🌙</button>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Importar CSV
       </button>
@@ -258,7 +270,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, setDoc, getDocs, getDoc, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, getDocs, getDoc, query, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ── FIREBASE ──────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -270,23 +282,21 @@ const firebaseConfig = {
   appId:"1:662084572571:web:b5b4a03ae3d7ae3835fd3e"
 };
 const app = initializeApp(firebaseConfig);
-const db  = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-});
+const db  = getFirestore(app);
 
 async function saveOrder(order) {
   await setDoc(doc(db,'catering_orders',order.orderId),{...order,updatedAt:Timestamp.now()},{merge:true});
 }
 async function getOrders({from,to}={}) {
   const col = collection(db,'catering_orders');
-  let q;
-  if(from&&to){
-    q=query(col,where('deliveryAt','>=',Timestamp.fromDate(from)),where('deliveryAt','<=',Timestamp.fromDate(to)),orderBy('deliveryAt','asc'));
-  } else {
-    q=query(col,orderBy('deliveryAt','asc'));
-  }
+  const q=query(col,orderBy('updatedAt','asc'));
   const snap=await getDocs(q);
-  return snap.docs.map(d=>({id:d.id,...d.data()}));
+  const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+  if(!from||!to)return all;
+  return all.filter(o=>{
+    const d=toDate(o.deliveryAt);
+    return d&&d>=from&&d<=to;
+  });
 }
 async function getExistingOrderIds() {
   const snap=await getDocs(collection(db,'catering_orders'));
@@ -653,6 +663,16 @@ async function renderView(view,container,date=new Date()){
     console.error(e);
   }
 }
+
+// ── MODO NOCHE ────────────────────────────────────────────────────
+const btnTheme=document.getElementById('btnTheme');
+const root=document.documentElement;
+if(localStorage.getItem('theme')==='dark'){root.classList.add('dark');btnTheme.textContent='☀️';}
+btnTheme.addEventListener('click',()=>{
+  const isDark=root.classList.toggle('dark');
+  btnTheme.textContent=isDark?'☀️':'🌙';
+  localStorage.setItem('theme',isDark?'dark':'light');
+});
 
 // ── NAVEGADOR DE FECHAS ───────────────────────────────────────────
 let selectedDate = new Date();
