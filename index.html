@@ -120,6 +120,15 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 .period-day-meta{font-size:12px;color:var(--text-tertiary);display:flex;gap:12px}
 .period-day-body{padding:10px 16px;display:flex;flex-direction:column;gap:6px}
 .period-day-body.collapsed{display:none}
+.cumulative-controls{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.range-select{font-family:var(--font-sans);font-size:12.5px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-card);color:var(--text-primary);cursor:pointer}
+.range-inputs{display:flex;align-items:center;gap:6px}
+.range-inputs input[type=date]{font-family:var(--font-sans);font-size:12.5px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-card);color:var(--text-primary)}
+.range-compare-toggle{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary);cursor:pointer}
+.compare-badge{font-size:11px;padding:2px 8px;border-radius:12px;font-weight:500}
+.compare-up{background:var(--ok-bg);color:var(--ok-fg)}
+.compare-down{background:var(--alert-red-bg);color:var(--alert-red-fg)}
+.compare-flat{background:var(--other-bg);color:var(--other-fg)}
 .stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px}
 .stat-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:16px}
 .stat-card h3{font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
@@ -189,10 +198,6 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
       <button class="btn-action" id="btnImport">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Importar CSV
-      </button>
-      <button class="btn-action" id="btnAdd">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Añadir
       </button>
     </div>
   </header>
@@ -305,8 +310,8 @@ async function getExistingOrderIds() {
 async function getConfig() {
   try{
     const snap=await getDoc(doc(db,'catering_config','settings'));
-    return snap.exists()?snap.data():{paxAlertIndividual:30,paxAlertHigh:50,paxAlertDayTotal:100};
-  }catch(e){return {paxAlertIndividual:30,paxAlertHigh:50,paxAlertDayTotal:100};}
+    return snap.exists()?snap.data():{paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100};
+  }catch(e){return {paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100};}
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────
@@ -471,7 +476,7 @@ function renderKPIs(orders,config){
 }
 
 function renderTimeline(orders){
-  const active=orders.filter(o=>o.orderStatus!=='CANCELADO'&&toDate(o.deliveryAt));
+  const active=orders.filter(o=>o.orderStatus!=='CANCELADO'&&toDate(o.deliveryAt)).sort((a,b)=>toDate(a.deliveryAt)-toDate(b.deliveryAt));
   if(!active.length)return'';
   const hours=active.map(o=>toDate(o.deliveryAt).getHours());
   const minH=Math.max(0,Math.min(...hours));
@@ -507,7 +512,7 @@ function renderOrderCard(o,showNew=true){
   let paxPill='';
   if(!isCancelled&&o.pax){
     if(o.pax>=50)paxPill=`<span class="pill pill-pax-red">${o.pax} pax</span>`;
-    else if(o.pax>=30)paxPill=`<span class="pill pill-pax-amber">${o.pax} pax</span>`;
+    else if(o.pax>=35)paxPill=`<span class="pill pill-pax-amber">${o.pax} pax</span>`;
   }
   const newBadge=(o.isNew&&showNew)?`<span class="pill pill-new">Nuevo</span>`:'';
   const loc=[o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'—';
@@ -539,8 +544,13 @@ function renderOrderCard(o,showNew=true){
 async function renderToday(container,now=new Date()){
   const[orders,config]=await Promise.all([getOrders({from:startOfDay(now),to:endOfDay(now)}),getConfig()]);
   if(!orders.length){container.innerHTML=`<div class="empty-state"><p>Sin pedidos para hoy</p></div>`;return;}
+  const sorted=[...orders].sort((a,b)=>{
+    const da=toDate(a.deliveryAt),db=toDate(b.deliveryAt);
+    if(!da&&!db)return 0;if(!da)return 1;if(!db)return -1;
+    return da-db;
+  });
   const alerts=buildAlerts(orders,config);
-  container.innerHTML=renderKPIs(orders,config)+renderAlerts(alerts)+renderTimeline(orders)+`<p class="section-label">Pedidos</p><div class="orders">${orders.map(o=>renderOrderCard(o)).join('')}</div>`;
+  container.innerHTML=renderKPIs(orders,config)+renderAlerts(alerts)+renderTimeline(orders)+`<p class="section-label">Pedidos</p><div class="orders">${sorted.map(o=>renderOrderCard(o)).join('')}</div>`;
 }
 
 async function renderWeek(container,now=new Date()){
@@ -661,16 +671,101 @@ async function renderMonth(container,now=new Date()){
   container.innerHTML=html;
 }
 
-async function renderCumulative(container){
-  const[orders,config]=await Promise.all([getOrders(),getConfig()]);
+let cumulativeRange={type:'all',from:null,to:null,compare:false};
+
+function getRangeForType(type,refDate=new Date()){
+  const d=new Date(refDate);
+  if(type==='day')return{from:startOfDay(d),to:endOfDay(d)};
+  if(type==='week')return{from:startOfWeek(d),to:endOfWeek(d)};
+  if(type==='month')return{from:startOfMonth(d),to:endOfMonth(d)};
+  if(type==='year')return{from:new Date(d.getFullYear(),0,1),to:new Date(d.getFullYear(),11,31,23,59,59,999)};
+  return{from:null,to:null};
+}
+
+function getPreviousPeriod(type,from,to){
+  const diff=to-from;
+  if(type==='month'){
+    const prevMonth=new Date(from);prevMonth.setMonth(prevMonth.getMonth()-1);
+    return{from:startOfMonth(prevMonth),to:endOfMonth(prevMonth)};
+  }
+  if(type==='week'){
+    const prevWeek=new Date(from);prevWeek.setDate(prevWeek.getDate()-7);
+    return{from:startOfWeek(prevWeek),to:endOfWeek(prevWeek)};
+  }
+  if(type==='year'){
+    return{from:new Date(from.getFullYear()-1,0,1),to:new Date(from.getFullYear()-1,11,31,23,59,59,999)};
+  }
+  // day or custom range: shift back by the same duration
+  return{from:new Date(from.getTime()-diff-86400000),to:new Date(from.getTime()-86400000)};
+}
+
+function computeStats(orders){
   const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
-  if(!active.length){container.innerHTML=`<div class="empty-state"><p>Sin datos acumulados</p></div>`;return;}
+  return{
+    count:active.length,
+    pax:active.reduce((s,o)=>s+(o.pax||0),0),
+    price:active.reduce((s,o)=>s+(o.priceTotal||0),0),
+    active
+  };
+}
+
+function compareBadge(current,previous){
+  if(previous===0)return'';
+  const diff=((current-previous)/previous*100);
+  const cls=diff>2?'compare-up':diff<-2?'compare-down':'compare-flat';
+  const arrow=diff>2?'↑':diff<-2?'↓':'→';
+  return`<span class="compare-badge ${cls}">${arrow} ${Math.abs(diff).toFixed(0)}% vs anterior</span>`;
+}
+
+async function renderCumulative(container){
+  const range=cumulativeRange;
+  let from=range.from,to=range.to;
+  if(range.type!=='all'&&range.type!=='custom'){
+    const r=getRangeForType(range.type,range.refDate||new Date());
+    from=r.from;to=r.to;
+  }
+
+  const allOrders=await getOrders();
+  const orders=(from&&to)?allOrders.filter(o=>{const d=toDate(o.deliveryAt);return d&&d>=from&&d<=to;}):allOrders;
+  const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
+
+  const controlsHtml=`<div class="cumulative-controls">
+    <select class="range-select" id="rangeType">
+      <option value="all" ${range.type==='all'?'selected':''}>Todo</option>
+      <option value="day" ${range.type==='day'?'selected':''}>Día</option>
+      <option value="week" ${range.type==='week'?'selected':''}>Semana</option>
+      <option value="month" ${range.type==='month'?'selected':''}>Mes</option>
+      <option value="year" ${range.type==='year'?'selected':''}>Año</option>
+      <option value="custom" ${range.type==='custom'?'selected':''}>Rango personalizado</option>
+    </select>
+    <div class="range-inputs" id="customRangeInputs" style="display:${range.type==='custom'?'flex':'none'}">
+      <input type="date" id="rangeFrom" value="${range.from?range.from.toISOString().slice(0,10):''}">
+      <span style="color:var(--text-tertiary);font-size:12px">a</span>
+      <input type="date" id="rangeTo" value="${range.to?range.to.toISOString().slice(0,10):''}">
+    </div>
+    <label class="range-compare-toggle"><input type="checkbox" id="compareToggle" ${range.compare?'checked':''}> Comparar con período anterior</label>
+  </div>`;
+
+  if(!active.length){container.innerHTML=controlsHtml+`<div class="empty-state"><p>Sin datos en este rango</p></div>`;bindCumulativeControls(container);return;}
+
   const totalPax=active.reduce((s,o)=>s+(o.pax||0),0);
   const totalPrice=active.reduce((s,o)=>s+(o.priceTotal||0),0);
   const totalFood=active.reduce((s,o)=>s+(o.priceFood||0),0);
   const totalDrink=active.reduce((s,o)=>s+(o.priceDrinks||0),0);
   const totalTrans=active.reduce((s,o)=>s+(o.priceTransport||0),0);
   const totalStaff=active.reduce((s,o)=>s+(o.priceStaff||0),0);
+
+  // Comparativa
+  let compareCount='',comparePax='',comparePrice='';
+  if(range.compare&&from&&to){
+    const prev=getPreviousPeriod(range.type,from,to);
+    const prevOrders=allOrders.filter(o=>{const d=toDate(o.deliveryAt);return d&&d>=prev.from&&d<=prev.to;});
+    const prevStats=computeStats(prevOrders);
+    compareCount=compareBadge(active.length,prevStats.count);
+    comparePax=compareBadge(totalPax,prevStats.pax);
+    comparePrice=compareBadge(totalPrice,prevStats.price);
+  }
+
   const byType={};
   active.forEach(o=>{const t=o.cateringType||'Otros';if(!byType[t])byType[t]={count:0,pax:0,price:0};byType[t].count++;byType[t].pax+=o.pax||0;byType[t].price+=o.priceTotal||0;});
   const byCompany={};
@@ -679,10 +774,11 @@ async function renderCumulative(container){
   const maxCP=Math.max(...Object.values(byCompany).map(v=>v.price))||1;
   const typeRows=Object.entries(byType).sort((a,b)=>b[1].pax-a[1].pax).map(([t,v])=>`<div class="bar-row"><span class="bar-label" title="${t}">${t}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.pax/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.pax} pax</span></div>`).join('');
   const compRows=Object.entries(byCompany).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCP*100).toFixed(0)}%"></div></div><span class="bar-val">${fmtMoney(v.price)}</span></div>`).join('');
-  container.innerHTML=`<div class="kpi-grid">
-    <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Importe total sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div></div>
+
+  container.innerHTML=controlsHtml+`<div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${compareCount}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div><div class="kpi-sub">${comparePax}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Importe total sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div><div class="kpi-sub">${comparePrice}</div></div>
     <div class="kpi-card"><div class="kpi-label">Media pax / servicio</div><div class="kpi-value">${Math.round(totalPax/active.length)}</div></div>
   </div>
   <div class="stats-grid">
@@ -701,6 +797,41 @@ async function renderCumulative(container){
       <div class="bar-row"><span class="bar-label">Con comentario</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(active.filter(o=>o.userComment||o.internalComment).length/active.length*100).toFixed(0)}%"></div></div><span class="bar-val">${active.filter(o=>o.userComment||o.internalComment).length}</span></div>
     </div></div>
   </div>`;
+  bindCumulativeControls(container);
+}
+
+function bindCumulativeControls(container){
+  const sel=container.querySelector('#rangeType');
+  const customInputs=container.querySelector('#customRangeInputs');
+  const fromInput=container.querySelector('#rangeFrom');
+  const toInput=container.querySelector('#rangeTo');
+  const compareToggle=container.querySelector('#compareToggle');
+  if(!sel)return;
+
+  sel.addEventListener('change',()=>{
+    cumulativeRange.type=sel.value;
+    if(sel.value==='custom'){
+      customInputs.style.display='flex';
+      if(!cumulativeRange.from)cumulativeRange.from=startOfMonth(new Date());
+      if(!cumulativeRange.to)cumulativeRange.to=endOfMonth(new Date());
+    } else {
+      customInputs.style.display='none';
+    }
+    renderCumulative(container);
+  });
+
+  if(fromInput)fromInput.addEventListener('change',()=>{
+    cumulativeRange.from=new Date(fromInput.value+'T00:00:00');
+    renderCumulative(container);
+  });
+  if(toInput)toInput.addEventListener('change',()=>{
+    cumulativeRange.to=new Date(toInput.value+'T23:59:59');
+    renderCumulative(container);
+  });
+  if(compareToggle)compareToggle.addEventListener('change',()=>{
+    cumulativeRange.compare=compareToggle.checked;
+    renderCumulative(container);
+  });
 }
 
 async function renderView(view,container,date=new Date()){
