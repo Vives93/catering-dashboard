@@ -489,7 +489,7 @@ function buildAlerts(orders,config){
     const bRoom=(b.room||b.buildingRoom||'').toLowerCase().trim();
     if(aRoom&&aRoom===bRoom)continue; // eso ya es solapamiento, no proximidad
     const gap=toDate(b.deliveryAt)-toDate(a.deliveryAt);
-    if(gap>0&&gap<minGap){
+    if(gap>=0&&gap<minGap){
       const key=`${a.orderId}|${b.orderId}`;
       if(flaggedPairs.has(key))continue;
       flaggedPairs.add(key);
@@ -833,10 +833,48 @@ async function renderCumulative(container){
   active.forEach(o=>{const t=o.cateringType||'Otros';if(!byType[t])byType[t]={count:0,pax:0,price:0};byType[t].count++;byType[t].pax+=o.pax||0;byType[t].price+=o.priceTotal||0;});
   const byCompany={};
   active.forEach(o=>{const c=o.company||'Sin empresa';if(!byCompany[c])byCompany[c]={count:0,pax:0,price:0};byCompany[c].count++;byCompany[c].pax+=o.pax||0;byCompany[c].price+=o.priceTotal||0;});
+
+  // Top clientes (por persona, no por empresa)
+  const byCustomer={};
+  active.forEach(o=>{const c=o.customerName||'Sin nombre';if(!byCustomer[c])byCustomer[c]={count:0,pax:0,price:0};byCustomer[c].count++;byCustomer[c].pax+=o.pax||0;byCustomer[c].price+=o.priceTotal||0;});
+
+  // Top salas
+  const byRoomStat={};
+  active.forEach(o=>{const r=o.room||o.buildingRoom||'Sin sala';if(!byRoomStat[r])byRoomStat[r]={count:0,pax:0,price:0};byRoomStat[r].count++;byRoomStat[r].pax+=o.pax||0;byRoomStat[r].price+=o.priceTotal||0;});
+
+  // Franja horaria
+  const hourSlots=[
+    {label:'Antes de las 9',test:h=>h<9},
+    {label:'9-10h',test:h=>h>=9&&h<10},
+    {label:'10-11h',test:h=>h>=10&&h<11},
+    {label:'11-12h',test:h=>h>=11&&h<12},
+    {label:'12-13h',test:h=>h>=12&&h<13},
+    {label:'13-14h',test:h=>h>=13&&h<14},
+    {label:'14-15h',test:h=>h>=14&&h<15},
+    {label:'15-16h',test:h=>h>=15&&h<16},
+    {label:'16h+',test:h=>h>=16},
+  ];
+  const byHour=hourSlots.map(slot=>({label:slot.label,count:0}));
+  let noHourCount=0;
+  active.forEach(o=>{
+    const d=toDate(o.deliveryAt);
+    if(!d){noHourCount++;return;}
+    const h=d.getHours();
+    const idx=hourSlots.findIndex(s=>s.test(h));
+    if(idx>=0)byHour[idx].count++;else noHourCount++;
+  });
+
   const maxTP=Math.max(...Object.values(byType).map(v=>v.pax))||1;
   const maxCP=Math.max(...Object.values(byCompany).map(v=>v.price))||1;
+  const maxCustP=Math.max(...Object.values(byCustomer).map(v=>v.price))||1;
+  const maxRoomC=Math.max(...Object.values(byRoomStat).map(v=>v.count))||1;
+  const maxHourC=Math.max(...byHour.map(v=>v.count))||1;
+
   const typeRows=Object.entries(byType).sort((a,b)=>b[1].pax-a[1].pax).map(([t,v])=>`<div class="bar-row"><span class="bar-label" title="${t}">${t}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.pax/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.pax} pax</span></div>`).join('');
   const compRows=Object.entries(byCompany).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCP*100).toFixed(0)}%"></div></div><span class="bar-val">${fmtMoney(v.price)}</span></div>`).join('');
+  const custRows=Object.entries(byCustomer).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCustP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
+  const roomRows=Object.entries(byRoomStat).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([r,v])=>`<div class="bar-row"><span class="bar-label" title="${r}">${r}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxRoomC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
+  const hourRows=byHour.map(v=>`<div class="bar-row"><span class="bar-label">${v.label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count}</span></div>`).join('')+(noHourCount>0?`<div class="bar-row"><span class="bar-label">Sin hora</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(noHourCount/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${noHourCount}</span></div>`:'');
 
   container.innerHTML=controlsHtml+`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${compareCount}</div></div>
@@ -847,6 +885,9 @@ async function renderCumulative(container){
   <div class="stats-grid">
     <div class="stat-card"><h3>Pax por tipo de servicio</h3><div class="bar-chart">${typeRows}</div></div>
     <div class="stat-card"><h3>Importe por empresa (top 10)</h3><div class="bar-chart">${compRows}</div></div>
+    <div class="stat-card"><h3>Clientes que más consumen (top 10)</h3><div class="bar-chart">${custRows}</div></div>
+    <div class="stat-card"><h3>Salas con más pedidos (top 10)</h3><div class="bar-chart">${roomRows}</div></div>
+    <div class="stat-card"><h3>Demanda por franja horaria</h3><div class="bar-chart">${hourRows}</div></div>
     <div class="stat-card"><h3>Desglose de importes</h3><div class="bar-chart">
       <div class="bar-row"><span class="bar-label">Alimentos</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${totalPrice?(totalFood/totalPrice*100).toFixed(0):0}%"></div></div><span class="bar-val">${fmtMoney(totalFood)}</span></div>
       <div class="bar-row"><span class="bar-label">Bebidas</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${totalPrice?(totalDrink/totalPrice*100).toFixed(0):0}%"></div></div><span class="bar-val">${fmtMoney(totalDrink)}</span></div>
