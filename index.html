@@ -494,7 +494,7 @@ function renderTimeline(orders){
     const d=toDate(o.deliveryAt);
     const hPos=((d.getHours()+d.getMinutes()/60)-minH)/span*100;
     const cls=[typeClass(o),overlapIds.has(o.orderId)?'overlap':''].filter(Boolean).join(' ');
-    const label=`${o.customerName} · ${o.room||o.buildingRoom} · ${o.pax} pax`;
+    const label=`${o.customerName} · ${o.cateringType||'Otros'} · ${o.room||o.buildingRoom} · ${o.pax} pax`;
     return`<div class="tl-row"><span class="tl-time">${fmtTime(o.deliveryAt)}</span><div class="tl-track"><div class="tl-bar ${cls}" style="left:${hPos.toFixed(1)}%;width:${Math.max(15,60-hPos*.3)}%" title="${label}">${label}</div></div></div>`;
   }).join('');
   let axisTicks='';
