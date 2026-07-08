@@ -17,6 +17,7 @@
   --pending-bg:#FEF3E2;--pending-fg:#7A4410;
   --alert-red-bg:#FDEDED;--alert-red-border:#F5A5A5;--alert-red-fg:#7A1F1F;
   --alert-amber-bg:#FEF3E2;--alert-amber-border:#FAC97A;--alert-amber-fg:#7A4410;
+  --alert-purple-bg:#F3E8FD;--alert-purple-border:#C9A0F5;--alert-purple-fg:#5B2E8C;
   --radius-sm:4px;--radius-md:8px;--radius-lg:12px;
   --font-sans:'Inter',system-ui,sans-serif;--font-mono:'JetBrains Mono',monospace;
 }
@@ -29,6 +30,7 @@
   --pending-bg:#2A1F0E;--pending-fg:#FAC97A;
   --alert-red-bg:#220E0E;--alert-red-border:#8B3030;--alert-red-fg:#F5A5A5;
   --alert-amber-bg:#2A1F0E;--alert-amber-border:#8B6020;--alert-amber-fg:#FAC97A;
+  --alert-purple-bg:#241A30;--alert-purple-border:#7A4FA8;--alert-purple-fg:#D9BBF5;
 }
 .btn-theme{background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:6px 10px;cursor:pointer;font-size:15px;color:var(--text-secondary);transition:all .15s}
 .btn-theme:hover{border-color:var(--text-primary);color:var(--text-primary)}
@@ -65,6 +67,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 .alert svg{flex-shrink:0;margin-top:1px}
 .alert-red{background:var(--alert-red-bg);border-color:var(--alert-red-border);color:var(--alert-red-fg)}
 .alert-amber{background:var(--alert-amber-bg);border-color:var(--alert-amber-border);color:var(--alert-amber-fg)}
+.alert-purple{background:var(--alert-purple-bg);border-color:var(--alert-purple-border);color:var(--alert-purple-fg)}
 .alert-new{background:var(--ok-bg);border-color:#A3D977;color:#2D6A0A}
 .section-label{font-size:11px;font-weight:500;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
 .timeline-wrap{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px;overflow-x:auto}
@@ -388,7 +391,8 @@ function mapRow(raw){
     deliveryAt:deliveryAt?Timestamp.fromDate(deliveryAt):null,
     deliveryAtISO:deliveryAt?deliveryAt.toISOString():null,
     setupTime:raw['hora de montaje']||'',startTime:raw['hora de inicio']||'',
-    teardownTime:raw['hora de desmontaje']||'',pax,
+    teardownTime:raw['hora de desmontaje']||'',
+    pickupTime:raw['hora de recogida']||'',pax,
     cateringType:raw['tipo de catering']||'',
     cateringCategory:categorizeCatering(raw['tipo de catering']||''),
     orderStatus,statusCode:raw['estado']||'',
@@ -495,7 +499,7 @@ function buildAlerts(orders,config){
       flaggedPairs.add(key);
       const sameBuilding=a.center&&b.center&&a.center===b.center;
       const locNote=sameBuilding?`mismo edificio (${a.center})`:`${a.center||'—'} → ${b.center||'—'}`;
-      alerts.push({type:'amber',msg:`Entregas próximas · ${fmtTime(a.deliveryAt)} y ${fmtTime(b.deliveryAt)} (${Math.round(gap/60000)} min) — ${a.customerName} / ${b.customerName} · ${locNote} · verificar personal disponible`});
+      alerts.push({type:'purple',msg:`Entregas próximas · ${fmtTime(a.deliveryAt)} y ${fmtTime(b.deliveryAt)} (${Math.round(gap/60000)} min) — ${a.customerName} / ${b.customerName} · ${locNote} · verificar personal disponible`});
     }
   }
 
@@ -504,7 +508,9 @@ function buildAlerts(orders,config){
 
 function renderAlerts(alerts){
   if(!alerts.length)return'';
-  return`<div class="alerts">${alerts.map(a=>`<div class="alert alert-${a.type==='new'?'new':a.type==='red'?'red':'amber'}">${a.type==='new'?ICON_OK:a.type==='red'?ICON_WARN:ICON_INFO}<span>${a.msg}</span></div>`).join('')}</div>`;
+  const cls=a=>a.type==='new'?'new':a.type==='red'?'red':a.type==='purple'?'purple':'amber';
+  const icon=a=>a.type==='new'?ICON_OK:a.type==='red'?ICON_WARN:ICON_INFO;
+  return`<div class="alerts">${alerts.map(a=>`<div class="alert alert-${cls(a)}">${icon(a)}<span>${a.msg}</span></div>`).join('')}</div>`;
 }
 
 function renderKPIs(orders,config){
@@ -566,6 +572,7 @@ function renderOrderCard(o,showNew=true){
   const reviewBtn=(isPendingReview&&showNew)?`<button onclick="markReviewed('${o.orderId}')" class="pill" style="background:var(--bg-hover);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer" title="Marcar como revisado">✓ Revisar</button>`:'';
   const loc=[o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'—';
   const teardown=o.teardownTime?` – ${o.teardownTime}`:'';
+  const pickupInfo=o.pickupTime?`<span class="meta-item">📦 Recogida: ${o.pickupTime}</span>`:'';
   const prices=[];
   if(o.priceFood)prices.push(`Alim. ${fmtMoney(o.priceFood)}`);
   if(o.priceDrinks)prices.push(`Beb. ${fmtMoney(o.priceDrinks)}`);
@@ -580,6 +587,7 @@ function renderOrderCard(o,showNew=true){
     <div class="order-meta">
       ${o.deliveryAt?`<span class="meta-item">🕐 ${fmtTime(o.deliveryAt)}${teardown}</span>`:''}
       ${o.pax&&!paxPill?`<span class="meta-item">👥 ${o.pax} pax</span>`:''}
+      ${pickupInfo}
       ${priceDetail}
       ${o.company?`<span class="meta-item" style="color:var(--text-tertiary)">${o.company}</span>`:''}
       ${o.hasDeliveryPhoto?`<span class="photo-dot"><span class="dot dot-yes"></span> foto entrega</span>`:''}
@@ -831,9 +839,6 @@ async function renderCumulative(container){
 
   const byType={};
   active.forEach(o=>{const t=o.cateringType||'Otros';if(!byType[t])byType[t]={count:0,pax:0,price:0};byType[t].count++;byType[t].pax+=o.pax||0;byType[t].price+=o.priceTotal||0;});
-  const byCompany={};
-  active.forEach(o=>{const c=o.company||'Sin empresa';if(!byCompany[c])byCompany[c]={count:0,pax:0,price:0};byCompany[c].count++;byCompany[c].pax+=o.pax||0;byCompany[c].price+=o.priceTotal||0;});
-
   // Top clientes (por persona, no por empresa)
   const byCustomer={};
   active.forEach(o=>{const c=o.customerName||'Sin nombre';if(!byCustomer[c])byCustomer[c]={count:0,pax:0,price:0};byCustomer[c].count++;byCustomer[c].pax+=o.pax||0;byCustomer[c].price+=o.priceTotal||0;});
@@ -865,13 +870,11 @@ async function renderCumulative(container){
   });
 
   const maxTP=Math.max(...Object.values(byType).map(v=>v.pax))||1;
-  const maxCP=Math.max(...Object.values(byCompany).map(v=>v.price))||1;
   const maxCustP=Math.max(...Object.values(byCustomer).map(v=>v.price))||1;
   const maxRoomC=Math.max(...Object.values(byRoomStat).map(v=>v.count))||1;
   const maxHourC=Math.max(...byHour.map(v=>v.count))||1;
 
   const typeRows=Object.entries(byType).sort((a,b)=>b[1].pax-a[1].pax).map(([t,v])=>`<div class="bar-row"><span class="bar-label" title="${t}">${t}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.pax/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.pax} pax</span></div>`).join('');
-  const compRows=Object.entries(byCompany).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCP*100).toFixed(0)}%"></div></div><span class="bar-val">${fmtMoney(v.price)}</span></div>`).join('');
   const custRows=Object.entries(byCustomer).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCustP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
   const roomRows=Object.entries(byRoomStat).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([r,v])=>`<div class="bar-row"><span class="bar-label" title="${r}">${r}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxRoomC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
   const hourRows=byHour.map(v=>`<div class="bar-row"><span class="bar-label">${v.label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count}</span></div>`).join('')+(noHourCount>0?`<div class="bar-row"><span class="bar-label">Sin hora</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(noHourCount/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${noHourCount}</span></div>`:'');
@@ -884,7 +887,6 @@ async function renderCumulative(container){
   </div>
   <div class="stats-grid">
     <div class="stat-card"><h3>Pax por tipo de servicio</h3><div class="bar-chart">${typeRows}</div></div>
-    <div class="stat-card"><h3>Importe por empresa (top 10)</h3><div class="bar-chart">${compRows}</div></div>
     <div class="stat-card"><h3>Clientes que más consumen (top 10)</h3><div class="bar-chart">${custRows}</div></div>
     <div class="stat-card"><h3>Salas con más pedidos (top 10)</h3><div class="bar-chart">${roomRows}</div></div>
     <div class="stat-card"><h3>Demanda por franja horaria</h3><div class="bar-chart">${hourRows}</div></div>
@@ -1000,7 +1002,7 @@ async function renderLogic(container){
   </div>
 
   <div class="logic-section">
-    <h3>🟡 Entregas próximas (aunque no coincidan de sala)</h3>
+    <h3>🟣 Entregas próximas (aunque no coincidan de sala)</h3>
     <p>Dos entregas programadas con menos de <strong>${config.minGapMinutes || 20} minutos</strong> de diferencia, sin importar si son en la misma sala o edificio. No es un conflicto directo, pero puede significar que el mismo personal tenga que cubrir ambas entregas casi a la vez — especialmente si son en edificios distintos y hay que desplazarse.</p>
   </div>
 
