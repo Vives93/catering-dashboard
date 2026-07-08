@@ -329,6 +329,7 @@ async function getConfig() {
 
 // ── HELPERS ───────────────────────────────────────────────────────
 function toDate(ts){if(!ts)return null;if(ts instanceof Date)return ts;if(ts.seconds)return new Date(ts.seconds*1000);return new Date(ts);}
+function localISODate(d){const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0');const day=String(d.getDate()).padStart(2,'0');return`${y}-${m}-${day}`;}
 function fmtTime(ts){const d=toDate(ts);if(!d)return'--';return d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});}
 function fmtDateShort(ts){const d=toDate(ts);if(!d)return'--';return d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});}
 function fmtMoney(n){return n?n.toLocaleString('es-ES',{minimumFractionDigits:0,maximumFractionDigits:0})+'€':'—';}
@@ -614,7 +615,7 @@ async function renderWeek(container,now=new Date()){
   const[orders,config]=await Promise.all([getOrders({from:startOfWeek(now),to:endOfWeek(now)}),getConfig()]);
   if(!orders.length){container.innerHTML=`<div class="empty-state"><p>Sin pedidos esta semana</p></div>`;return;}
   const byDay={};
-  orders.forEach(o=>{const d=toDate(o.deliveryAt);if(!d)return;const key=d.toISOString().slice(0,10);if(!byDay[key])byDay[key]=[];byDay[key].push(o);});
+  orders.forEach(o=>{const d=toDate(o.deliveryAt);if(!d)return;const key=localISODate(d);if(!byDay[key])byDay[key]=[];byDay[key].push(o);});
   const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
   const totalPax=active.reduce((s,o)=>s+(o.pax||0),0);
   const totalPrice=active.reduce((s,o)=>s+(o.priceTotal||0),0);
@@ -660,7 +661,7 @@ async function renderWeek(container,now=new Date()){
   }
 
   // Pedidos por día
-  const todayKey=now.toISOString().slice(0,10);
+  const todayKey=localISODate(now);
   html+=`<p class="section-label">Pedidos por día</p><div class="period-grid">`;
   Object.keys(byDay).sort().forEach(key=>{
     const dayOrders=byDay[key];
@@ -695,10 +696,19 @@ async function renderMonth(container,now=new Date()){
   orders.forEach(o=>{
     const d=toDate(o.deliveryAt);if(!d)return;
     const ws=startOfWeek(d);
-    const key=ws.toISOString().slice(0,10);
+    const key=localISODate(ws);
     if(!byWeek[key])byWeek[key]=[];
     byWeek[key].push(o);
   });
+
+  // Generar TODAS las semanas del calendario que tocan este mes, aunque estén vacías
+  const monthStart=startOfMonth(now),monthEnd=endOfMonth(now);
+  const allWeekKeys=[];
+  let cursor=startOfWeek(monthStart);
+  while(cursor<=monthEnd){
+    allWeekKeys.push(localISODate(cursor));
+    cursor=new Date(cursor);cursor.setDate(cursor.getDate()+7);
+  }
 
   let html=`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Servicios mes</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${cancelled.length} cancelados</div></div>
@@ -707,8 +717,8 @@ async function renderMonth(container,now=new Date()){
     <div class="kpi-card"><div class="kpi-label">Semanas con servicio</div><div class="kpi-value">${Object.keys(byWeek).length}</div></div>
   </div><div class="period-grid">`;
 
-  Object.keys(byWeek).sort().forEach(key=>{
-    const weekOrders=byWeek[key];
+  allWeekKeys.forEach(key=>{
+    const weekOrders=byWeek[key]||[];
     const weekActive=weekOrders.filter(o=>o.orderStatus!=='CANCELADO');
     const weekPax=weekActive.reduce((s,o)=>s+(o.pax||0),0);
     const weekPrice=weekActive.reduce((s,o)=>s+(o.priceTotal||0),0);
@@ -716,12 +726,13 @@ async function renderMonth(container,now=new Date()){
     const we=new Date(ws);we.setDate(we.getDate()+4);
     const label=`${ws.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${we.toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`;
     const weekHasAlert=weekActive.some(o=>o.pax>=config.paxAlertIndividual||o.userComment||o.internalComment);
+    const isEmpty=weekOrders.length===0;
     html+=`<div class="period-day">
-      <div class="period-day-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+      <div class="period-day-header" onclick="this.nextElementSibling.classList.toggle('collapsed')" style="${isEmpty?'opacity:.5':''}">
         <span class="period-day-title">Semana ${label}${weekHasAlert?' <span style="color:#C45A00;font-size:11px">⚑</span>':''}</span>
-        <span class="period-day-meta"><span>${weekActive.length} servicios</span><span>${weekPax} pax</span><span>${fmtMoney(weekPrice)}</span></span>
+        <span class="period-day-meta">${isEmpty?'<span>sin pedidos</span>':`<span>${weekActive.length} servicios</span><span>${weekPax} pax</span><span>${fmtMoney(weekPrice)}</span>`}</span>
       </div>
-      <div class="period-day-body collapsed">${weekOrders.map(o=>renderOrderCard(o,false)).join('')}</div>
+      <div class="period-day-body collapsed">${weekOrders.length?weekOrders.map(o=>renderOrderCard(o,false)).join(''):'<div style="padding:8px 0;font-size:12px;color:var(--text-tertiary)">Sin pedidos esta semana</div>'}</div>
     </div>`;
   });
   html+='</div>';
@@ -810,9 +821,9 @@ async function renderCumulative(container){
       <button class="date-nav-btn" id="cumNext">▶</button>
     </div>`:''}
     <div class="range-inputs" id="customRangeInputs" style="display:${range.type==='custom'?'flex':'none'}">
-      <input type="date" id="rangeFrom" value="${range.from?range.from.toISOString().slice(0,10):''}">
+      <input type="date" id="rangeFrom" value="${range.from?localISODate(range.from):''}">
       <span style="color:var(--text-tertiary);font-size:12px">a</span>
-      <input type="date" id="rangeTo" value="${range.to?range.to.toISOString().slice(0,10):''}">
+      <input type="date" id="rangeTo" value="${range.to?localISODate(range.to):''}">
     </div>
     <label class="range-compare-toggle"><input type="checkbox" id="compareToggle" ${range.compare?'checked':''}> Comparar con período anterior</label>
   </div>`;
@@ -1080,7 +1091,7 @@ document.getElementById('btnNext').addEventListener('click',()=>{
 document.getElementById('dateNavLabel').addEventListener('click',()=>{
   const input=document.getElementById('datePickerInput');
   if(!input)return;
-  input.valueAsDate=selectedDate;
+  input.value=localISODate(selectedDate);
   try{input.showPicker();}catch(e){}
   input.addEventListener('change',function handler(){
     if(this.value){selectedDate=new Date(this.value+'T12:00:00');updateDateLabel();renderView(currentView,mainContent,selectedDate);}
