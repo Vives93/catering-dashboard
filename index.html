@@ -140,6 +140,14 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 .bar-val{width:60px;text-align:right;color:var(--text-secondary);font-family:var(--font-mono);font-size:11px}
 .empty-state{text-align:center;padding:60px 20px;color:var(--text-tertiary)}
 .empty-state p{font-size:13px;margin-top:8px}
+.logic-section{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:20px;margin-bottom:14px}
+.logic-section h3{font-size:14px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.logic-section p{font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:8px}
+.logic-rule{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--border-soft)}
+.logic-rule:first-of-type{border-top:none}
+.logic-rule-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.logic-rule-text{font-size:12.5px;color:var(--text-secondary);line-height:1.5}
+.logic-rule-text strong{color:var(--text-primary);font-weight:500}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
 .modal-overlay[hidden]{display:none}
 .modal{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--border);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.12)}
@@ -180,12 +188,14 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
     <div class="topbar-left">
       <span class="logo">Catering</span>
       <span class="topbar-date" id="currentDate"></span>
+      <span class="topbar-date" id="lastImportLabel" style="color:var(--text-tertiary)"></span>
     </div>
     <nav class="tabs" id="mainTabs">
       <button class="tab active" data-view="today">Hoy</button>
       <button class="tab" data-view="week">Semana</button>
       <button class="tab" data-view="month">Mes</button>
       <button class="tab" data-view="cumulative">Acumulado</button>
+      <button class="tab" data-view="logic">Cómo funciona</button>
     </nav>
     <div class="topbar-actions">
       <div class="date-nav" id="dateNav">
@@ -310,8 +320,8 @@ async function getExistingOrderIds() {
 async function getConfig() {
   try{
     const snap=await getDoc(doc(db,'catering_config','settings'));
-    return snap.exists()?snap.data():{paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100};
-  }catch(e){return {paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100};}
+    return snap.exists()?snap.data():{paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100,minGapMinutes:20,serviceCountAlert:15};
+  }catch(e){return {paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100,minGapMinutes:20,serviceCountAlert:15};}
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────
@@ -432,26 +442,63 @@ const ICON_OK=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" strok
 function buildAlerts(orders,config){
   const alerts=[];
   const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
-  const newOnes=active.filter(o=>o.isNew);
+  const newOnes=active.filter(o=>o.isNew&&!o.reviewed);
   if(newOnes.length>0)alerts.push({type:'new',msg:`${newOnes.length} pedido${newOnes.length>1?'s':''} nuevo${newOnes.length>1?'s':''} en esta importación`});
+
+  // Alertas individuales por pax (montaje / refuerzo puntual)
   active.forEach(o=>{
-    if(o.pax>=config.paxAlertHigh)alerts.push({type:'red',msg:`Carga alta · ${o.customerName} (${fmtTime(o.deliveryAt)}) — ${o.pax} pax · valorar refuerzo de producción`});
+    if(o.pax>=config.paxAlertHigh)alerts.push({type:'red',msg:`Montaje grande · ${o.customerName} (${fmtTime(o.deliveryAt)}) — ${o.pax} pax · valorar 2 personas para el montaje`});
     else if(o.pax>=config.paxAlertIndividual)alerts.push({type:'amber',msg:`Volumen elevado · ${o.customerName} (${fmtTime(o.deliveryAt)}) — ${o.pax} pax`});
   });
+
+  // Carga total del día por pax acumulados
   const totalPax=active.reduce((s,o)=>s+(o.pax||0),0);
   if(totalPax>=config.paxAlertDayTotal)alerts.push({type:'red',msg:`Producción total del día: ${totalPax} pax — carga elevada acumulada`});
+
+  // Carga total del día por NÚMERO de servicios (aunque sean pequeños)
+  const serviceThreshold=config.serviceCountAlert||15;
+  if(active.length>=serviceThreshold)alerts.push({type:'red',msg:`${active.length} servicios hoy — volumen alto de pedidos, aunque sean pequeños, valorar refuerzo de personal`});
+
+  // Solapamientos — comparamos por SALA (campo fiable), ignorando edificio que suele venir vacío
   const byRoom={};
-  active.forEach(o=>{const key=`${o.building}|${o.room}`.toLowerCase();if(!byRoom[key])byRoom[key]=[];byRoom[key].push(o);});
+  active.forEach(o=>{
+    const roomKey=(o.room||o.buildingRoom||'').toLowerCase().trim();
+    if(!roomKey)return;
+    if(!byRoom[roomKey])byRoom[roomKey]=[];
+    byRoom[roomKey].push(o);
+  });
   Object.entries(byRoom).forEach(([,group])=>{
     if(group.length<2)return;
     for(let i=0;i<group.length;i++){for(let j=i+1;j<group.length;j++){
       const a=group[i],b=group[j];
       const aS=toDate(a.deliveryAt),bS=toDate(b.deliveryAt);
       if(aS&&bS&&Math.abs(aS-bS)<60*60*1000){
-        alerts.push({type:'red',msg:`Solapamiento · ${fmtTime(a.deliveryAt)} — 2 servicios en ${a.building} · ${a.room} al mismo tiempo`});return;
+        const loc=a.room?`sala ${a.room}`:a.buildingRoom;
+        alerts.push({type:'red',msg:`Solapamiento · ${fmtTime(a.deliveryAt)} — ${a.customerName} y ${b.customerName} en ${loc}`});
       }
     }}
   });
+
+  // Entregas muy próximas entre sí (aunque sean en salas/edificios distintos) — puede requerir el mismo personal
+  const minGap=(config.minGapMinutes||20)*60*1000;
+  const sortedByTime=active.filter(o=>toDate(o.deliveryAt)).sort((a,b)=>toDate(a.deliveryAt)-toDate(b.deliveryAt));
+  const flaggedPairs=new Set();
+  for(let i=0;i<sortedByTime.length-1;i++){
+    const a=sortedByTime[i],b=sortedByTime[i+1];
+    const aRoom=(a.room||a.buildingRoom||'').toLowerCase().trim();
+    const bRoom=(b.room||b.buildingRoom||'').toLowerCase().trim();
+    if(aRoom&&aRoom===bRoom)continue; // eso ya es solapamiento, no proximidad
+    const gap=toDate(b.deliveryAt)-toDate(a.deliveryAt);
+    if(gap>0&&gap<minGap){
+      const key=`${a.orderId}|${b.orderId}`;
+      if(flaggedPairs.has(key))continue;
+      flaggedPairs.add(key);
+      const sameBuilding=a.center&&b.center&&a.center===b.center;
+      const locNote=sameBuilding?`mismo edificio (${a.center})`:`${a.center||'—'} → ${b.center||'—'}`;
+      alerts.push({type:'amber',msg:`Entregas próximas · ${fmtTime(a.deliveryAt)} y ${fmtTime(b.deliveryAt)} (${Math.round(gap/60000)} min) — ${a.customerName} / ${b.customerName} · ${locNote} · verificar personal disponible`});
+    }
+  }
+
   return alerts;
 }
 
@@ -505,16 +552,18 @@ function renderTimeline(orders){
 function renderOrderCard(o,showNew=true){
   const isCancelled=o.orderStatus==='CANCELADO';
   const hasComment=!!(o.userComment||o.internalComment);
+  const isPendingReview=o.isNew&&!o.reviewed;
   const classes=['order-card'];
   if(isCancelled)classes.push('cancelled');
   if(hasComment)classes.push('has-comment');
-  if(o.isNew&&showNew)classes.push('is-new');
+  if(isPendingReview&&showNew)classes.push('is-new');
   let paxPill='';
   if(!isCancelled&&o.pax){
     if(o.pax>=50)paxPill=`<span class="pill pill-pax-red">${o.pax} pax</span>`;
     else if(o.pax>=35)paxPill=`<span class="pill pill-pax-amber">${o.pax} pax</span>`;
   }
-  const newBadge=(o.isNew&&showNew)?`<span class="pill pill-new">Nuevo</span>`:'';
+  const newBadge=(isPendingReview&&showNew)?`<span class="pill pill-new">Nuevo</span>`:'';
+  const reviewBtn=(isPendingReview&&showNew)?`<button onclick="markReviewed('${o.orderId}')" class="pill" style="background:var(--bg-hover);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer" title="Marcar como revisado">✓ Revisar</button>`:'';
   const loc=[o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'—';
   const teardown=o.teardownTime?` – ${o.teardownTime}`:'';
   const prices=[];
@@ -525,8 +574,8 @@ function renderOrderCard(o,showNew=true){
   const priceDetail=prices.length?`<span class="meta-item" title="${prices.join(' | ')}">${fmtMoney(o.priceTotal)}</span>`:'';
   return`<div class="${classes.join(' ')}">
     <div class="order-top">
-      <div class="order-who"><span class="order-name">${o.customerName||'—'}</span><span class="order-loc">${loc}</span></div>
-      <div class="order-pills">${newBadge}${typePill(o)}${paxPill}${statusPill(o)}${o.isLate?`<span class="pill pill-pax-red">⚑ ${o.lateMinutes?o.lateMinutes+' min':'Tarde'}</span>`:''}</div>
+      <div class="order-who"><span class="order-name">${o.customerName||'—'}</span><span class="order-loc">Nº ${o.orderId} · ${loc}</span></div>
+      <div class="order-pills">${newBadge}${reviewBtn}${typePill(o)}${paxPill}${statusPill(o)}${o.isLate?`<span class="pill pill-pax-red">⚑ ${o.lateMinutes?o.lateMinutes+' min':'Tarde'}</span>`:''}</div>
     </div>
     <div class="order-meta">
       ${o.deliveryAt?`<span class="meta-item">🕐 ${fmtTime(o.deliveryAt)}${teardown}</span>`:''}
@@ -876,11 +925,63 @@ async function renderView(view,container,date=new Date()){
     if(view==='today')await renderToday(container,date);
     else if(view==='week')await renderWeek(container,date);
     else if(view==='month')await renderMonth(container,date);
+    else if(view==='logic')await renderLogic(container);
     else await renderCumulative(container);
   }catch(e){
     container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${e.message}</p></div>`;
     console.error(e);
   }
+}
+
+async function renderLogic(container){
+  const config=await getConfig();
+  container.innerHTML=`
+  <div class="logic-section">
+    <h3>📋 Qué hace esta herramienta</h3>
+    <p>Este panel analiza los pedidos de catering importados y detecta automáticamente situaciones que requieren atención: solapamientos, volúmenes altos de producción, y entregas que pueden necesitar personal adicional. El objetivo es que, de un vistazo, sepas dónde poner el foco cada día.</p>
+  </div>
+
+  <div class="logic-section">
+    <h3>🔴 Alertas de volumen individual</h3>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-amber-border)"></span><span class="logic-rule-text"><strong>Volumen elevado (ámbar):</strong> un servicio con ${config.paxAlertIndividual || 35}+ pax. Puede necesitar más atención en la preparación.</span></div>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-red-border)"></span><span class="logic-rule-text"><strong>Montaje grande (rojo):</strong> un servicio con ${config.paxAlertHigh || 50}+ pax. Se recomienda valorar 2 personas para el montaje.</span></div>
+  </div>
+
+  <div class="logic-section">
+    <h3>🔴 Alertas de carga acumulada del día</h3>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-red-border)"></span><span class="logic-rule-text"><strong>Producción total alta:</strong> la suma de pax de todos los servicios activos del día supera ${config.paxAlertDayTotal || 100} pax.</span></div>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-red-border)"></span><span class="logic-rule-text"><strong>Volumen de pedidos alto:</strong> hay ${config.serviceCountAlert || 15} o más servicios el mismo día, aunque cada uno sea pequeño. Muchos pedidos pequeños también consumen tiempo de personal y logística.</span></div>
+  </div>
+
+  <div class="logic-section">
+    <h3>🔴 Solapamiento de sala</h3>
+    <p>Dos servicios programados en la <strong>misma sala</strong> con menos de 60 minutos de diferencia entre sus horas de entrega. Esto es un conflicto real — la sala no puede atender dos eventos a la vez.</p>
+  </div>
+
+  <div class="logic-section">
+    <h3>🟡 Entregas próximas (aunque no coincidan de sala)</h3>
+    <p>Dos entregas programadas con menos de <strong>${config.minGapMinutes || 20} minutos</strong> de diferencia, sin importar si son en la misma sala o edificio. No es un conflicto directo, pero puede significar que el mismo personal tenga que cubrir ambas entregas casi a la vez — especialmente si son en edificios distintos y hay que desplazarse.</p>
+  </div>
+
+  <div class="logic-section">
+    <h3>🟢 Pedidos nuevos</h3>
+    <p>Cuando importas un CSV, el sistema compara los pedidos por su <strong>Id de pedido</strong>. Si no existía antes, se marca como "Nuevo" con borde verde — así detectas rápidamente qué ha cambiado desde la última importación, sin tener que revisar todo el listado otra vez.</p>
+  </div>
+
+  <div class="logic-section">
+    <h3>📷 Fotos de entrega y recogida</h3>
+    <p>Solo se muestra si existe o no la foto (sí/no) — no se descarga ni almacena la imagen en sí, para no sobrecargar la herramienta. Útil para hacer seguimiento de qué pedidos están completamente cerrados.</p>
+  </div>
+
+  <div class="logic-section">
+    <h3>📊 Vista Acumulado</h3>
+    <p>Permite elegir un rango de fechas (día, semana, mes, año o personalizado) y compararlo con el período anterior equivalente. Las flechas ↑↓ indican si ha subido o bajado respecto al período de comparación.</p>
+  </div>
+
+  <div class="logic-section">
+    <h3>⚙️ Cómo cambiar estos umbrales</h3>
+    <p>Estos valores están pensados como punto de partida razonable. Si con el uso diario ves que deberían ser distintos (por ejemplo, que el aviso de volumen salte antes o después), se pueden ajustar en la configuración del sistema.</p>
+  </div>`;
 }
 
 // ── MODO NOCHE ────────────────────────────────────────────────────
@@ -950,8 +1051,29 @@ const currentDate=document.getElementById('currentDate');
 const mainTabs=document.getElementById('mainTabs');
 let currentView='today';
 
+window.markReviewed=async function(orderId){
+  try{
+    await setDoc(doc(db,'catering_orders',orderId),{reviewed:true},{merge:true});
+    renderView(currentView,mainContent,selectedDate);
+  }catch(e){alert('Error al marcar como revisado: '+e.message);}
+};
+
+async function updateLastImportLabel(){
+  const label=document.getElementById('lastImportLabel');
+  try{
+    const snap=await getDoc(doc(db,'catering_config','importInfo'));
+    if(snap.exists()&&snap.data().lastImportAt){
+      const d=toDate(snap.data().lastImportAt);
+      label.textContent=`· Datos importados: ${d.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} a las ${fmtTime(snap.data().lastImportAt)}`;
+    } else {
+      label.textContent='· Sin importaciones registradas todavía';
+    }
+  }catch(e){label.textContent='';}
+}
+
 currentDate.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 updateDateLabel();
+updateLastImportLabel();
 renderView(currentView,mainContent,selectedDate);
 
 mainTabs.addEventListener('click',e=>{
@@ -1013,12 +1135,17 @@ btnConfirm.addEventListener('click',async()=>{
   const newIds=new Set(pendingImport.newOrders.map(o=>o.orderId));
   let done=0;
   for(const order of pendingImport.orders){
-    await saveOrder({...order,isNew:newIds.has(order.orderId)});
+    const isNew=newIds.has(order.orderId);
+    const payload={...order,isNew};
+    if(isNew)payload.reviewed=false;
+    await saveOrder(payload);
     done++;
     const pct=Math.round(done/pendingImport.orders.length*100);
     progressFill.style.width=pct+'%';
     progressText.textContent=`Guardando… ${done} de ${pendingImport.orders.length}`;
   }
+  await setDoc(doc(db,'catering_config','importInfo'),{lastImportAt:Timestamp.now(),lastImportCount:pendingImport.orders.length},{merge:true});
+  await updateLastImportLabel();
   progressText.textContent='✓ Importación completada';
   setTimeout(()=>{importModal.hidden=true;resetImport();renderView(currentView,mainContent,selectedDate);},1200);
 });
