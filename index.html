@@ -72,7 +72,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 .section-label{font-size:11px;font-weight:500;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
 .timeline-wrap{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px;overflow-x:auto}
 .tl-axis{display:flex;border-top:1px solid var(--border);padding-top:6px;margin-top:8px}
-.tl-hour{font-size:10px;color:var(--text-tertiary);font-family:var(--font-mono);flex:1;text-align:left}
+.tl-hour{font-size:10px;color:var(--text-tertiary);font-family:var(--font-mono);text-align:left;white-space:nowrap}
 .tl-rows{display:flex;flex-direction:column;gap:5px;padding-bottom:4px}
 .tl-row{display:flex;align-items:center;gap:8px;font-size:12px}
 .tl-time{font-family:var(--font-mono);font-size:11px;color:var(--text-tertiary);width:40px;flex-shrink:0}
@@ -535,7 +535,7 @@ function renderTimeline(orders){
   const hours=active.map(o=>toDate(o.deliveryAt).getHours());
   const minH=Math.max(0,Math.min(...hours));
   const maxH=Math.min(23,Math.max(...hours)+2);
-  const span=maxH-minH||1;
+  const totalMinutes=(maxH-minH)*60||60;
   const overlapIds=new Set();
   for(let i=0;i<active.length;i++){for(let j=i+1;j<active.length;j++){
     const a=active[i],b=active[j];
@@ -546,14 +546,19 @@ function renderTimeline(orders){
   }}
   const rows=active.map(o=>{
     const d=toDate(o.deliveryAt);
-    const hPos=((d.getHours()+d.getMinutes()/60)-minH)/span*100;
+    const minutesFromStart=(d.getHours()-minH)*60+d.getMinutes();
+    const leftPct=(minutesFromStart/totalMinutes*100);
+    const widthPct=Math.max(10,Math.min(28,(45/totalMinutes*100)));
     const cls=[typeClass(o),overlapIds.has(o.orderId)?'overlap':''].filter(Boolean).join(' ');
     const label=`${o.customerName} · ${o.cateringType||'Otros'} · ${o.room||o.buildingRoom} · ${o.pax} pax`;
-    return`<div class="tl-row"><span class="tl-time">${fmtTime(o.deliveryAt)}</span><div class="tl-track"><div class="tl-bar ${cls}" style="left:${hPos.toFixed(1)}%;width:${Math.max(15,60-hPos*.3)}%" title="${label}">${label}</div></div></div>`;
+    return`<div class="tl-row"><span class="tl-time">${fmtTime(o.deliveryAt)}</span><div class="tl-track"><div class="tl-bar ${cls}" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(1)}%" title="${label}">${label}</div></div></div>`;
   }).join('');
   let axisTicks='';
-  for(let h=minH;h<=maxH;h++)axisTicks+=`<span class="tl-hour">${String(h).padStart(2,'0')}:00</span>`;
-  return`<p class="section-label">Línea de tiempo</p><div class="timeline-wrap"><div class="tl-rows">${rows}</div><div class="tl-axis">${axisTicks}</div></div>`;
+  for(let h=minH;h<=maxH;h++){
+    const leftPct=((h-minH)*60/totalMinutes*100);
+    axisTicks+=`<span class="tl-hour" style="position:absolute;left:${leftPct.toFixed(2)}%">${String(h).padStart(2,'0')}:00</span>`;
+  }
+  return`<p class="section-label">Línea de tiempo</p><div class="timeline-wrap"><div class="tl-rows">${rows}</div><div class="tl-axis"><span class="tl-time" style="flex-shrink:0"></span><div style="position:relative;flex:1;height:16px">${axisTicks}</div></div></div>`;
 }
 
 function renderOrderCard(o,showNew=true){
