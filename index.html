@@ -895,11 +895,30 @@ async function renderCumulative(container){
   const roomRows=Object.entries(byRoomStat).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([r,v])=>`<div class="bar-row"><span class="bar-label" title="${r}">${r}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxRoomC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
   const hourRows=byHour.map(v=>`<div class="bar-row"><span class="bar-label">${v.label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count}</span></div>`).join('')+(noHourCount>0?`<div class="bar-row"><span class="bar-label">Sin hora</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(noHourCount/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${noHourCount}</span></div>`:'');
 
+  // Cancelaciones
+  const cancelledOrders=orders.filter(o=>o.orderStatus==='CANCELADO');
+  const cancelledCount=cancelledOrders.length;
+  const cancelRate=orders.length?(cancelledCount/orders.length*100):0;
+  const lostValue=cancelledOrders.reduce((s,o)=>s+(o.priceTotal||0),0);
+  const byCancelCustomer={};
+  cancelledOrders.forEach(o=>{const c=o.customerName||'Sin nombre';if(!byCancelCustomer[c])byCancelCustomer[c]={count:0,value:0};byCancelCustomer[c].count++;byCancelCustomer[c].value+=o.priceTotal||0;});
+  const maxCancelC=Math.max(...Object.values(byCancelCustomer).map(v=>v.count),1);
+  const cancelCustomerRows=Object.entries(byCancelCustomer).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxCancelC*100).toFixed(0)}%;background:var(--alert-red-border)"></div></div><span class="bar-val">${v.count} cancel.</span></div>`).join('');
+
   container.innerHTML=controlsHtml+`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${compareCount}</div></div>
     <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div><div class="kpi-sub">${comparePax}</div></div>
     <div class="kpi-card"><div class="kpi-label">Importe total sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div><div class="kpi-sub">${comparePrice}</div></div>
     <div class="kpi-card"><div class="kpi-label">Media pax / servicio</div><div class="kpi-value">${Math.round(totalPax/active.length)}</div></div>
+  </div>
+  <p class="section-label">Cancelaciones</p>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Cateringes cancelados</div><div class="kpi-value alert">${cancelledCount}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Tasa de cancelación</div><div class="kpi-value">${cancelRate.toFixed(1)}%</div></div>
+    <div class="kpi-card"><div class="kpi-label">Valor perdido (no facturado)</div><div class="kpi-value alert">${fmtMoney(lostValue)}</div></div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card"><h3>Quién cancela más (top 10)</h3><div class="bar-chart">${cancelCustomerRows||'<div style="font-size:12px;color:var(--text-tertiary)">Sin cancelaciones en este período</div>'}</div></div>
   </div>
   <div class="stats-grid">
     <div class="stat-card"><h3>Pax por tipo de servicio</h3><div class="bar-chart">${typeRows}</div></div>
