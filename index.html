@@ -90,7 +90,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 .order-card:hover{border-color:var(--border)}
 .order-card.has-comment{border-left:3px solid #F5A940}
 .order-card.cancelled{opacity:.5}
-.order-card.is-new{border-left:3px solid #6DBF40}
+.order-card.is-new{border-left:4px solid #4CAF20;background:linear-gradient(to right, rgba(76,175,32,0.08), var(--bg-card) 40px);box-shadow:0 0 0 1px rgba(76,175,32,0.25)}
 .order-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
 .order-who{display:flex;flex-direction:column;gap:2px}
 .order-name{font-size:13.5px;font-weight:500}
@@ -106,7 +106,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 .pill-pending{background:var(--pending-bg);color:var(--pending-fg)}
 .pill-pax-red{background:var(--alert-red-bg);color:var(--alert-red-fg)}
 .pill-pax-amber{background:var(--alert-amber-bg);color:var(--alert-amber-fg)}
-.pill-new{background:var(--ok-bg);color:var(--ok-fg)}
+.pill-new{background:#4CAF20;color:#fff;font-weight:600;letter-spacing:.02em}
 .pill-overlap{background:var(--alert-red-bg);color:var(--alert-red-fg)}
 .order-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary)}
 .meta-item{display:flex;align-items:center;gap:4px}
@@ -366,24 +366,35 @@ function splitLine(line,sep){
   for(const ch of line){if(ch==='"'){inQ=!inQ;continue;}if(ch===sep&&!inQ){result.push(current);current='';continue;}current+=ch;}
   result.push(current);return result;
 }
+function findValue(raw,keywords){
+  const keys=Object.keys(raw);
+  for(const k of keys){
+    if(keywords.every(w=>k.includes(w)))return raw[k];
+  }
+  return '';
+}
+function truthy(v){return !!(v&&v!=='--'&&v.trim());}
+
 function mapRow(raw){
   const orderId=raw['id de pedido']||'';
   if(!orderId)return null;
   const deliveryAt=parseDate(raw['fecha entrega / hora']||raw['fecha entrega']||'');
   const {building,floor,room}=parseBR(raw['edificio y sala']||'');
   const pax=parseInt(raw['cantidad personas']||'0',10)||0;
-  const priceFood=parseFloat((raw['importe alimentos']||raw['precio alimentos']||'0').replace(',','.'))||0;
-  const priceDrinks=parseFloat((raw['importe de bebidas']||raw['precio bebidas']||'0').replace(',','.'))||0;
-  const priceTransport=parseFloat((raw['importe de transporte y servicio']||raw['precio transporte']||'0').replace(',','.'))||0;
-  const priceStaff=parseFloat((raw['importe de camareros']||raw['precio camareros']||'0').replace(',','.'))||0;
-  const priceTotal=parseFloat((raw['total importe sin iva']||raw['precio total sin iva']||'0').replace(',','.'))||0;
-  const hasDeliveryPhoto=!!(raw['fecha de la imagen de entrega']&&raw['fecha de la imagen de entrega']!=='--'&&raw['fecha de la imagen de entrega'].trim());
-  const hasPickupPhoto=!!(raw['fecha de la imagen de recogida']&&raw['fecha de la imagen de recogida']!=='--'&&raw['fecha de la imagen de recogida'].trim());
+  const priceFood=parseFloat((findValue(raw,['aliment'])||'0').toString().replace(',','.'))||0;
+  const priceDrinks=parseFloat((findValue(raw,['bebida'])||'0').toString().replace(',','.'))||0;
+  const priceTransport=parseFloat((findValue(raw,['transporte'])||'0').toString().replace(',','.'))||0;
+  const priceStaff=parseFloat((findValue(raw,['camarero'])||findValue(raw,['personal'])||'0').toString().replace(',','.'))||0;
+  const priceTotal=parseFloat((findValue(raw,['total','iva'])||'0').toString().replace(',','.'))||0;
+  const hasDeliveryPhoto=truthy(findValue(raw,['imagen','entrega']));
+  const hasPickupPhoto=truthy(findValue(raw,['imagen','recogida']));
   const isLate=(raw['tarde?']||'').toLowerCase().startsWith('s');
   const lateMinutes=parseInt(raw['cuanto de tarde']||'0',10)||0;
   const orderStatus=normalizeStatus(raw['estado pedido']||'');
-  const createdAt=parseDate(raw['fecha de creación']||raw['fecha de creacion']||'');
-  const costCenter=raw['centro de coste / departamento']||raw['centro de coste']||'';
+  const createdAt=parseDate(findValue(raw,['fecha','creaci'])||'');
+  const costCenter=findValue(raw,['centro','coste'])||'';
+  const pickupTime=findValue(raw,['hora','recogida'])||'';
+  const billingNotes=findValue(raw,['notas','facturaci'])||'';
   return{
     orderId:orderId.trim(),customerId:raw['id']||'',center:raw['centro']||'',
     buildingRoom:raw['edificio y sala']||'',building,floor,room,
@@ -393,12 +404,12 @@ function mapRow(raw){
     deliveryAtISO:deliveryAt?deliveryAt.toISOString():null,
     setupTime:raw['hora de montaje']||'',startTime:raw['hora de inicio']||'',
     teardownTime:raw['hora de desmontaje']||'',
-    pickupTime:raw['hora de recogida']||'',pax,
+    pickupTime,pax,
     cateringType:raw['tipo de catering']||'',
     cateringCategory:categorizeCatering(raw['tipo de catering']||''),
     orderStatus,statusCode:raw['estado']||'',
     userComment:raw['comentario usuario']||'',internalComment:raw['comentario interno']||'',
-    billingNotes:raw['notas internas facturacion']||raw['notas internas de facturación']||'',
+    billingNotes,
     hasDeliveryPhoto,hasPickupPhoto,isLate,lateMinutes,
     costCenter,department:raw['departamento']||'',
     priceFood,priceDrinks,priceTransport,priceStaff,priceTotal,
@@ -855,9 +866,14 @@ async function renderCumulative(container){
 
   const byType={};
   active.forEach(o=>{const t=o.cateringType||'Otros';if(!byType[t])byType[t]={count:0,pax:0,price:0};byType[t].count++;byType[t].pax+=o.pax||0;byType[t].price+=o.priceTotal||0;});
-  // Top clientes (por persona, no por empresa)
+  // Top clientes (por persona, no por empresa) — se excluyen cuentas internas conocidas
+  const EXCLUDED_CUSTOMERS=['sol catering'];
   const byCustomer={};
-  active.forEach(o=>{const c=o.customerName||'Sin nombre';if(!byCustomer[c])byCustomer[c]={count:0,pax:0,price:0};byCustomer[c].count++;byCustomer[c].pax+=o.pax||0;byCustomer[c].price+=o.priceTotal||0;});
+  active.forEach(o=>{
+    const c=o.customerName||'Sin nombre';
+    if(EXCLUDED_CUSTOMERS.includes(c.toLowerCase().trim()))return;
+    if(!byCustomer[c])byCustomer[c]={count:0,pax:0,price:0};byCustomer[c].count++;byCustomer[c].pax+=o.pax||0;byCustomer[c].price+=o.priceTotal||0;
+  });
 
   // Top salas
   const byRoomStat={};
@@ -885,15 +901,16 @@ async function renderCumulative(container){
     if(idx>=0)byHour[idx].count++;else noHourCount++;
   });
 
-  const maxTP=Math.max(...Object.values(byType).map(v=>v.pax))||1;
+  const maxTP=Math.max(...Object.values(byType).map(v=>v.count))||1;
   const maxCustP=Math.max(...Object.values(byCustomer).map(v=>v.price))||1;
   const maxRoomC=Math.max(...Object.values(byRoomStat).map(v=>v.count))||1;
   const maxHourC=Math.max(...byHour.map(v=>v.count))||1;
 
-  const typeRows=Object.entries(byType).sort((a,b)=>b[1].pax-a[1].pax).map(([t,v])=>`<div class="bar-row"><span class="bar-label" title="${t}">${t}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.pax/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.pax} pax</span></div>`).join('');
+  const typeRows=Object.entries(byType).sort((a,b)=>b[1].count-a[1].count).map(([t,v])=>`<div class="bar-row"><span class="bar-label" title="${t}">${t}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val" title="${v.pax} pax en total">${v.count} ped.</span></div>`).join('');
   const custRows=Object.entries(byCustomer).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCustP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
   const roomRows=Object.entries(byRoomStat).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([r,v])=>`<div class="bar-row"><span class="bar-label" title="${r}">${r}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxRoomC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
-  const hourRows=byHour.map(v=>`<div class="bar-row"><span class="bar-label">${v.label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count}</span></div>`).join('')+(noHourCount>0?`<div class="bar-row"><span class="bar-label">Sin hora</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(noHourCount/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${noHourCount}</span></div>`:'');
+  const totalHourOrders=byHour.reduce((s,v)=>s+v.count,0)+noHourCount;
+  const hourRows=byHour.map(v=>`<div class="bar-row"><span class="bar-label">${v.label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} (${totalHourOrders?(v.count/totalHourOrders*100).toFixed(0):0}%)</span></div>`).join('')+(noHourCount>0?`<div class="bar-row"><span class="bar-label">Sin hora</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(noHourCount/maxHourC*100).toFixed(0)}%"></div></div><span class="bar-val">${noHourCount} (${totalHourOrders?(noHourCount/totalHourOrders*100).toFixed(0):0}%)</span></div>`:'');
 
   // Cancelaciones
   const cancelledOrders=orders.filter(o=>o.orderStatus==='CANCELADO');
@@ -902,8 +919,15 @@ async function renderCumulative(container){
   const lostValue=cancelledOrders.reduce((s,o)=>s+(o.priceTotal||0),0);
   const byCancelCustomer={};
   cancelledOrders.forEach(o=>{const c=o.customerName||'Sin nombre';if(!byCancelCustomer[c])byCancelCustomer[c]={count:0,value:0};byCancelCustomer[c].count++;byCancelCustomer[c].value+=o.priceTotal||0;});
+  // Total de pedidos (cualquier estado) por cliente, para calcular el % de cancelación individual
+  const totalByCustomer={};
+  orders.forEach(o=>{const c=o.customerName||'Sin nombre';totalByCustomer[c]=(totalByCustomer[c]||0)+1;});
   const maxCancelC=Math.max(...Object.values(byCancelCustomer).map(v=>v.count),1);
-  const cancelCustomerRows=Object.entries(byCancelCustomer).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxCancelC*100).toFixed(0)}%;background:var(--alert-red-border)"></div></div><span class="bar-val">${v.count} cancel.</span></div>`).join('');
+  const cancelCustomerRows=Object.entries(byCancelCustomer).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([c,v])=>{
+    const totalForCustomer=totalByCustomer[c]||v.count;
+    const pctForCustomer=(v.count/totalForCustomer*100).toFixed(0);
+    return`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxCancelC*100).toFixed(0)}%;background:var(--alert-red-border)"></div></div><span class="bar-val">${v.count} cancel. (${pctForCustomer}%)</span></div>`;
+  }).join('');
 
   container.innerHTML=controlsHtml+`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${compareCount}</div></div>
@@ -921,7 +945,7 @@ async function renderCumulative(container){
     <div class="stat-card"><h3>Quién cancela más (top 10)</h3><div class="bar-chart">${cancelCustomerRows||'<div style="font-size:12px;color:var(--text-tertiary)">Sin cancelaciones en este período</div>'}</div></div>
   </div>
   <div class="stats-grid">
-    <div class="stat-card"><h3>Pax por tipo de servicio</h3><div class="bar-chart">${typeRows}</div></div>
+    <div class="stat-card"><h3>Demanda por tipo de servicio (nº de pedidos)</h3><div class="bar-chart">${typeRows}</div></div>
     <div class="stat-card"><h3>Clientes que más consumen (top 10)</h3><div class="bar-chart">${custRows}</div></div>
     <div class="stat-card"><h3>Salas con más pedidos (top 10)</h3><div class="bar-chart">${roomRows}</div></div>
     <div class="stat-card"><h3>Demanda por franja horaria</h3><div class="bar-chart">${hourRows}</div></div>
@@ -1043,17 +1067,28 @@ async function renderLogic(container){
 
   <div class="logic-section">
     <h3>🟢 Pedidos nuevos</h3>
-    <p>Cuando importas un CSV, el sistema compara los pedidos por su <strong>Id de pedido</strong>. Si no existía antes, se marca como "Nuevo" con borde verde — así detectas rápidamente qué ha cambiado desde la última importación, sin tener que revisar todo el listado otra vez.</p>
+    <p>Cuando importas un CSV, el sistema compara los pedidos por su <strong>Id de pedido</strong>. Si no existía antes, se marca como "Nuevo" con fondo verde y un botón "✓ Revisar" — así detectas rápidamente qué ha cambiado desde la última importación. El aviso general de "pedidos nuevos" se mantiene visible hasta que todos estén marcados como revisados.</p>
   </div>
 
   <div class="logic-section">
     <h3>📷 Fotos de entrega y recogida</h3>
-    <p>Solo se muestra si existe o no la foto (sí/no) — no se descarga ni almacena la imagen en sí, para no sobrecargar la herramienta. Útil para hacer seguimiento de qué pedidos están completamente cerrados.</p>
+    <p>Solo se muestra si existe o no la foto (sí/no) — no se descarga ni almacena la imagen en sí, para no sobrecargar la herramienta. Se detecta buscando cualquier columna del CSV relacionada con "imagen" y "entrega"/"recogida", así sigue funcionando aunque tu sistema cambie ligeramente el nombre de esa columna entre exportaciones.</p>
+  </div>
+
+  <div class="logic-section">
+    <h3>🏷️ Categoría "Otros"</h3>
+    <p>Cuando ves "Otros" en una gráfica de tipo de servicio, significa que esos pedidos venían con el campo <strong>"Tipo de catering"</strong> vacío en el CSV importado — no es un tipo real, es la etiqueta que se usa cuando no hay dato.</p>
   </div>
 
   <div class="logic-section">
     <h3>📊 Vista Acumulado</h3>
     <p>Permite elegir un rango de fechas (día, semana, mes, año o personalizado) y compararlo con el período anterior equivalente. Las flechas ↑↓ indican si ha subido o bajado respecto al período de comparación.</p>
+  </div>
+
+  <div class="logic-section">
+    <h3>🚫 Cancelaciones</h3>
+    <p>Se calcula la tasa de cancelación como % del total de pedidos en el rango seleccionado, y el valor perdido como la suma de los importes de los pedidos cancelados. En el ranking "Quién cancela más", el porcentaje junto a cada nombre es <strong>específico de esa persona</strong> — cuántos de sus propios pedidos canceló, no del total general.</p>
+    <p>La cuenta "Sol Catering" se excluye de los rankings de clientes por ser una cuenta interna, no un cliente real.</p>
   </div>
 
   <div class="logic-section">
