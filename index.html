@@ -354,13 +354,14 @@ function parseCSV(text){
   if(lines.length<2)throw new Error('CSV vacío');
   const sep=lines[0].includes(';')?';':',';
   const rawHeaders=lines[0].split(sep).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+  const isSQLFormat=rawHeaders.includes('id_order')||rawHeaders.includes('customer_name');
   const rows=[];
   for(let i=1;i<lines.length;i++){
     const cells=splitLine(lines[i],sep);
     if(cells.every(c=>!c.trim()))continue;
     const raw={};
     rawHeaders.forEach((h,idx)=>{raw[h]=cells[idx]?.replace(/"/g,'').trim()??'';});
-    const order=mapRow(raw);
+    const order=isSQLFormat?mapRowSQL(raw):mapRow(raw);
     if(order)rows.push(order);
   }
   return rows;
@@ -370,6 +371,120 @@ function splitLine(line,sep){
   for(const ch of line){if(ch==='"'){inQ=!inQ;continue;}if(ch===sep&&!inQ){result.push(current);current='';continue;}current+=ch;}
   result.push(current);return result;
 }
+// ── DIRECTORIO OFICIAL DE SALAS (con aforo) ───────────────────────
+const ROOM_DIRECTORY=[
+  {building:'1',floor:'1',room:'War Room Zona EUR CONFECTIONERY - Lado MONT',capacity:10},
+  {building:'1',floor:'1',room:'War Room GLOBAL SALES & CUSTOMERS - Lado MAR',capacity:10},
+  {building:'1',floor:'1',room:'War Room NHSC INTERNATIONAL - Lado MAR',capacity:10},
+  {building:'1',floor:'1',room:'101',capacity:14},
+  {building:'1',floor:'1',room:'107',capacity:14},
+  {building:'1',floor:'1',room:'Zonas colaborativas - Lado MONTAÑA',capacity:null},
+  {building:'1',floor:'1',room:'Zonas colaborativas - Lado MAR',capacity:null},
+  {building:'1',floor:'2',room:'WE CAN',capacity:null},
+  {building:'1',floor:'2',room:'201',capacity:14},
+  {building:'1',floor:'2',room:'207',capacity:14},
+  {building:'1',floor:'2',room:'Zona ZEN DEN - Lado MONTAÑA',capacity:null},
+  {building:'1',floor:'2',room:'Zona COLLAB HIVE - Lado MAR',capacity:null},
+  {building:'1',floor:'2',room:'Boutique Nespresso',capacity:null},
+  {building:'1',floor:'3',room:'War Room PROCUREMENT - Lado MAR',capacity:10},
+  {building:'1',floor:'3',room:'War Room PRODUCCION - Lado MAR',capacity:10},
+  {building:'1',floor:'3',room:'War Room  Director Supply & Sustainability - Lado MONTAÑA',capacity:10},
+  {building:'1',floor:'3',room:'301',capacity:14},
+  {building:'1',floor:'3',room:'307',capacity:14},
+  {building:'1',floor:'3',room:'Zonas colaborativas - Lado MONTAÑA',capacity:null},
+  {building:'1',floor:'3',room:'Zonas colaborativas - Lado MAR',capacity:null},
+  {building:'1',floor:'4',room:'War Room Director Financiero',capacity:null},
+  {building:'1',floor:'4',room:'War Room Director General',capacity:null},
+  {building:'1',floor:'4',room:'402',capacity:14},
+  {building:'1',floor:'4',room:'Dirección - 404',capacity:25},
+  {building:'1',floor:'4',room:'Zonas colaborativas - Lado MONTAÑA',capacity:null},
+  {building:'1',floor:'5',room:'War Room WATERS - Lado MONTAÑA',capacity:10},
+  {building:'1',floor:'5',room:'War Room VENTAS - Lado MONTAÑA',capacity:10},
+  {building:'1',floor:'5',room:'War Room COMUNICACIÓN - Lado MAR',capacity:10},
+  {building:'1',floor:'5',room:'War Room CULINARIOS - Lado MAR',capacity:10},
+  {building:'1',floor:'5',room:'504',capacity:23},
+  {building:'1',floor:'5',room:'507',capacity:14},
+  {building:'1',floor:'5',room:'Zonas colaborativas - Lado MONTAÑA',capacity:null},
+  {building:'1',floor:'5',room:'Zonas colaborativas - Lado MAR',capacity:null},
+  {building:'1',floor:'6',room:'War Room Nestlé Health Sciencie - Lado MONTAÑA',capacity:10},
+  {building:'1',floor:'6',room:'War Room Chocolates - Lado MAR',capacity:10},
+  {building:'1',floor:'6',room:'War Room Cereales - Lado MONTAÑA',capacity:10},
+  {building:'1',floor:'6',room:'War Room Infant Nutrition - Lado MAR',capacity:10},
+  {building:'1',floor:'6',room:'601',capacity:18},
+  {building:'1',floor:'6',room:'607',capacity:14},
+  {building:'1',floor:'6',room:'Zonas colaborativas - Lado MONTAÑA',capacity:null},
+  {building:'1',floor:'6',room:'Zonas colaborativas - Lado MAR',capacity:null},
+  {building:'1',floor:'7',room:'War Room NESPRESSO - Lado MAR',capacity:10},
+  {building:'1',floor:'7',room:'War Room HUMAN RESOURCES - Lado MAR',capacity:10},
+  {building:'1',floor:'7',room:'War Room NESTLÉS PROFESSIONAL - Lado NORTE',capacity:10},
+  {building:'1',floor:'7',room:'War Room CAFÉS - Lado NORTE',capacity:10},
+  {building:'1',floor:'7',room:'701',capacity:18},
+  {building:'1',floor:'7',room:'707',capacity:14},
+  {building:'1',floor:'7',room:'Zonas colaborativas - Lado MONTAÑA',capacity:null},
+  {building:'1',floor:'7',room:'Zonas colaborativas - Lado MAR',capacity:null},
+  {building:'2',floor:'PB',room:'B01',capacity:12},
+  {building:'2',floor:'PB',room:'B02',capacity:30},
+  {building:'2',floor:'PB',room:'B04',capacity:16},
+  {building:'2',floor:'PB',room:'B05',capacity:30},
+  {building:'2',floor:'1',room:'102',capacity:18},
+  {building:'2',floor:'1',room:'104',capacity:15},
+  {building:'2',floor:'1',room:'War Room 105',capacity:7},
+  {building:'2',floor:'1',room:'Coffee Area',capacity:null},
+  {building:'2',floor:'2',room:'LAPLACE - 205',capacity:12},
+  {building:'2',floor:'2',room:'ALAN TOURING - 209',capacity:10},
+  {building:'2',floor:'2',room:'Coffee Area',capacity:null},
+  {building:'2',floor:'3',room:'307',capacity:14},
+  {building:'2',floor:'3',room:'310',capacity:10},
+  {building:'2',floor:'3',room:'War Room 315',capacity:12},
+  {building:'2',floor:'3',room:'Coffee Area',capacity:null},
+  {building:'2',floor:'4',room:'403',capacity:18},
+  {building:'2',floor:'4',room:'405',capacity:18},
+  {building:'2',floor:'4',room:'Coffee Area',capacity:null},
+  {building:'2',floor:'5',room:'502',capacity:10},
+  {building:'2',floor:'5',room:'Sofa Room PURINA STUDIOS - 507',capacity:12},
+  {building:'2',floor:'5',room:'515',capacity:38},
+  {building:'2',floor:'5',room:'Coffee Area PURINA STUDIOS',capacity:null},
+  {building:'2',floor:'6',room:'602',capacity:14},
+  {building:'2',floor:'6',room:'606',capacity:10},
+  {building:'2',floor:'6',room:'607',capacity:12},
+  {building:'2',floor:'6',room:'War Room 611',capacity:12},
+  {building:'2',floor:'6',room:'Coffee Area',capacity:null},
+  {building:'2',floor:'7',room:'707',capacity:20},
+  {building:'2',floor:'7',room:'710',capacity:10},
+  {building:'2',floor:'7',room:'Coffee Area',capacity:null},
+  {building:'2',floor:'8',room:'CLOUD',capacity:29},
+  {building:'2',floor:'8',room:'MOONSHOT',capacity:22},
+  {building:'2',floor:'8',room:'815',capacity:10},
+  {building:'2',floor:'8',room:'Coffee Area',capacity:null},
+  {building:'3',floor:'0',room:'PUZZLE SPACE',capacity:27},
+  {building:'3',floor:'0',room:'THINK TANK',capacity:22},
+  {building:'3',floor:'0',room:'MIAJADAS',capacity:25},
+  {building:'1',floor:'0',room:'CASTELLBISBAL',capacity:20},
+  {building:'1',floor:'0',room:'GIRONA',capacity:25},
+  {building:'1',floor:'0',room:'HENRI NESTLÉ',capacity:20},
+  {building:'1',floor:'0',room:'LA PENILLA',capacity:26},
+  {building:'1',floor:'0',room:'REUS',capacity:14},
+  {building:'1',floor:'0',room:'SEBARES',capacity:10},
+  {building:'1',floor:'0',room:'VILADRAU',capacity:16},
+  {building:'3',floor:'0',room:'NESCAFÉ',capacity:18},
+  {building:'3',floor:'PB',room:'B50',capacity:50},
+  {building:'4',floor:'1',room:'Polivalente',capacity:180},
+  {building:'0',floor:'0',room:'Social Area',capacity:null},
+  {building:'0',floor:'0',room:'Terraza Social Area',capacity:null},
+  {building:'0',floor:'0',room:'Terraza Lounge Area',capacity:null},
+  {building:'0',floor:'0',room:'Terraza Shopper Experience Center',capacity:null},
+  {building:'5',floor:'0',room:'Shopper Experience Center',capacity:null},
+  {building:'3',floor:'1',room:'El Terrat',capacity:null},
+  {building:'3',floor:'1',room:'Comedor Privado',capacity:null},
+];
+function normRoom(s){return(s||'').toLowerCase().trim().replace(/^sala\s+/,'').replace(/\s+/g,' ');}
+const ROOM_CAPACITY_MAP={};
+ROOM_DIRECTORY.forEach(r=>{const key=normRoom(r.room);if(!(key in ROOM_CAPACITY_MAP))ROOM_CAPACITY_MAP[key]=r;});
+function getRoomCapacity(roomName){
+  const entry=ROOM_CAPACITY_MAP[normRoom(roomName)];
+  return entry?entry.capacity:null;
+}
+
 function findValue(raw,keywords){
   const keys=Object.keys(raw);
   for(const k of keys){
@@ -401,7 +516,7 @@ function mapRow(raw){
   const billingNotes=findValue(raw,['notas','facturaci'])||'';
   return{
     orderId:orderId.trim(),customerId:raw['id']||'',center:raw['centro']||'',
-    buildingRoom:raw['edificio y sala']||'',building,floor,room,
+    buildingRoom:raw['edificio y sala']||'',building:raw['centro']||'',floor,room,
     customerName:raw['customer']||'',company:raw['empresa']||'',
     email:raw['email']||'',phone:raw['teléfono catering']||'',
     deliveryAt:deliveryAt?Timestamp.fromDate(deliveryAt):null,
@@ -417,7 +532,51 @@ function mapRow(raw){
     hasDeliveryPhoto,hasPickupPhoto,isLate,lateMinutes,
     costCenter,department:raw['departamento']||'',
     priceFood,priceDrinks,priceTransport,priceStaff,priceTotal,
+    itemsMenu:'',internalAnnotation:'',address:'',purchaseOrder:'',
     isManual:false,source:'csv',
+    createdAt:createdAt?Timestamp.fromDate(createdAt):null,
+  };
+}
+
+// Mapeo para el formato de exportación SQL (nombres en inglés/snake_case)
+function mapRowSQL(raw){
+  const orderId=raw['id_order']||'';
+  if(!orderId)return null;
+  const deliveryAt=parseDate(raw['date']||'');
+  const {building,floor,room}=parseBR(raw['edificio_sala']||'');
+  const pax=parseInt(raw['people_quantity']||'0',10)||0;
+  const priceFood=parseFloat((raw['food_import']||'0').toString().replace(',','.'))||0;
+  const priceDrinks=parseFloat((raw['drinks_import']||'0').toString().replace(',','.'))||0;
+  const priceTransport=parseFloat((raw['transport_service_import']||'0').toString().replace(',','.'))||0;
+  const priceStaff=parseFloat((raw['camareros_import']||'0').toString().replace(',','.'))||0;
+  const priceTotal=parseFloat((raw['total_price']||'0').toString().replace(',','.'))||0;
+  const hasDeliveryPhoto=truthy(raw['date_img_envio']);
+  const hasPickupPhoto=truthy(raw['date_img_recogida']);
+  const orderStatus=normalizeStatus(raw['estado_pedido']||'');
+  const createdAt=parseDate(raw['fecha_creacion']||'');
+  return{
+    orderId:orderId.trim(),customerId:raw['id_catering_request_cart']||'',center:raw['centro']||'',
+    buildingRoom:raw['edificio_sala']||'',building:raw['centro']||'',floor,room,
+    customerName:raw['customer_name']||'',company:raw['company_name']||'',
+    email:raw['mail']||'',phone:raw['telefono']||'',
+    deliveryAt:deliveryAt?Timestamp.fromDate(deliveryAt):null,
+    deliveryAtISO:deliveryAt?deliveryAt.toISOString():null,
+    setupTime:raw['hora_montaje']||'',startTime:raw['hora_inicio']||'',
+    teardownTime:raw['hora_desmontaje']||'',
+    pickupTime:'',pax,
+    cateringType:raw['menu']||'',
+    cateringCategory:categorizeCatering(raw['menu']||''),
+    orderStatus,statusCode:'',
+    userComment:raw['comentarios']||'',internalComment:raw['comentario_interno']||'',
+    billingNotes:'',
+    itemsMenu:raw['items_menu']||'',
+    internalAnnotation:raw['anotacion_interna']||'',
+    address:raw['address']||'',
+    purchaseOrder:raw['purchase_order']||'',
+    hasDeliveryPhoto,hasPickupPhoto,isLate:false,lateMinutes:0,
+    costCenter:raw['centro_coste']||'',department:'',
+    priceFood,priceDrinks,priceTransport,priceStaff,priceTotal,
+    isManual:false,source:'csv_sql',
     createdAt:createdAt?Timestamp.fromDate(createdAt):null,
   };
 }
@@ -434,10 +593,16 @@ function parseDate(str){
 }
 function parseBR(str){
   if(!str)return{building:'',floor:'',room:''};
-  const parts=str.split('-').map(s=>s.trim());
-  let building='',floor='',room='';
-  parts.forEach(p=>{if(/planta/i.test(p))floor=p;else if(/sala/i.test(p))room=p.replace(/sala\s*/i,'').trim();else building=p;});
-  return{building,floor,room};
+  const parts=str.split('-').map(s=>s.trim()).filter(Boolean);
+  if(!parts.length)return{building:'',floor:'',room:''};
+  let floor='',room='';
+  if(/planta/i.test(parts[0])){
+    floor=parts[0];
+    room=parts.slice(1).join(' - ').replace(/^sala\s*/i,'').trim();
+  } else {
+    room=parts.join(' - ').replace(/^sala\s*/i,'').trim();
+  }
+  return{building:'',floor,room};
 }
 function normalizeStatus(raw){
   const r=raw.toLowerCase();
@@ -469,6 +634,14 @@ function buildAlerts(orders,config){
   active.forEach(o=>{
     if(o.pax>=config.paxAlertHigh)alerts.push({type:'red',msg:`Montaje grande · ${o.customerName} (${fmtTime(o.deliveryAt)}) — ${o.pax} pax · valorar 2 personas para el montaje`});
     else if(o.pax>=config.paxAlertIndividual)alerts.push({type:'amber',msg:`Volumen elevado · ${o.customerName} (${fmtTime(o.deliveryAt)}) — ${o.pax} pax`});
+  });
+
+  // Aforo de sala superado (según directorio oficial de salas)
+  active.forEach(o=>{
+    const capacity=getRoomCapacity(o.room);
+    if(capacity!=null&&o.pax>capacity){
+      alerts.push({type:'red',msg:`Aforo superado · ${o.room} permite hasta ${capacity} pax — pedido de ${o.customerName} (${fmtTime(o.deliveryAt)}) es de ${o.pax} pax`});
+    }
   });
 
   // Carga total del día por pax acumulados
@@ -611,11 +784,14 @@ function renderOrderCard(o,showNew=true){
       ${pickupInfo}
       ${priceDetail}
       ${o.company?`<span class="meta-item" style="color:var(--text-tertiary)">${o.company}</span>`:''}
+      ${o.purchaseOrder?`<span class="meta-item" style="color:var(--text-tertiary)">OC: ${o.purchaseOrder}</span>`:''}
       ${o.hasDeliveryPhoto?`<span class="photo-dot"><span class="dot dot-yes"></span> foto entrega</span>`:''}
       ${o.hasPickupPhoto?`<span class="photo-dot"><span class="dot dot-yes"></span> foto recogida</span>`:''}
     </div>
     ${o.userComment?`<div class="comment-box">💬 ${o.userComment}</div>`:''}
     ${o.internalComment?`<div class="comment-internal">📋 ${o.internalComment}</div>`:''}
+    ${o.internalAnnotation?`<div class="comment-internal">📌 ${o.internalAnnotation}</div>`:''}
+    ${o.itemsMenu?`<div class="comment-internal" style="font-style:normal">🍽️ ${o.itemsMenu}</div>`:''}
   </div>`;
 }
 
@@ -1080,6 +1256,19 @@ async function renderLogic(container){
   </div>
 
   <div class="logic-section">
+    <h3>🎨 Qué significa cada color de alerta</h3>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-red-border)"></span><span class="logic-rule-text"><strong>Rojo:</strong> requiere atención hoy — solapamiento real de sala, montaje muy grande, o carga total del día muy alta.</span></div>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-amber-border)"></span><span class="logic-rule-text"><strong>Ámbar:</strong> volumen a vigilar, no crítico todavía.</span></div>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-purple-border)"></span><span class="logic-rule-text"><strong>Morado:</strong> dos entregas muy próximas en el tiempo (aunque no sea la misma sala) — puede necesitar el mismo personal en dos sitios casi a la vez.</span></div>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:#4CAF20"></span><span class="logic-rule-text"><strong>Verde:</strong> informativo — pedidos nuevos detectados en la última importación.</span></div>
+  </div>
+
+  <div class="logic-section">
+    <h3>📥 Formatos de importación compatibles</h3>
+    <p>El importador detecta automáticamente el tipo de archivo que subes — funciona tanto con la exportación habitual de la web (columnas en español) como con la exportación de base de datos (columnas en inglés, ej. <code>id_order</code>). No hace falta indicar cuál es, el sistema lo reconoce solo.</p>
+  </div>
+
+  <div class="logic-section">
     <h3>🔴 Alertas de volumen individual</h3>
     <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-amber-border)"></span><span class="logic-rule-text"><strong>Volumen elevado (ámbar):</strong> un servicio con ${config.paxAlertIndividual || 35}+ pax. Puede necesitar más atención en la preparación.</span></div>
     <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-red-border)"></span><span class="logic-rule-text"><strong>Montaje grande (rojo):</strong> un servicio con ${config.paxAlertHigh || 50}+ pax. Se recomienda valorar 2 personas para el montaje.</span></div>
@@ -1094,6 +1283,11 @@ async function renderLogic(container){
   <div class="logic-section">
     <h3>🔴 Solapamiento de sala</h3>
     <p>Dos servicios programados en la <strong>misma sala</strong> con menos de 60 minutos de diferencia entre sus horas de entrega. Esto es un conflicto real — la sala no puede atender dos eventos a la vez.</p>
+  </div>
+
+  <div class="logic-section">
+    <h3>🔴 Aforo de sala superado</h3>
+    <p>Se compara la cantidad de pax de cada pedido contra el aforo oficial de la sala (según el directorio de salas parametrizadas). Si el pedido pide más personas de las que la sala permite físicamente, se marca como conflicto real — no es una estimación, es un límite físico del espacio.</p>
   </div>
 
   <div class="logic-section">
