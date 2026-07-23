@@ -1147,6 +1147,67 @@ async function renderCumulative(container){
     return`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxCancelC*100).toFixed(0)}%;background:var(--alert-red-border)"></div></div><span class="bar-val">${v.count} cancel. (${pctForCustomer}%)</span></div>`;
   }).join('');
 
+  // ── Demanda por día de la semana (histórico completo) ────────────
+  const allActive=allOrders.filter(o=>o.orderStatus!=='CANCELADO');
+  const dayNames=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  const byWeekday=dayNames.map(name=>({label:name,count:0,pax:0}));
+  allActive.forEach(o=>{
+    const d=toDate(o.deliveryAt);
+    if(!d)return;
+    const jsDay=d.getDay(); // 0=domingo
+    const idx=jsDay===0?6:jsDay-1;
+    byWeekday[idx].count++;
+    byWeekday[idx].pax+=o.pax||0;
+  });
+  const totalWeekdayOrders=byWeekday.reduce((s,v)=>s+v.count,0)||1;
+  const maxWeekday=Math.max(...byWeekday.map(v=>v.count),1);
+  const weekdayRows=byWeekday.map(v=>`<div class="bar-row"><span class="bar-label">${v.label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxWeekday*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} (${(v.count/totalWeekdayOrders*100).toFixed(0)}%)</span></div>`).join('');
+  // Indicador de concentración: si el día con más pedidos supera claramente la media, se marca como concentrado
+  const avgWeekday=totalWeekdayOrders/7;
+  const topWeekdayCount=Math.max(...byWeekday.map(v=>v.count));
+  const topWeekdayName=byWeekday.find(v=>v.count===topWeekdayCount)?.label||'';
+  const isConcentrated=topWeekdayCount>avgWeekday*1.4;
+  const weekdayInsight=isConcentrated
+    ? `📌 Los pedidos se concentran especialmente en <strong>${topWeekdayName}</strong> (${topWeekdayCount} de ${totalWeekdayOrders} pedidos totales)`
+    : `📊 La demanda está bastante repartida entre los días de la semana, sin un día que destaque claramente`;
+
+  // ── Tendencia mensual (histórico completo) ───────────────────────
+  const byMonth={};
+  allActive.forEach(o=>{
+    const d=toDate(o.deliveryAt);
+    if(!d)return;
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(!byMonth[key])byMonth[key]={count:0,pax:0};
+    byMonth[key].count++;
+    byMonth[key].pax+=o.pax||0;
+  });
+  const monthKeys=Object.keys(byMonth).sort();
+  const maxMonthCount=Math.max(...monthKeys.map(k=>byMonth[k].count),1);
+  const monthRows=monthKeys.map(k=>{
+    const [y,m]=k.split('-');
+    const label=new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'short',year:'2-digit'});
+    return`<div class="bar-row"><span class="bar-label">${label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(byMonth[k].count/maxMonthCount*100).toFixed(0)}%"></div></div><span class="bar-val">${byMonth[k].count} ped.</span></div>`;
+  }).join('');
+  // Tendencia: comparar la primera mitad de meses vs la segunda mitad para determinar dirección
+  let trendInsight='';
+  if(monthKeys.length>=2){
+    const firstMonth=byMonth[monthKeys[0]].count;
+    const lastMonth=byMonth[monthKeys[monthKeys.length-1]].count;
+    const mid=Math.floor(monthKeys.length/2);
+    const firstHalfAvg=monthKeys.slice(0,mid||1).reduce((s,k)=>s+byMonth[k].count,0)/(mid||1);
+    const secondHalfAvg=monthKeys.slice(mid).reduce((s,k)=>s+byMonth[k].count,0)/(monthKeys.length-mid);
+    const changePct=firstHalfAvg?((secondHalfAvg-firstHalfAvg)/firstHalfAvg*100):0;
+    const firstLabel=new Date(+monthKeys[0].split('-')[0],+monthKeys[0].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long'});
+    const lastLabel=new Date(+monthKeys[monthKeys.length-1].split('-')[0],+monthKeys[monthKeys.length-1].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long'});
+    if(changePct>10){
+      trendInsight=`📈 Tendencia <strong>creciente</strong> · de ${firstLabel} a ${lastLabel} el volumen ha subido un ${changePct.toFixed(0)}% de media`;
+    } else if(changePct<-10){
+      trendInsight=`📉 Tendencia <strong>decreciente</strong> · de ${firstLabel} a ${lastLabel} el volumen ha bajado un ${Math.abs(changePct).toFixed(0)}% de media`;
+    } else {
+      trendInsight=`➡️ Volumen <strong>estable</strong> · sin cambios significativos entre ${firstLabel} y ${lastLabel}`;
+    }
+  }
+
   container.innerHTML=controlsHtml+`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${compareCount}</div></div>
     <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div><div class="kpi-sub">${comparePax}</div></div>
@@ -1161,6 +1222,19 @@ async function renderCumulative(container){
   </div>
   <div class="stats-grid">
     <div class="stat-card"><h3>Quién cancela más (top 10)</h3><div class="bar-chart">${cancelCustomerRows||'<div style="font-size:12px;color:var(--text-tertiary)">Sin cancelaciones en este período</div>'}</div></div>
+  </div>
+  <p class="section-label">Patrones a lo largo del tiempo (histórico completo)</p>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <h3>Demanda por día de la semana</h3>
+      <div class="bar-chart">${weekdayRows}</div>
+      <p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${weekdayInsight}</p>
+    </div>
+    <div class="stat-card">
+      <h3>Tendencia mensual</h3>
+      <div class="bar-chart">${monthRows||'<div style="font-size:12px;color:var(--text-tertiary)">Aún no hay suficientes meses de datos</div>'}</div>
+      ${trendInsight?`<p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${trendInsight}</p>`:''}
+    </div>
   </div>
   <div class="stats-grid">
     <div class="stat-card"><h3>Demanda por tipo de servicio (nº de pedidos)</h3><div class="bar-chart">${typeRows}</div></div>
