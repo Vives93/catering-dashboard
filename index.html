@@ -366,6 +366,10 @@ async function getConfig() {
 // ── HELPERS ───────────────────────────────────────────────────────
 function toDate(ts){if(!ts)return null;if(ts instanceof Date)return ts;if(ts.seconds)return new Date(ts.seconds*1000);return new Date(ts);}
 function localISODate(d){const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0');const day=String(d.getDate()).padStart(2,'0');return`${y}-${m}-${day}`;}
+function escapeHtml(str){
+  if(str==null)return'';
+  return String(str).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
 function fmtTime(ts){const d=toDate(ts);if(!d)return'--';return d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});}
 function fmtDateShort(ts){const d=toDate(ts);if(!d)return'--';return d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});}
 function fmtMoney(n){return n?n.toLocaleString('es-ES',{minimumFractionDigits:0,maximumFractionDigits:0})+'€':'—';}
@@ -635,7 +639,7 @@ function renderAlerts(alerts){
   if(!alerts.length)return'';
   const cls=a=>a.type==='new'?'new':a.type==='red'?'red':a.type==='purple'?'purple':'amber';
   const icon=a=>a.type==='new'?ICON_OK:a.type==='red'?ICON_WARN:ICON_INFO;
-  return`<div class="alerts">${alerts.map(a=>`<div class="alert alert-${cls(a)}">${icon(a)}<span>${a.msg}</span></div>`).join('')}</div>`;
+  return`<div class="alerts">${alerts.map(a=>`<div class="alert alert-${cls(a)}">${icon(a)}<span>${escapeHtml(a.msg)}</span></div>`).join('')}</div>`;
 }
 
 function renderKPIs(orders,config){
@@ -674,7 +678,7 @@ function renderTimeline(orders){
     const leftPct=(minutesFromStart/totalMinutes*100);
     const widthPct=Math.max(10,Math.min(28,(45/totalMinutes*100)));
     const cls=[typeClass(o),overlapIds.has(o.orderId)?'overlap':''].filter(Boolean).join(' ');
-    const label=`${o.customerName} · ${o.cateringType||'Otros'} · ${o.room||o.buildingRoom} · ${o.pax} pax`;
+    const label=escapeHtml(`${o.customerName} · ${o.cateringType||'Otros'} · ${o.room||o.buildingRoom} · ${o.pax} pax`);
     return`<div class="tl-row"><span class="tl-time">${fmtTime(o.deliveryAt)}</span><div class="tl-track"><div class="tl-bar ${cls}" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(1)}%" title="${label}">${label}</div></div></div>`;
   }).join('');
   let axisTicks='';
@@ -699,19 +703,19 @@ function renderOrderCard(o,showNew=true){
     else if(o.pax>=35)paxPill=`<span class="pill pill-pax-amber">${o.pax} pax</span>`;
   }
   const newBadge=(isPendingReview&&showNew)?`<span class="pill pill-new">Nuevo</span>`:'';
-  const reviewBtn=(isPendingReview&&showNew)?`<button onclick="markReviewed('${o.orderId}')" class="pill" style="background:var(--bg-hover);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer" title="Marcar como revisado">✓ Revisar</button>`:'';
-  const loc=[o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'—';
-  const teardown=o.teardownTime?` – ${o.teardownTime}`:'';
-  const pickupInfo=o.pickupTime?`<span class="meta-item">📦 Recogida: ${o.pickupTime}</span>`:'';
+  const reviewBtn=(isPendingReview&&showNew)?`<button onclick="markReviewed('${escapeHtml(o.orderId)}')" class="pill" style="background:var(--bg-hover);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer" title="Marcar como revisado">✓ Revisar</button>`:'';
+  const loc=escapeHtml([o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'—');
+  const teardown=o.teardownTime?` – ${escapeHtml(o.teardownTime)}`:'';
+  const pickupInfo=o.pickupTime?`<span class="meta-item">📦 Recogida: ${escapeHtml(o.pickupTime)}</span>`:'';
   const prices=[];
   if(o.priceFood)prices.push(`Alim. ${fmtMoney(o.priceFood)}`);
   if(o.priceDrinks)prices.push(`Beb. ${fmtMoney(o.priceDrinks)}`);
   if(o.priceTransport)prices.push(`Transp. ${fmtMoney(o.priceTransport)}`);
   if(o.priceStaff)prices.push(`Cam. ${fmtMoney(o.priceStaff)}`);
-  const priceDetail=prices.length?`<span class="meta-item" title="${prices.join(' | ')}">${fmtMoney(o.priceTotal)}</span>`:'';
+  const priceDetail=prices.length?`<span class="meta-item" title="${escapeHtml(prices.join(' | '))}">${fmtMoney(o.priceTotal)}</span>`:'';
   return`<div class="${classes.join(' ')}">
     <div class="order-top">
-      <div class="order-who"><span class="order-name">${o.customerName||'—'}</span><span class="order-loc">Nº ${o.orderId} · ${loc}</span></div>
+      <div class="order-who"><span class="order-name">${escapeHtml(o.customerName)||'—'}</span><span class="order-loc">Nº ${escapeHtml(o.orderId)} · ${loc}</span></div>
       <div class="order-pills">${newBadge}${reviewBtn}${typePill(o)}${paxPill}${statusPill(o)}${o.isLate?`<span class="pill pill-pax-red">⚑ ${o.lateMinutes?o.lateMinutes+' min':'Tarde'}</span>`:''}</div>
     </div>
     <div class="order-meta">
@@ -719,15 +723,15 @@ function renderOrderCard(o,showNew=true){
       ${o.pax&&!paxPill?`<span class="meta-item">👥 ${o.pax} pax</span>`:''}
       ${pickupInfo}
       ${priceDetail}
-      ${o.company?`<span class="meta-item" style="color:var(--text-tertiary)">${o.company}</span>`:''}
-      ${o.purchaseOrder?`<span class="meta-item" style="color:var(--text-tertiary)">OC: ${o.purchaseOrder}</span>`:''}
+      ${o.company?`<span class="meta-item" style="color:var(--text-tertiary)">${escapeHtml(o.company)}</span>`:''}
+      ${o.purchaseOrder?`<span class="meta-item" style="color:var(--text-tertiary)">OC: ${escapeHtml(o.purchaseOrder)}</span>`:''}
       ${o.hasDeliveryPhoto?`<span class="photo-dot"><span class="dot dot-yes"></span> foto entrega</span>`:''}
       ${o.hasPickupPhoto?`<span class="photo-dot"><span class="dot dot-yes"></span> foto recogida</span>`:''}
     </div>
-    ${o.userComment?`<div class="comment-box">💬 ${o.userComment}</div>`:''}
-    ${o.internalComment?`<div class="comment-internal">📋 ${o.internalComment}</div>`:''}
-    ${o.internalAnnotation?`<div class="comment-internal">📌 ${o.internalAnnotation}</div>`:''}
-    ${o.itemsMenu?`<div class="comment-internal" style="font-style:normal">🍽️ ${o.itemsMenu}</div>`:''}
+    ${o.userComment?`<div class="comment-box">💬 ${escapeHtml(o.userComment)}</div>`:''}
+    ${o.internalComment?`<div class="comment-internal">📋 ${escapeHtml(o.internalComment)}</div>`:''}
+    ${o.internalAnnotation?`<div class="comment-internal">📌 ${escapeHtml(o.internalAnnotation)}</div>`:''}
+    ${o.itemsMenu?`<div class="comment-internal" style="font-style:normal">🍽️ ${escapeHtml(o.itemsMenu)}</div>`:''}
   </div>`;
 }
 
@@ -778,15 +782,15 @@ async function renderWeek(container,now=new Date()){
   if(withComment.length>0){
     html+=`<p class="section-label">Comentarios de la semana</p><div class="orders" style="margin-bottom:16px">`;
     withComment.forEach(o=>{
-      const loc=[o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'';
+      const loc=escapeHtml([o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'');
       html+=`<div class="order-card has-comment">
         <div class="order-top">
-          <div class="order-who"><span class="order-name">${o.customerName}</span><span class="order-loc">${loc} · ${fmtTime(o.deliveryAt)}</span></div>
+          <div class="order-who"><span class="order-name">${escapeHtml(o.customerName)}</span><span class="order-loc">${loc} · ${fmtTime(o.deliveryAt)}</span></div>
           <div class="order-pills">${typePill(o)}</div>
         </div>
-        ${o.userComment?`<div class="comment-box">💬 ${o.userComment}</div>`:''}
-        ${o.internalComment?`<div class="comment-internal">📋 ${o.internalComment}</div>`:''}
-        ${o.billingNotes?`<div class="comment-internal">🧾 ${o.billingNotes}</div>`:''}
+        ${o.userComment?`<div class="comment-box">💬 ${escapeHtml(o.userComment)}</div>`:''}
+        ${o.internalComment?`<div class="comment-internal">📋 ${escapeHtml(o.internalComment)}</div>`:''}
+        ${o.billingNotes?`<div class="comment-internal">🧾 ${escapeHtml(o.billingNotes)}</div>`:''}
       </div>`;
     });
     html+='</div>';
@@ -1040,10 +1044,10 @@ async function renderCumulative(container){
 
   const typeRows=Object.entries(byType).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([t,v])=>{
     const displayLabel=t==='Otros'?'Otros (sin tipo especificado en el CSV)':t;
-    return`<div class="bar-row"><span class="bar-label" title="${displayLabel}">${displayLabel}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val" title="${v.pax} pax en total">${v.count} ped.</span></div>`;
+    return`<div class="bar-row"><span class="bar-label" title="${escapeHtml(displayLabel)}">${escapeHtml(displayLabel)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val" title="${v.pax} pax en total">${v.count} ped.</span></div>`;
   }).join('');
-  const custRows=Object.entries(byCustomer).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCustP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
-  const roomRows=Object.entries(byRoomStat).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([r,v])=>`<div class="bar-row"><span class="bar-label" title="${r}">${r}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxRoomC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
+  const custRows=Object.entries(byCustomer).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${escapeHtml(c)}">${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCustP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
+  const roomRows=Object.entries(byRoomStat).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([r,v])=>`<div class="bar-row"><span class="bar-label" title="${escapeHtml(r)}">${escapeHtml(r)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxRoomC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
   const totalHourOrders=byHour.reduce((s,v)=>s+v.count,0)+noHourCount;
   const maxCombined=Math.max(maxHourC,maxHourPickupC,1);
   const showPickupBars=pickupWithHour>0;
@@ -1079,7 +1083,7 @@ async function renderCumulative(container){
   const cancelCustomerRows=Object.entries(byCancelCustomer).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([c,v])=>{
     const totalForCustomer=totalByCustomer[c]||v.count;
     const pctForCustomer=(v.count/totalForCustomer*100).toFixed(0);
-    return`<div class="bar-row"><span class="bar-label" title="${c}">${c}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxCancelC*100).toFixed(0)}%;background:var(--alert-red-border)"></div></div><span class="bar-val">${v.count} cancel. (${pctForCustomer}%)</span></div>`;
+    return`<div class="bar-row"><span class="bar-label" title="${escapeHtml(c)}">${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxCancelC*100).toFixed(0)}%;background:var(--alert-red-border)"></div></div><span class="bar-val">${v.count} cancel. (${pctForCustomer}%)</span></div>`;
   }).join('');
 
   // ── Demanda por día de la semana (histórico completo) ────────────
@@ -1571,7 +1575,7 @@ async function handleFile(file){
     const updatedOrders=orders.filter(o=>existingIds.has(o.orderId));
     pendingImport={orders,newOrders,updatedOrders};
     importSummary.innerHTML=`<strong>${orders.length}</strong> pedidos en el archivo<br><span style="color:var(--ok-fg)">✓ ${newOrders.length} nuevos</span> &nbsp;·&nbsp; <span style="color:var(--text-secondary)">${updatedOrders.length} ya existentes (se actualizarán)</span>`;
-    importNewList.innerHTML=newOrders.length>0?newOrders.map(o=>`<div class="import-new-item"><span>${o.customerName} · ${o.buildingRoom}</span><span>${o.deliveryAtISO?new Date(o.deliveryAtISO).toLocaleDateString('es-ES'):'—'}</span></div>`).join(''):'<div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">No hay pedidos nuevos — solo actualizaciones</div>';
+    importNewList.innerHTML=newOrders.length>0?newOrders.map(o=>`<div class="import-new-item"><span>${escapeHtml(o.customerName)} · ${escapeHtml(o.buildingRoom)}</span><span>${o.deliveryAtISO?new Date(o.deliveryAtISO).toLocaleDateString('es-ES'):'—'}</span></div>`).join(''):'<div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">No hay pedidos nuevos — solo actualizaciones</div>';
     importPreview.hidden=false;
   }catch(e){alert('Error al procesar el archivo: '+e.message);}
 }
