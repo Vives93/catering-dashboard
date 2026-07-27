@@ -404,7 +404,9 @@ function splitLine(line,sep){
   result.push(current);return result;
 }
 // ── DIRECTORIO OFICIAL DE SALAS (con aforo) ───────────────────────
-const ROOM_DIRECTORY=[
+// Datos de siembra (seed) — se migran a Firestore automáticamente en el primer arranque
+// y dejan de usarse desde el código público una vez migrados.
+let ROOM_DIRECTORY=[
   {building:'1',floor:'1',room:'War Room Zona EUR CONFECTIONERY - Lado MONT',capacity:10},
   {building:'1',floor:'1',room:'War Room GLOBAL SALES & CUSTOMERS - Lado MAR',capacity:10},
   {building:'1',floor:'1',room:'War Room NHSC INTERNATIONAL - Lado MAR',capacity:10},
@@ -510,8 +512,13 @@ const ROOM_DIRECTORY=[
   {building:'3',floor:'1',room:'Comedor Privado',capacity:null},
 ];
 function normRoom(s){return(s||'').toLowerCase().trim().replace(/^sala\s+/,'').replace(/\s+/g,' ');}
-const ROOM_CAPACITY_MAP={};
-ROOM_DIRECTORY.forEach(r=>{const key=normRoom(r.room);if(!(key in ROOM_CAPACITY_MAP))ROOM_CAPACITY_MAP[key]=r;});
+let EXCLUDED_CUSTOMER_KEYWORDS=['sol catering','cristianu ronaldo','testing nestle','testing nestlé'];
+let ROOM_CAPACITY_MAP={};
+function rebuildRoomCapacityMap(){
+  ROOM_CAPACITY_MAP={};
+  ROOM_DIRECTORY.forEach(r=>{const key=normRoom(r.room);if(!(key in ROOM_CAPACITY_MAP))ROOM_CAPACITY_MAP[key]=r;});
+}
+rebuildRoomCapacityMap();
 function getRoomCapacity(roomName){
   const entry=ROOM_CAPACITY_MAP[normRoom(roomName)];
   return entry?entry.capacity:null;
@@ -1079,11 +1086,10 @@ async function renderCumulative(container){
   const byType={};
   active.forEach(o=>{const t=o.cateringType||'Otros';if(!byType[t])byType[t]={count:0,pax:0,price:0};byType[t].count++;byType[t].pax+=o.pax||0;byType[t].price+=o.priceTotal||0;});
   // Top clientes (por persona, no por empresa) — se excluyen cuentas internas / de prueba conocidas
-  const TEST_ACCOUNT_KEYWORDS=['sol catering','cristianu ronaldo','testing nestle','testing nestlé'];
   function isTestAccount(o){
     const name=(o.customerName||'').toLowerCase();
     const comp=(o.company||'').toLowerCase();
-    return TEST_ACCOUNT_KEYWORDS.some(kw=>name.includes(kw)||comp.includes(kw));
+    return EXCLUDED_CUSTOMER_KEYWORDS.some(kw=>name.includes(kw)||comp.includes(kw));
   }
   const byCustomer={};
   active.forEach(o=>{
@@ -1520,7 +1526,29 @@ async function updateLastImportLabel(){
   }catch(e){label.textContent='';}
 }
 
-function startApp(){
+async function ensureConfigSeeded(){
+  try{
+    const roomsSnap=await getDoc(doc(db,'catering_config','room_directory'));
+    if(!roomsSnap.exists()){
+      await setDoc(doc(db,'catering_config','room_directory'),{rooms:ROOM_DIRECTORY});
+    } else if(roomsSnap.data().rooms){
+      ROOM_DIRECTORY=roomsSnap.data().rooms;
+    }
+    rebuildRoomCapacityMap();
+  }catch(e){console.warn('No se pudo sincronizar el directorio de salas:',e.message);}
+
+  try{
+    const exclSnap=await getDoc(doc(db,'catering_config','excluded_customers'));
+    if(!exclSnap.exists()){
+      await setDoc(doc(db,'catering_config','excluded_customers'),{keywords:EXCLUDED_CUSTOMER_KEYWORDS});
+    } else if(exclSnap.data().keywords){
+      EXCLUDED_CUSTOMER_KEYWORDS=exclSnap.data().keywords;
+    }
+  }catch(e){console.warn('No se pudo sincronizar la lista de exclusión:',e.message);}
+}
+
+async function startApp(){
+  await ensureConfigSeeded();
   currentDate.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   updateDateLabel();
   updateLastImportLabel();
