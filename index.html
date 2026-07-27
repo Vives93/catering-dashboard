@@ -339,7 +339,8 @@ const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(()=>{});
 
 async function saveOrder(order) {
-  await setDoc(doc(db,'catering_orders',order.orderId),{...order,updatedAt:Timestamp.now()},{merge:true});
+  const safeId=String(order.orderId).replace(/[\/\s]+/g,'_').slice(0,300);
+  await setDoc(doc(db,'catering_orders',safeId),{...order,orderId:safeId,updatedAt:Timestamp.now()},{merge:true});
 }
 async function getOrders({from,to}={}) {
   const col = collection(db,'catering_orders');
@@ -381,7 +382,7 @@ function startOfMonth(d){return new Date(d.getFullYear(),d.getMonth(),1);}
 function endOfMonth(d){return new Date(d.getFullYear(),d.getMonth()+1,0,23,59,59,999);}
 
 function typeClass(o){const c=o.cateringCategory||'other';return c;}
-function typePill(o){const cls=typeClass(o);return`<span class="pill pill-${cls}">${o.cateringType||'Otros'}</span>`;}
+function typePill(o){const cls=typeClass(o);return`<span class="pill pill-${cls}">${escapeHtml(o.cateringType)||'Otros'}</span>`;}
 function statusPill(o){const s=o.orderStatus||'';if(s==='CANCELADO')return`<span class="pill pill-cancel">Cancelado</span>`;if(s==='ENTREGADO'||s==='CONFIRMADO')return`<span class="pill pill-ok">${s==='ENTREGADO'?'Entregado':'Confirmado'}</span>`;return`<span class="pill pill-pending">Pendiente</span>`;}
 
 // ── IMPORTER ──────────────────────────────────────────────────────
@@ -703,7 +704,7 @@ function renderOrderCard(o,showNew=true){
     else if(o.pax>=35)paxPill=`<span class="pill pill-pax-amber">${o.pax} pax</span>`;
   }
   const newBadge=(isPendingReview&&showNew)?`<span class="pill pill-new">Nuevo</span>`:'';
-  const reviewBtn=(isPendingReview&&showNew)?`<button onclick="markReviewed('${escapeHtml(o.orderId)}')" class="pill" style="background:var(--bg-hover);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer" title="Marcar como revisado">✓ Revisar</button>`:'';
+  const reviewBtn=(isPendingReview&&showNew)?`<button class="pill btn-review" data-order-id="${escapeHtml(o.orderId)}" style="background:var(--bg-hover);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer" title="Marcar como revisado">✓ Revisar</button>`:'';
   const loc=escapeHtml([o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'—');
   const teardown=o.teardownTime?` – ${escapeHtml(o.teardownTime)}`:'';
   const pickupInfo=o.pickupTime?`<span class="meta-item">📦 Recogida: ${escapeHtml(o.pickupTime)}</span>`:'';
@@ -1407,12 +1408,21 @@ const currentDate=document.getElementById('currentDate');
 const mainTabs=document.getElementById('mainTabs');
 let currentView='today';
 
-window.markReviewed=async function(orderId){
+async function markReviewed(orderId){
   try{
     await setDoc(doc(db,'catering_orders',orderId),{reviewed:true},{merge:true});
     renderView(currentView,mainContent,selectedDate);
   }catch(e){alert('Error al marcar como revisado: '+e.message);}
-};
+}
+
+// Delegación de eventos: evita usar onclick con datos incrustados en el HTML
+mainContent.addEventListener('click', e=>{
+  const btn=e.target.closest('.btn-review');
+  if(btn){
+    const orderId=btn.dataset.orderId;
+    if(orderId)markReviewed(orderId);
+  }
+});
 
 async function updateLastImportLabel(){
   const label=document.getElementById('lastImportLabel');
