@@ -84,4 +84,4 @@ Para pedidos ad-hoc que no pasan por el sistema:
 - 🟡 **Ámbar**: 30-50 pax en un servicio
 - 🟢 **Verde**: pedidos nuevos en la última importación
 
-Los umbrales son configurables en `js/firebase.js` → `defaultConfig()`.
+Los umbrales son configurables en `js/firebase.js` → `defaultConfig()`. K
