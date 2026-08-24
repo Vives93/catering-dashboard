@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
 :root{
   --bg:#F7F6F3;--bg-card:#FFFFFF;--bg-hover:#F0EFEb;--border:#E4E2DC;--border-soft:#EDEBE6;
@@ -266,8 +267,8 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
       <div class="drop-zone" id="dropZone">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <p>Arrastra el CSV aquí o <label class="file-link" for="fileInput">selecciona el archivo</label></p>
-        <p class="drop-hint">Exportación directa del sistema de catering</p>
-        <input type="file" id="fileInput" accept=".csv" hidden />
+        <p class="drop-hint">CSV del sistema de catering o Excel de presupuestos (Holded)</p>
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" hidden />
       </div>
       <div class="import-preview" id="importPreview" hidden>
         <div class="import-summary" id="importSummary"></div>
@@ -549,7 +550,7 @@ function normalizeStatus(raw){
   const r=raw.toLowerCase();
   if(r.includes('cancel'))return'CANCELADO';
   if(r.includes('entregado')||r.includes('completado'))return'ENTREGADO';
-  if(r.includes('empresa')||r.includes('pago'))return'CONFIRMADO';
+  if(r.includes('empresa')||r.includes('pago')||r.includes('aceptado'))return'CONFIRMADO';
   if(r.includes('pendiente'))return'PENDIENTE';
   return raw||'PENDIENTE';
 }
@@ -558,6 +559,65 @@ function categorizeCatering(type){
   if(t.includes('desayuno')||t.includes('coffee')||t.includes('break'))return'coffee';
   if(t.includes('comida')||t.includes('lunch')||t.includes('finger')||t.includes('carta'))return'lunch';
   return'other';
+}
+
+// ── FORMATO HOLDED (presupuestos/facturación) ─────────────────────
+function parseXLSXHolded(arrayBuffer){
+  const wb=XLSX.read(arrayBuffer,{type:'array',cellDates:true});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+  // Buscar la fila de cabeceras real (puede haber filas de título antes)
+  let headerRowIdx=-1;
+  for(let i=0;i<rows.length;i++){
+    const cells=rows[i].map(c=>String(c||'').toLowerCase().trim());
+    if(cells.includes('num')&&cells.includes('cliente')&&cells.includes('fecha')){headerRowIdx=i;break;}
+  }
+  if(headerRowIdx===-1)throw new Error('No se encontró la fila de cabeceras en el Excel (se esperaba Fecha/Num/Cliente)');
+  const headers=rows[headerRowIdx].map(h=>String(h||'').toLowerCase().trim());
+  const orders=[];
+  for(let i=headerRowIdx+1;i<rows.length;i++){
+    const cells=rows[i];
+    if(!cells||cells.every(c=>c===''||c==null))continue;
+    const raw={};
+    headers.forEach((h,idx)=>{raw[h]=cells[idx]??'';});
+    const order=mapRowHolded(raw);
+    if(order)orders.push(order);
+  }
+  return orders;
+}
+
+function mapRowHolded(raw){
+  const num=String(raw['num']||'').trim();
+  if(!num)return null;
+  const fechaVal=raw['fecha'];
+  const deliveryAt=(fechaVal instanceof Date)?fechaVal:parseDate(String(fechaVal||''));
+  const descripcion=String(raw['descripción']||raw['descripcion']||'').trim();
+  const paxMatch=descripcion.match(/(\d+)\s*pax/i);
+  const pax=paxMatch?parseInt(paxMatch[1],10):0;
+  const clienteRaw=String(raw['cliente']||'').trim();
+  const cliente=clienteRaw.replace(/\(\(cliente\)\)/i,'').trim();
+  const subtotal=parseFloat(raw['subtotal']||0)||0;
+  const orderStatus=normalizeStatus(String(raw['estado']||''));
+  return{
+    orderId:'HOLDED-'+num,customerId:'',center:'',
+    buildingRoom:descripcion,building:'',floor:'',room:'',
+    customerName:cliente,company:cliente,
+    email:'',phone:'',
+    deliveryAt:deliveryAt?Timestamp.fromDate(deliveryAt):null,
+    deliveryAtISO:deliveryAt?deliveryAt.toISOString():null,
+    setupTime:'',startTime:'',teardownTime:'',pickupTime:'',
+    pax,
+    cateringType:descripcion||'Presupuesto',
+    cateringCategory:categorizeCatering(descripcion),
+    orderStatus,statusCode:'',
+    userComment:'',internalComment:'',billingNotes:'',
+    itemsMenu:'',internalAnnotation:'',address:'',purchaseOrder:num,
+    hasDeliveryPhoto:false,hasPickupPhoto:false,isLate:false,lateMinutes:0,
+    costCenter:'',department:'',
+    priceFood:0,priceDrinks:0,priceTransport:0,priceStaff:0,priceTotal:subtotal,
+    isManual:false,source:'holded',
+    createdAt:null,
+  };
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────
@@ -1578,8 +1638,16 @@ fileInput.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target
 
 async function handleFile(file){
   try{
-    const text=await file.text();
-    const orders=parseCSV(text);
+    const isXlsx=/\.xlsx?$/i.test(file.name);
+    let orders;
+    if(isXlsx){
+      const buffer=await file.arrayBuffer();
+      orders=parseXLSXHolded(buffer);
+    } else {
+      const text=await file.text();
+      orders=parseCSV(text);
+    }
+    if(!orders.length)throw new Error('No se encontraron registros válidos en el archivo');
     const existingIds=await getExistingOrderIds();
     const newOrders=orders.filter(o=>!existingIds.has(o.orderId));
     const updatedOrders=orders.filter(o=>existingIds.has(o.orderId));
