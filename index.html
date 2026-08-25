@@ -1202,14 +1202,14 @@ async function renderCumulative(container){
     const firstHalfPriceAvg=monthKeys.slice(0,mid2||1).reduce((s,k)=>s+byMonth[k].price,0)/(mid2||1);
     const secondHalfPriceAvg=monthKeys.slice(mid2).reduce((s,k)=>s+byMonth[k].price,0)/(monthKeys.length-mid2);
     const billingChangePct=firstHalfPriceAvg?((secondHalfPriceAvg-firstHalfPriceAvg)/firstHalfPriceAvg*100):0;
-    const firstLabel2=new Date(+monthKeys[0].split('-')[0],+monthKeys[0].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long'});
-    const lastLabel2=new Date(+monthKeys[monthKeys.length-1].split('-')[0],+monthKeys[monthKeys.length-1].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long'});
+    const firstLabel2=new Date(+monthKeys[0].split('-')[0],+monthKeys[0].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+    const lastLabel2=new Date(+monthKeys[monthKeys.length-1].split('-')[0],+monthKeys[monthKeys.length-1].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
     if(billingChangePct>10){
-      billingTrendInsight=`📈 Facturación <strong>creciente</strong> · de ${firstLabel2} a ${lastLabel2} ha subido un ${billingChangePct.toFixed(0)}% de media`;
+      billingTrendInsight=`📈 Facturación <strong>creciente</strong> · comparando la primera mitad del período (desde ${firstLabel2}) con la segunda mitad (hasta ${lastLabel2}), la media mensual ha subido un ${billingChangePct.toFixed(0)}%`;
     } else if(billingChangePct<-10){
-      billingTrendInsight=`📉 Facturación <strong>decreciente</strong> · de ${firstLabel2} a ${lastLabel2} ha bajado un ${Math.abs(billingChangePct).toFixed(0)}% de media`;
+      billingTrendInsight=`📉 Facturación <strong>decreciente</strong> · comparando la primera mitad del período (desde ${firstLabel2}) con la segunda mitad (hasta ${lastLabel2}), la media mensual ha bajado un ${Math.abs(billingChangePct).toFixed(0)}%`;
     } else {
-      billingTrendInsight=`➡️ Facturación <strong>estable</strong> · sin cambios significativos entre ${firstLabel2} y ${lastLabel2}`;
+      billingTrendInsight=`➡️ Facturación <strong>estable</strong> · sin cambios significativos entre la primera mitad del período (${firstLabel2}) y la segunda (${lastLabel2})`;
     }
   }
   // Tendencia: comparar la primera mitad de meses vs la segunda mitad para determinar dirección
@@ -1221,14 +1221,14 @@ async function renderCumulative(container){
     const firstHalfAvg=monthKeys.slice(0,mid||1).reduce((s,k)=>s+byMonth[k].count,0)/(mid||1);
     const secondHalfAvg=monthKeys.slice(mid).reduce((s,k)=>s+byMonth[k].count,0)/(monthKeys.length-mid);
     const changePct=firstHalfAvg?((secondHalfAvg-firstHalfAvg)/firstHalfAvg*100):0;
-    const firstLabel=new Date(+monthKeys[0].split('-')[0],+monthKeys[0].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long'});
-    const lastLabel=new Date(+monthKeys[monthKeys.length-1].split('-')[0],+monthKeys[monthKeys.length-1].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long'});
+    const firstLabel=new Date(+monthKeys[0].split('-')[0],+monthKeys[0].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+    const lastLabel=new Date(+monthKeys[monthKeys.length-1].split('-')[0],+monthKeys[monthKeys.length-1].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
     if(changePct>10){
-      trendInsight=`📈 Tendencia <strong>creciente</strong> · de ${firstLabel} a ${lastLabel} el volumen ha subido un ${changePct.toFixed(0)}% de media`;
+      trendInsight=`📈 Tendencia <strong>creciente</strong> · comparando la primera mitad del período (desde ${firstLabel}) con la segunda mitad (hasta ${lastLabel}), la media mensual de pedidos ha subido un ${changePct.toFixed(0)}%`;
     } else if(changePct<-10){
-      trendInsight=`📉 Tendencia <strong>decreciente</strong> · de ${firstLabel} a ${lastLabel} el volumen ha bajado un ${Math.abs(changePct).toFixed(0)}% de media`;
+      trendInsight=`📉 Tendencia <strong>decreciente</strong> · comparando la primera mitad del período (desde ${firstLabel}) con la segunda mitad (hasta ${lastLabel}), la media mensual de pedidos ha bajado un ${Math.abs(changePct).toFixed(0)}%`;
     } else {
-      trendInsight=`➡️ Volumen <strong>estable</strong> · sin cambios significativos entre ${firstLabel} y ${lastLabel}`;
+      trendInsight=`➡️ Volumen <strong>estable</strong> · sin cambios significativos entre la primera mitad del período (${firstLabel}) y la segunda (${lastLabel})`;
     }
   }
 
@@ -1246,14 +1246,14 @@ async function renderCumulative(container){
   </div>
   <div class="stats-grid">
     <div class="stat-card"><h3>Quién cancela más (top 10)</h3><div class="bar-chart">${cancelCustomerRows||'<div style="font-size:12px;color:var(--text-tertiary)">Sin cancelaciones en este período</div>'}</div></div>
-  </div>
-  <p class="section-label">Patrones a lo largo del tiempo (histórico completo)</p>
-  <div class="stats-grid">
     <div class="stat-card">
       <h3>Demanda por día de la semana</h3>
       <div class="bar-chart">${weekdayRows}</div>
       <p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${weekdayInsight}</p>
     </div>
+  </div>
+  <p class="section-label">Patrones a lo largo del tiempo (histórico completo)</p>
+  <div class="stats-grid">
     <div class="stat-card">
       <h3>Tendencia mensual (nº de pedidos)</h3>
       <div class="bar-chart">${monthRows||'<div style="font-size:12px;color:var(--text-tertiary)">Aún no hay suficientes meses de datos</div>'}</div>
