@@ -1177,17 +1177,41 @@ async function renderCumulative(container){
     const d=toDate(o.deliveryAt);
     if(!d)return;
     const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if(!byMonth[key])byMonth[key]={count:0,pax:0};
+    if(!byMonth[key])byMonth[key]={count:0,pax:0,price:0};
     byMonth[key].count++;
     byMonth[key].pax+=o.pax||0;
+    byMonth[key].price+=o.priceTotal||0;
   });
   const monthKeys=Object.keys(byMonth).sort();
   const maxMonthCount=Math.max(...monthKeys.map(k=>byMonth[k].count),1);
+  const maxMonthPrice=Math.max(...monthKeys.map(k=>byMonth[k].price),1);
   const monthRows=monthKeys.map(k=>{
     const [y,m]=k.split('-');
     const label=new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'short',year:'2-digit'});
     return`<div class="bar-row"><span class="bar-label">${label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(byMonth[k].count/maxMonthCount*100).toFixed(0)}%"></div></div><span class="bar-val">${byMonth[k].count} ped.</span></div>`;
   }).join('');
+  const monthBillingRows=monthKeys.map(k=>{
+    const [y,m]=k.split('-');
+    const label=new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'short',year:'2-digit'});
+    return`<div class="bar-row"><span class="bar-label">${label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(byMonth[k].price/maxMonthPrice*100).toFixed(0)}%;background:#1A5C38"></div></div><span class="bar-val">${fmtMoney(byMonth[k].price)}</span></div>`;
+  }).join('');
+  // Tendencia de facturación: misma lógica que la de pedidos, pero con importes
+  let billingTrendInsight='';
+  if(monthKeys.length>=2){
+    const mid2=Math.floor(monthKeys.length/2);
+    const firstHalfPriceAvg=monthKeys.slice(0,mid2||1).reduce((s,k)=>s+byMonth[k].price,0)/(mid2||1);
+    const secondHalfPriceAvg=monthKeys.slice(mid2).reduce((s,k)=>s+byMonth[k].price,0)/(monthKeys.length-mid2);
+    const billingChangePct=firstHalfPriceAvg?((secondHalfPriceAvg-firstHalfPriceAvg)/firstHalfPriceAvg*100):0;
+    const firstLabel2=new Date(+monthKeys[0].split('-')[0],+monthKeys[0].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long'});
+    const lastLabel2=new Date(+monthKeys[monthKeys.length-1].split('-')[0],+monthKeys[monthKeys.length-1].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long'});
+    if(billingChangePct>10){
+      billingTrendInsight=`📈 Facturación <strong>creciente</strong> · de ${firstLabel2} a ${lastLabel2} ha subido un ${billingChangePct.toFixed(0)}% de media`;
+    } else if(billingChangePct<-10){
+      billingTrendInsight=`📉 Facturación <strong>decreciente</strong> · de ${firstLabel2} a ${lastLabel2} ha bajado un ${Math.abs(billingChangePct).toFixed(0)}% de media`;
+    } else {
+      billingTrendInsight=`➡️ Facturación <strong>estable</strong> · sin cambios significativos entre ${firstLabel2} y ${lastLabel2}`;
+    }
+  }
   // Tendencia: comparar la primera mitad de meses vs la segunda mitad para determinar dirección
   let trendInsight='';
   if(monthKeys.length>=2){
@@ -1231,9 +1255,14 @@ async function renderCumulative(container){
       <p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${weekdayInsight}</p>
     </div>
     <div class="stat-card">
-      <h3>Tendencia mensual</h3>
+      <h3>Tendencia mensual (nº de pedidos)</h3>
       <div class="bar-chart">${monthRows||'<div style="font-size:12px;color:var(--text-tertiary)">Aún no hay suficientes meses de datos</div>'}</div>
       ${trendInsight?`<p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${trendInsight}</p>`:''}
+    </div>
+    <div class="stat-card">
+      <h3>Tendencia mensual (facturación)</h3>
+      <div class="bar-chart">${monthBillingRows||'<div style="font-size:12px;color:var(--text-tertiary)">Aún no hay suficientes meses de datos</div>'}</div>
+      ${billingTrendInsight?`<p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${billingTrendInsight}</p>`:''}
     </div>
   </div>
   <div class="stats-grid">
