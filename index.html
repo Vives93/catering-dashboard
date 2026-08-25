@@ -589,7 +589,7 @@ function parseXLSXHolded(arrayBuffer){
 function mapRowHolded(raw){
   const num=String(raw['num']||'').trim();
   if(!num)return null;
-  const fechaVal=raw['fecha'];
+  const fechaVal=raw['vencimiento']||raw['fecha'];
   const deliveryAt=(fechaVal instanceof Date)?fechaVal:parseDate(String(fechaVal||''));
   const descripcion=String(raw['descripción']||raw['descripcion']||'').trim();
   const paxMatch=descripcion.match(/(\d+)\s*pax/i);
