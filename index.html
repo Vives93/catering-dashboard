@@ -938,12 +938,24 @@ async function renderMonth(container,now=new Date()){
 
 let cumulativeRange={type:'all',from:null,to:null,compare:false,refDate:new Date()};
 
+function getQuarterRange(d){
+  const q=Math.floor(d.getMonth()/3);
+  const startMonth=q*3;
+  return{from:new Date(d.getFullYear(),startMonth,1),to:new Date(d.getFullYear(),startMonth+3,0,23,59,59,999)};
+}
+
 function getRangeForType(type,refDate=new Date()){
   const d=new Date(refDate);
   if(type==='day')return{from:startOfDay(d),to:endOfDay(d)};
   if(type==='week')return{from:startOfWeek(d),to:endOfWeek(d)};
   if(type==='month')return{from:startOfMonth(d),to:endOfMonth(d)};
-  if(type==='year')return{from:new Date(d.getFullYear(),0,1),to:new Date(d.getFullYear(),11,31,23,59,59,999)};
+  if(type==='quarter')return getQuarterRange(d);
+  if(type==='year'){
+    const now=new Date();
+    const yearEnd=new Date(d.getFullYear(),11,31,23,59,59,999);
+    const cappedEnd=(d.getFullYear()===now.getFullYear()&&yearEnd>now)?now:yearEnd;
+    return{from:new Date(d.getFullYear(),0,1),to:cappedEnd};
+  }
   return{from:null,to:null};
 }
 
@@ -953,15 +965,31 @@ function getPreviousPeriod(type,from,to){
     const prevMonth=new Date(from);prevMonth.setMonth(prevMonth.getMonth()-1);
     return{from:startOfMonth(prevMonth),to:endOfMonth(prevMonth)};
   }
+  if(type==='quarter'){
+    const prevQ=new Date(from);prevQ.setMonth(prevQ.getMonth()-3);
+    return getQuarterRange(prevQ);
+  }
   if(type==='week'){
     const prevWeek=new Date(from);prevWeek.setDate(prevWeek.getDate()-7);
     return{from:startOfWeek(prevWeek),to:endOfWeek(prevWeek)};
   }
   if(type==='year'){
-    return{from:new Date(from.getFullYear()-1,0,1),to:new Date(from.getFullYear()-1,11,31,23,59,59,999)};
+    const prevYear=from.getFullYear()-1;
+    const equivEnd=new Date(to);equivEnd.setFullYear(prevYear);
+    return{from:new Date(prevYear,0,1),to:equivEnd};
   }
   // day or custom range: shift back by the same duration
   return{from:new Date(from.getTime()-diff-86400000),to:new Date(from.getTime()-86400000)};
+}
+
+function getSamePeriodLastYear(type,from,to){
+  if(type==='year')return getPreviousPeriod(type,from,to);
+  const shiftYear=d=>{const nd=new Date(d);nd.setFullYear(nd.getFullYear()-1);return nd;};
+  if(type==='month'){const s=shiftYear(from);return{from:startOfMonth(s),to:endOfMonth(s)};}
+  if(type==='quarter'){const s=shiftYear(from);return getQuarterRange(s);}
+  if(type==='week'){const s=shiftYear(from);return{from:startOfWeek(s),to:endOfWeek(s)};}
+  // day o rango personalizado: desplazar ambos extremos un año atrás
+  return{from:shiftYear(from),to:shiftYear(to)};
 }
 
 function computeStats(orders){
@@ -1000,7 +1028,12 @@ async function renderCumulative(container){
     if(range.type==='day')periodLabel=range.refDate.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});
     else if(range.type==='week'){const ws=startOfWeek(range.refDate),we=endOfWeek(range.refDate);periodLabel=`${ws.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${we.toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`;}
     else if(range.type==='month')periodLabel=range.refDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
-    else if(range.type==='year')periodLabel=String(range.refDate.getFullYear());
+    else if(range.type==='quarter'){const q=Math.floor(range.refDate.getMonth()/3)+1;periodLabel=`T${q} ${range.refDate.getFullYear()}`;}
+    else if(range.type==='year'){
+      const y=range.refDate.getFullYear();
+      const isCurrentYear=y===new Date().getFullYear();
+      periodLabel=isCurrentYear?`${y} (hasta hoy)`:String(y);
+    }
   }
 
   const controlsHtml=`<div class="cumulative-controls">
@@ -1009,6 +1042,7 @@ async function renderCumulative(container){
       <option value="day" ${range.type==='day'?'selected':''}>Día</option>
       <option value="week" ${range.type==='week'?'selected':''}>Semana</option>
       <option value="month" ${range.type==='month'?'selected':''}>Mes</option>
+      <option value="quarter" ${range.type==='quarter'?'selected':''}>Trimestre</option>
       <option value="year" ${range.type==='year'?'selected':''}>Año</option>
       <option value="custom" ${range.type==='custom'?'selected':''}>Rango personalizado</option>
     </select>
@@ -1022,7 +1056,11 @@ async function renderCumulative(container){
       <span style="color:var(--text-tertiary);font-size:12px">a</span>
       <input type="date" id="rangeTo" value="${range.to?localISODate(range.to):''}">
     </div>
-    <label class="range-compare-toggle"><input type="checkbox" id="compareToggle" ${range.compare?'checked':''}> Comparar con período anterior</label>
+    <label class="range-compare-toggle"><input type="checkbox" id="compareToggle" ${range.compare?'checked':''}> Comparar</label>
+    ${(range.compare&&range.type!=='year'&&range.type!=='all')?`<select class="range-select" id="compareMode" style="font-size:12px">
+      <option value="previous" ${(range.compareMode||'previous')==='previous'?'selected':''}>vs período anterior</option>
+      <option value="sameLastYear" ${range.compareMode==='sameLastYear'?'selected':''}>vs mismo período año anterior</option>
+    </select>`:''}
   </div>`;
 
   if(!active.length){container.innerHTML=controlsHtml+`<div class="empty-state"><p>Sin datos en este rango</p></div>`;bindCumulativeControls(container);return;}
@@ -1035,14 +1073,16 @@ async function renderCumulative(container){
   const totalStaff=active.reduce((s,o)=>s+(o.priceStaff||0),0);
 
   // Comparativa
-  let compareCount='',comparePax='',comparePrice='';
+  let compareCount='',comparePax='',comparePrice='',compareRangeLabel='';
   if(range.compare&&from&&to){
-    const prev=getPreviousPeriod(range.type,from,to);
+    const prev=range.compareMode==='sameLastYear'?getSamePeriodLastYear(range.type,from,to):getPreviousPeriod(range.type,from,to);
     const prevOrders=allOrders.filter(o=>{const d=toDate(o.deliveryAt);return d&&d>=prev.from&&d<=prev.to;});
     const prevStats=computeStats(prevOrders);
     compareCount=compareBadge(active.length,prevStats.count);
     comparePax=compareBadge(totalPax,prevStats.pax);
     comparePrice=compareBadge(totalPrice,prevStats.price);
+    const fmtShort=d=>d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+    compareRangeLabel=`vs ${fmtShort(prev.from)} – ${fmtShort(prev.to)}`;
   }
 
   const byType={};
@@ -1107,7 +1147,7 @@ async function renderCumulative(container){
     const displayLabel=t==='Otros'?'Otros (sin tipo especificado en el CSV)':t;
     return`<div class="bar-row"><span class="bar-label" title="${escapeHtml(displayLabel)}">${escapeHtml(displayLabel)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val" title="${v.pax} pax en total">${v.count} ped.</span></div>`;
   }).join('');
-  const custRows=Object.entries(byCustomer).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${escapeHtml(c)}">${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCustP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
+  const custRows=Object.entries(byCustomer).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${escapeHtml(c)}">${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCustP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped. · ${fmtMoney(v.price)}</span></div>`).join('');
   const roomRows=Object.entries(byRoomStat).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([r,v])=>`<div class="bar-row"><span class="bar-label" title="${escapeHtml(r)}">${escapeHtml(r)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxRoomC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
   const totalHourOrders=byHour.reduce((s,v)=>s+v.count,0)+noHourCount;
   const maxCombined=Math.max(maxHourC,maxHourPickupC,1);
@@ -1147,8 +1187,8 @@ async function renderCumulative(container){
     return`<div class="bar-row"><span class="bar-label" title="${escapeHtml(c)}">${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxCancelC*100).toFixed(0)}%;background:var(--alert-red-border)"></div></div><span class="bar-val">${v.count} cancel. (${pctForCustomer}%)</span></div>`;
   }).join('');
 
-  // ── Demanda por día de la semana (histórico completo) ────────────
-  const allActive=allOrders.filter(o=>o.orderStatus!=='CANCELADO');
+  // ── Demanda por día de la semana (respeta el rango seleccionado) ──
+  const allActive=active;
   const dayNames=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
   const byWeekday=dayNames.map(name=>({label:name,count:0,pax:0}));
   allActive.forEach(o=>{
@@ -1199,40 +1239,46 @@ async function renderCumulative(container){
   let billingTrendInsight='';
   if(monthKeys.length>=2){
     const mid2=Math.floor(monthKeys.length/2);
-    const firstHalfPriceAvg=monthKeys.slice(0,mid2||1).reduce((s,k)=>s+byMonth[k].price,0)/(mid2||1);
-    const secondHalfPriceAvg=monthKeys.slice(mid2).reduce((s,k)=>s+byMonth[k].price,0)/(monthKeys.length-mid2);
+    const firstHalfKeys2=monthKeys.slice(0,mid2||1);
+    const secondHalfKeys2=monthKeys.slice(mid2);
+    const monthLabel=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'short',year:'numeric'});};
+    const firstRange2=firstHalfKeys2.length>1?`${monthLabel(firstHalfKeys2[0])} – ${monthLabel(firstHalfKeys2[firstHalfKeys2.length-1])}`:monthLabel(firstHalfKeys2[0]);
+    const secondRange2=secondHalfKeys2.length>1?`${monthLabel(secondHalfKeys2[0])} – ${monthLabel(secondHalfKeys2[secondHalfKeys2.length-1])}`:monthLabel(secondHalfKeys2[0]);
+    const firstHalfPriceAvg=firstHalfKeys2.reduce((s,k)=>s+byMonth[k].price,0)/firstHalfKeys2.length;
+    const secondHalfPriceAvg=secondHalfKeys2.reduce((s,k)=>s+byMonth[k].price,0)/secondHalfKeys2.length;
     const billingChangePct=firstHalfPriceAvg?((secondHalfPriceAvg-firstHalfPriceAvg)/firstHalfPriceAvg*100):0;
-    const firstLabel2=new Date(+monthKeys[0].split('-')[0],+monthKeys[0].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
-    const lastLabel2=new Date(+monthKeys[monthKeys.length-1].split('-')[0],+monthKeys[monthKeys.length-1].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+    const baseMsg2=`media de ${fmtMoney(firstHalfPriceAvg)}/mes en ${firstRange2} → ${fmtMoney(secondHalfPriceAvg)}/mes en ${secondRange2}`;
     if(billingChangePct>10){
-      billingTrendInsight=`📈 Facturación <strong>creciente</strong> · comparando la primera mitad del período (desde ${firstLabel2}) con la segunda mitad (hasta ${lastLabel2}), la media mensual ha subido un ${billingChangePct.toFixed(0)}%`;
+      billingTrendInsight=`📈 Facturación <strong>creciente</strong> · ${baseMsg2} (+${billingChangePct.toFixed(0)}%)`;
     } else if(billingChangePct<-10){
-      billingTrendInsight=`📉 Facturación <strong>decreciente</strong> · comparando la primera mitad del período (desde ${firstLabel2}) con la segunda mitad (hasta ${lastLabel2}), la media mensual ha bajado un ${Math.abs(billingChangePct).toFixed(0)}%`;
+      billingTrendInsight=`📉 Facturación <strong>decreciente</strong> · ${baseMsg2} (${billingChangePct.toFixed(0)}%)`;
     } else {
-      billingTrendInsight=`➡️ Facturación <strong>estable</strong> · sin cambios significativos entre la primera mitad del período (${firstLabel2}) y la segunda (${lastLabel2})`;
+      billingTrendInsight=`➡️ Facturación <strong>estable</strong> · ${baseMsg2}`;
     }
   }
   // Tendencia: comparar la primera mitad de meses vs la segunda mitad para determinar dirección
   let trendInsight='';
   if(monthKeys.length>=2){
-    const firstMonth=byMonth[monthKeys[0]].count;
-    const lastMonth=byMonth[monthKeys[monthKeys.length-1]].count;
     const mid=Math.floor(monthKeys.length/2);
-    const firstHalfAvg=monthKeys.slice(0,mid||1).reduce((s,k)=>s+byMonth[k].count,0)/(mid||1);
-    const secondHalfAvg=monthKeys.slice(mid).reduce((s,k)=>s+byMonth[k].count,0)/(monthKeys.length-mid);
+    const firstHalfKeys=monthKeys.slice(0,mid||1);
+    const secondHalfKeys=monthKeys.slice(mid);
+    const monthLabelP=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'short',year:'numeric'});};
+    const firstRange=firstHalfKeys.length>1?`${monthLabelP(firstHalfKeys[0])} – ${monthLabelP(firstHalfKeys[firstHalfKeys.length-1])}`:monthLabelP(firstHalfKeys[0]);
+    const secondRange=secondHalfKeys.length>1?`${monthLabelP(secondHalfKeys[0])} – ${monthLabelP(secondHalfKeys[secondHalfKeys.length-1])}`:monthLabelP(secondHalfKeys[0]);
+    const firstHalfAvg=firstHalfKeys.reduce((s,k)=>s+byMonth[k].count,0)/firstHalfKeys.length;
+    const secondHalfAvg=secondHalfKeys.reduce((s,k)=>s+byMonth[k].count,0)/secondHalfKeys.length;
     const changePct=firstHalfAvg?((secondHalfAvg-firstHalfAvg)/firstHalfAvg*100):0;
-    const firstLabel=new Date(+monthKeys[0].split('-')[0],+monthKeys[0].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
-    const lastLabel=new Date(+monthKeys[monthKeys.length-1].split('-')[0],+monthKeys[monthKeys.length-1].split('-')[1]-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+    const baseMsg=`media de ${firstHalfAvg.toFixed(1)} pedidos/mes en ${firstRange} → ${secondHalfAvg.toFixed(1)} pedidos/mes en ${secondRange}`;
     if(changePct>10){
-      trendInsight=`📈 Tendencia <strong>creciente</strong> · comparando la primera mitad del período (desde ${firstLabel}) con la segunda mitad (hasta ${lastLabel}), la media mensual de pedidos ha subido un ${changePct.toFixed(0)}%`;
+      trendInsight=`📈 Tendencia <strong>creciente</strong> · ${baseMsg} (+${changePct.toFixed(0)}%)`;
     } else if(changePct<-10){
-      trendInsight=`📉 Tendencia <strong>decreciente</strong> · comparando la primera mitad del período (desde ${firstLabel}) con la segunda mitad (hasta ${lastLabel}), la media mensual de pedidos ha bajado un ${Math.abs(changePct).toFixed(0)}%`;
+      trendInsight=`📉 Tendencia <strong>decreciente</strong> · ${baseMsg} (${changePct.toFixed(0)}%)`;
     } else {
-      trendInsight=`➡️ Volumen <strong>estable</strong> · sin cambios significativos entre la primera mitad del período (${firstLabel}) y la segunda (${lastLabel})`;
+      trendInsight=`➡️ Volumen <strong>estable</strong> · ${baseMsg}`;
     }
   }
 
-  container.innerHTML=controlsHtml+`<div class="kpi-grid">
+  container.innerHTML=controlsHtml+(compareRangeLabel?`<p style="font-size:11px;color:var(--text-tertiary);margin:-4px 0 10px">Comparativa: ${compareRangeLabel}</p>`:'')+`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${compareCount}</div></div>
     <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div><div class="kpi-sub">${comparePax}</div></div>
     <div class="kpi-card"><div class="kpi-label">Importe total sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div><div class="kpi-sub">${comparePrice}</div></div>
@@ -1252,7 +1298,7 @@ async function renderCumulative(container){
       <p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${weekdayInsight}</p>
     </div>
   </div>
-  <p class="section-label">Patrones a lo largo del tiempo (histórico completo)</p>
+  <p class="section-label">Patrones a lo largo del tiempo ${range.type==='all'?'(histórico completo)':'(dentro del rango seleccionado)'}</p>
   <div class="stats-grid">
     <div class="stat-card">
       <h3>Tendencia mensual (nº de pedidos)</h3>
@@ -1267,7 +1313,7 @@ async function renderCumulative(container){
   </div>
   <div class="stats-grid">
     <div class="stat-card"><h3>Demanda por tipo de servicio (nº de pedidos)</h3><div class="bar-chart">${typeRows}</div></div>
-    <div class="stat-card"><h3>Clientes que más consumen (top 10)</h3><div class="bar-chart">${custRows}</div></div>
+    <div class="stat-card"><h3>Clientes que más consumen — por facturación (top 10)</h3><div class="bar-chart">${custRows}</div></div>
     <div class="stat-card"><h3>Salas con más pedidos (top 10)</h3><div class="bar-chart">${roomRows}</div></div>
     <div class="stat-card"><h3>${pickupWithHour>0?'Franja horaria: entregas vs recogidas':'Demanda por franja horaria'}</h3><div class="bar-chart">${hourRows}</div></div>
     <div class="stat-card"><h3>Resumen operativo</h3><div class="bar-chart">
@@ -1286,6 +1332,7 @@ function bindCumulativeControls(container){
   const fromInput=container.querySelector('#rangeFrom');
   const toInput=container.querySelector('#rangeTo');
   const compareToggle=container.querySelector('#compareToggle');
+  const compareModeSel=container.querySelector('#compareMode');
   const cumPrev=container.querySelector('#cumPrev');
   const cumNext=container.querySelector('#cumNext');
   if(!sel)return;
@@ -1308,6 +1355,7 @@ function bindCumulativeControls(container){
     if(cumulativeRange.type==='day')d.setDate(d.getDate()-1);
     else if(cumulativeRange.type==='week')d.setDate(d.getDate()-7);
     else if(cumulativeRange.type==='month')d.setMonth(d.getMonth()-1);
+    else if(cumulativeRange.type==='quarter')d.setMonth(d.getMonth()-3);
     else if(cumulativeRange.type==='year')d.setFullYear(d.getFullYear()-1);
     cumulativeRange.refDate=d;
     renderCumulative(container);
@@ -1317,6 +1365,7 @@ function bindCumulativeControls(container){
     if(cumulativeRange.type==='day')d.setDate(d.getDate()+1);
     else if(cumulativeRange.type==='week')d.setDate(d.getDate()+7);
     else if(cumulativeRange.type==='month')d.setMonth(d.getMonth()+1);
+    else if(cumulativeRange.type==='quarter')d.setMonth(d.getMonth()+3);
     else if(cumulativeRange.type==='year')d.setFullYear(d.getFullYear()+1);
     cumulativeRange.refDate=d;
     renderCumulative(container);
@@ -1332,6 +1381,10 @@ function bindCumulativeControls(container){
   });
   if(compareToggle)compareToggle.addEventListener('change',()=>{
     cumulativeRange.compare=compareToggle.checked;
+    renderCumulative(container);
+  });
+  if(compareModeSel)compareModeSel.addEventListener('change',()=>{
+    cumulativeRange.compareMode=compareModeSel.value;
     renderCumulative(container);
   });
 }
