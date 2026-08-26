@@ -44,6 +44,30 @@
 .pnl-var{width:80px;text-align:right;font-family:var(--font-mono);font-size:12px;flex-shrink:0}
 .pnl-var.up{color:var(--ok-fg)}
 .pnl-var.down{color:var(--alert-red-fg)}
+.staff-inline-input{font-family:var(--font-sans);font-size:13px;padding:4px 8px;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;color:var(--text-primary);transition:all .15s}
+.staff-inline-input:hover{border-color:var(--border);background:var(--bg)}
+.staff-inline-input:focus{border-color:var(--text-primary);background:var(--bg-card);outline:none}
+.staff-inline-input.staff-name{font-weight:500;font-size:13.5px;width:220px}
+.staff-inline-input.staff-role{font-size:12px;color:var(--text-secondary);width:220px}
+.staff-select{font-family:var(--font-sans);font-size:11.5px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary);cursor:pointer}
+.btn-del-staff{background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:13px;padding:3px 6px;border-radius:var(--radius-sm)}
+.btn-del-staff:hover{background:var(--alert-red-bg);color:var(--alert-red-fg)}
+.sched-wrap{overflow-x:auto;background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:12px}
+.sched-table{border-collapse:collapse;width:100%;font-size:12px}
+.sched-table th{padding:6px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-tertiary);font-weight:500;border-bottom:1px solid var(--border)}
+.sched-table td{padding:4px;border-bottom:1px solid var(--border-soft)}
+.sched-table td.sched-name,.sched-table th.sched-name{text-align:left;min-width:150px;font-size:12px;color:var(--text-primary);position:sticky;left:0;background:var(--bg-card);z-index:1}
+.sched-table td.sched-total,.sched-table th.sched-total{text-align:right;font-family:var(--font-mono);font-size:11px;min-width:70px}
+.sched-select{width:100%;min-width:88px;font-family:var(--font-sans);font-size:11px;padding:4px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary);cursor:pointer}
+.sched-table tfoot td{border-top:1px solid var(--border);border-bottom:none;padding-top:8px;font-size:11px}
+.cal-table td{width:20px;height:26px;border:1px solid var(--border-soft);padding:0}
+.cal-table th{width:20px;font-size:10px;padding:4px 2px}
+.cal-table th.cal-weekend{color:var(--text-tertiary);opacity:.5}
+.cal-vac{background:#7AAFF5}
+.cal-baja{background:#F09595}
+.cal-other{background:#FAC97A}
+.cal-today{outline:2px solid var(--text-primary);outline-offset:-2px}
+.cal-legend{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 8px;vertical-align:-1px}
 .btn-back{background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:5px 12px;cursor:pointer;font-size:12.5px;font-family:var(--font-sans);color:var(--text-secondary);transition:all .15s}
 .btn-back:hover{border-color:var(--text-primary);color:var(--text-primary)}
 .hub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
@@ -329,10 +353,17 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
       <button class="btn-back" id="btnBackFromStaff">← Hub</button>
       <span class="logo">Personal</span>
     </div>
+    <nav class="tabs" id="staffTabs">
+      <button class="tab active" data-staff-view="roster">Plantilla</button>
+      <button class="tab" data-staff-view="schedule">Horario</button>
+      <button class="tab" data-staff-view="calendar">Calendario</button>
+      <button class="tab" data-staff-view="ett">ETT</button>
+      <button class="tab" data-staff-view="costs">Costes</button>
+    </nav>
     <div class="topbar-actions">
       <button class="btn-action" id="btnImportStaff">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Importar horario
+        Importar plantilla
       </button>
       <button class="btn-theme" id="btnThemeStaff" title="Modo noche">🌙</button>
       <button class="btn-logout" id="btnLogoutStaff">Cerrar sesión</button>
@@ -2079,90 +2110,303 @@ function rateForRole(role){
 }
 function staffStatus(s){
   const txt=`${s.name} ${s.note}`.toLowerCase();
-  if(txt.includes('baja'))return{label:'De baja',cls:'pill-cancel'};
-  if(txt.includes('no cubierto')||txt.includes('falta'))return{label:'Sin cubrir',cls:'pill-pax-amber'};
+  if(txt.includes('ett'))return{label:'ETT',cls:'pill-break',isEtt:true};
+  if(txt.includes('baja'))return{label:'De baja',cls:'pill-cancel',onLeave:true};
+  if(txt.includes('no cubierto')||txt.includes('falta'))return{label:'Sin cubrir',cls:'pill-pax-amber',uncovered:true};
   if(txt.includes('practica'))return{label:'Prácticas',cls:'pill-break'};
   return{label:'Activo',cls:'pill-ok'};
 }
 
-async function renderStaff(container){
+// Calcula el coste mensual: plantilla activa + bajas (según % configurado) + ETT activas hoy (suman, no sustituyen)
+function computeStaffCost(staff,costs,ettList){
+  const leavePct=costs.leaveCostPct!==undefined?costs.leaveCostPct:100;
+  let payrollWeekly=0,onLeaveWeekly=0;
+  staff.forEach(p=>{
+    const status=p.status||'activo';
+    if(status==='inactivo')return;
+    const w=(p.weeklyHours||0)*rateForRole(p.role);
+    if(status==='baja')onLeaveWeekly+=w;
+    else payrollWeekly+=w; // activo y vacaciones siguen generando coste íntegro
+  });
+  // ETT: solo las vigentes en la fecha de hoy
+  let ettMonthly=0;
+  if(Array.isArray(ettList)){
+    const today=startOfDay(new Date());
+    ettList.forEach(e=>{
+      const s=new Date(e.start+'T12:00:00'),en=new Date(e.end+'T12:00:00');
+      if(s<=today&&en>=today)ettMonthly+=(e.monthlyCost||0);
+    });
+  } else {
+    ettMonthly=costs.ettMonthly||0; // compatibilidad con el importe global antiguo
+  }
+  const payrollMonthly=payrollWeekly*4.33;
+  const onLeaveMonthly=onLeaveWeekly*4.33*(leavePct/100);
+  return{payrollMonthly,onLeaveMonthly,ettMonthly,totalMonthly:payrollMonthly+onLeaveMonthly+ettMonthly,leavePct};
+}
+
+const SHIFT_OPTIONS=['','7-15h','8-16h','9-17h','12-20h','LIBRE','VACACIONES','BAJA','CATERING','CAFETERÍA'];
+const SHIFT_HOURS={'7-15h':8,'8-16h':8,'9-17h':8,'12-20h':8,'CATERING':8,'CAFETERÍA':8};
+const WEEKDAYS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+let currentStaffView='roster';
+
+async function loadStaffData(){
+  const [rosterSnap,absSnap,costSnap,schedSnap,ettSnap]=await Promise.all([
+    getDoc(doc(db,'staff_config','roster')),
+    getDoc(doc(db,'staff_config','absences')),
+    getDoc(doc(db,'pnl_config','costs')),
+    getDoc(doc(db,'staff_config','schedule')),
+    getDoc(doc(db,'staff_config','ett'))
+  ]);
+  return{
+    staff:rosterSnap.exists()?(rosterSnap.data().staff||[]):[],
+    absences:absSnap.exists()?(absSnap.data().list||[]):[],
+    costs:costSnap.exists()?costSnap.data():{leaveCostPct:100,ettMonthly:0},
+    schedule:schedSnap.exists()?(schedSnap.data().grid||{}):{},
+    ettList:ettSnap.exists()?(ettSnap.data().list||[]):[]
+  };
+}
+
+// ── PESTAÑA: PLANTILLA (editable) ─────────────────────────────────
+async function renderStaffRoster(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando plantilla…</span></div>`;
   try{
-    const [rosterSnap,absSnap]=await Promise.all([
-      getDoc(doc(db,'staff_config','roster')),
-      getDoc(doc(db,'staff_config','absences'))
-    ]);
-    const staff=rosterSnap.exists()?(rosterSnap.data().staff||[]):[];
-    const absences=absSnap.exists()?(absSnap.data().list||[]):[];
+    const {staff,absences,costs,ettList}=await loadStaffData();
     if(!staff.length){
-      container.innerHTML=`<div class="empty-state"><p>Aún no hay plantilla cargada</p><p style="font-size:12px;margin-top:6px">Usa "Importar horario" para subir el Excel de horarios</p></div>`;
+      container.innerHTML=`<div class="empty-state"><p>Aún no hay plantilla cargada</p><p style="font-size:12px;margin-top:6px">Usa "Importar plantilla" para subir el Excel, o añade personas manualmente abajo</p>
+      <button class="btn-primary" id="btnAddFirstPerson" style="max-width:220px;margin:16px auto 0">Añadir primera persona</button></div>`;
+      const b=container.querySelector('#btnAddFirstPerson');
+      if(b)b.addEventListener('click',async()=>{
+        await setDoc(doc(db,'staff_config','roster'),{staff:[{name:'Nueva persona',role:'',weeklyHours:40,status:'activo',note:''}],updatedAt:Timestamp.now()});
+        renderStaffRoster(container);
+      });
       return;
     }
     const today=startOfDay(new Date());
-    const in15=new Date(today);in15.setDate(in15.getDate()+15);
-
-    // Avisos de vacaciones/bajas próximas o en curso
-    const alerts=[];
-    absences.forEach(a=>{
-      const s=new Date(a.start+'T12:00:00'),e=new Date(a.end+'T12:00:00');
-      const typeLbl=a.type==='vacaciones'?'Vacaciones':a.type==='baja'?'Baja':'Ausencia';
-      if(s<=today&&e>=today){
-        alerts.push({type:'red',msg:`${typeLbl} en curso · ${a.person} — hasta el ${e.toLocaleDateString('es-ES',{day:'numeric',month:'long'})}`});
-      } else if(s>today&&s<=in15){
-        const days=Math.ceil((s-today)/86400000);
-        alerts.push({type:'amber',msg:`${typeLbl} próxima · ${a.person} — empieza en ${days} día${days>1?'s':''} (${s.toLocaleDateString('es-ES',{day:'numeric',month:'long'})})`});
-      }
+    const activeEtt=ettList.filter(e=>{
+      const s=new Date(e.start+'T12:00:00'),en=new Date(e.end+'T12:00:00');
+      return s<=today&&en>=today;
     });
+    const cb=computeStaffCost(staff,costs,ettList);
+    const counts={activo:0,baja:0,vacaciones:0,inactivo:0};
+    staff.forEach(p=>{counts[p.status||'activo']=(counts[p.status||'activo']||0)+1;});
+    const totalHours=staff.filter(p=>(p.status||'activo')!=='inactivo').reduce((s,p)=>s+(p.weeklyHours||0),0);
 
-    const totalHours=staff.reduce((s,p)=>s+(p.weeklyHours||0),0);
-    const totalCost=staff.reduce((s,p)=>s+(p.weeklyHours||0)*rateForRole(p.role),0);
-    const activeStaff=staff.filter(p=>staffStatus(p).label==='Activo');
-    const uncovered=staff.filter(p=>staffStatus(p).label==='Sin cubrir');
-    const onLeave=staff.filter(p=>staffStatus(p).label==='De baja');
-
-    const rows=staff.map(p=>{
-      const st=staffStatus(p);
+    const rows=staff.map((p,i)=>{
+      const status=p.status||'activo';
       const rate=rateForRole(p.role);
       const weekCost=(p.weeklyHours||0)*rate;
       const myAbs=absences.filter(a=>a.person===p.name);
-      const absHtml=myAbs.map(a=>{
-        const s=new Date(a.start+'T12:00:00'),e=new Date(a.end+'T12:00:00');
-        const isNow=s<=today&&e>=today;
-        const lbl=a.type==='vacaciones'?'🏖️':a.type==='baja'?'🏥':'📌';
-        return`<div class="comment-internal" style="font-style:normal">${lbl} ${escapeHtml(a.type)} · ${s.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'})}${isNow?' <strong>(en curso)</strong>':''}</div>`;
-      }).join('');
+      const myEtt=activeEtt.filter(e=>e.covers===p.name);
+      const statusPill={activo:'pill-ok',baja:'pill-cancel',vacaciones:'pill-break',inactivo:'pill-other'}[status];
+      const statusLbl={activo:'Activo',baja:'De baja',vacaciones:'Vacaciones',inactivo:'Inactivo'}[status];
       return`<div class="order-card">
         <div class="order-top">
-          <div class="order-who">
-            <span class="order-name">${escapeHtml(p.name)}</span>
-            <span class="order-loc">${escapeHtml(p.role||'Sin rol asignado')}</span>
+          <div class="order-who" style="flex:1">
+            <input class="staff-inline-input staff-name" data-idx="${i}" data-field="name" value="${escapeHtml(p.name)}" placeholder="Nombre">
+            <input class="staff-inline-input staff-role" data-idx="${i}" data-field="role" value="${escapeHtml(p.role||'')}" placeholder="Rol / puesto">
           </div>
-          <div class="order-pills">
-            <span class="pill ${st.cls}">${st.label}</span>
-            <span class="pill pill-other">${p.weeklyHours||0}h/sem</span>
+          <div class="order-pills" style="align-items:center">
+            <select class="staff-select" data-idx="${i}" data-field="status">
+              <option value="activo" ${status==='activo'?'selected':''}>Activo</option>
+              <option value="baja" ${status==='baja'?'selected':''}>De baja</option>
+              <option value="vacaciones" ${status==='vacaciones'?'selected':''}>Vacaciones</option>
+              <option value="inactivo" ${status==='inactivo'?'selected':''}>Inactivo</option>
+            </select>
+            <input class="staff-inline-input" style="width:64px;text-align:right" type="number" data-idx="${i}" data-field="weeklyHours" value="${p.weeklyHours||0}" min="0" max="60" step="0.5"> <span style="font-size:11px;color:var(--text-tertiary)">h/sem</span>
+            <button class="btn-del-staff" data-del-idx="${i}" title="Eliminar">✕</button>
           </div>
         </div>
         <div class="order-meta">
-          <span class="meta-item">${rate.toFixed(2)}€/h estimado</span>
-          <span class="meta-item">${fmtMoney(weekCost)}/semana</span>
-          <span class="meta-item">${fmtMoney(weekCost*4.33)}/mes aprox.</span>
-          ${p.note?`<span class="meta-item" style="color:var(--alert-amber-fg)">${escapeHtml(p.note)}</span>`:''}
+          <span class="pill ${statusPill}">${statusLbl}</span>
+          <span class="meta-item">${rate.toFixed(2)}€/h est.</span>
+          <span class="meta-item">${fmtMoney(weekCost*4.33)}/mes</span>
         </div>
-        ${absHtml}
+        ${myEtt.map(e=>`<div class="comment-internal" style="font-style:normal">🔄 Cubierto por ETT: ${escapeHtml(e.ettName||'sin nombre')} · hasta ${new Date(e.end+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</div>`).join('')}
+        ${myAbs.map(a=>{
+          const s=new Date(a.start+'T12:00:00'),en=new Date(a.end+'T12:00:00');
+          const isNow=s<=today&&en>=today;
+          const lbl=a.type==='vacaciones'?'🏖️':a.type==='baja'?'🏥':'📌';
+          return`<div class="comment-internal" style="font-style:normal">${lbl} ${escapeHtml(a.type)} · ${s.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${en.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'})}${isNow?' <strong>(en curso)</strong>':''}</div>`;
+        }).join('')}
       </div>`;
     }).join('');
 
-    const staffOptions=staff.map(p=>`<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
-
     container.innerHTML=`<div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Personas en plantilla</div><div class="kpi-value">${staff.length}</div><div class="kpi-sub">${activeStaff.length} activas</div></div>
+      <div class="kpi-card"><div class="kpi-label">Plantilla</div><div class="kpi-value">${staff.length}</div><div class="kpi-sub">${counts.activo} activas${activeEtt.length?` · +${activeEtt.length} ETT hoy`:''}</div></div>
       <div class="kpi-card"><div class="kpi-label">Horas semanales</div><div class="kpi-value">${totalHours}</div><div class="kpi-sub">${(totalHours/40).toFixed(1)} FTE</div></div>
-      <div class="kpi-card"><div class="kpi-label">Coste semanal estimado</div><div class="kpi-value">${fmtMoney(totalCost)}</div><div class="kpi-sub">${fmtMoney(totalCost*4.33)}/mes</div></div>
-      <div class="kpi-card"><div class="kpi-label">Puestos a cubrir</div><div class="kpi-value ${uncovered.length+onLeave.length>0?'alert':''}">${uncovered.length+onLeave.length}</div><div class="kpi-sub">${onLeave.length} bajas · ${uncovered.length} sin cubrir</div></div>
+      <div class="kpi-card"><div class="kpi-label">Coste mensual total</div><div class="kpi-value">${fmtMoney(cb.totalMonthly)}</div><div class="kpi-sub">plantilla + bajas + ETT</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ausencias hoy</div><div class="kpi-value ${counts.baja+counts.vacaciones>0?'warn':''}">${counts.baja+counts.vacaciones}</div><div class="kpi-sub">${counts.baja} bajas · ${counts.vacaciones} vacaciones</div></div>
     </div>
-    ${alerts.length?renderAlerts(alerts):''}
-    <div class="audit-section">
-      <h3>Registrar vacaciones o baja</h3>
+    <p class="section-label">Plantilla · edita directamente cualquier campo</p>
+    <div class="orders">${rows}</div>
+    <button class="btn-primary" id="btnAddPerson" style="max-width:200px;margin-top:12px">+ Añadir persona</button>
+    <p id="rosterMsg" style="font-size:12px;margin-top:10px"></p>`;
+
+    const saveRoster=async(updated)=>{
+      const msg=container.querySelector('#rosterMsg');
+      try{
+        await setDoc(doc(db,'staff_config','roster'),{staff:updated,updatedAt:Timestamp.now()});
+        if(msg){msg.textContent='✓ Guardado';msg.style.color='var(--ok-fg)';setTimeout(()=>{if(msg)msg.textContent='';},1500);}
+      }catch(e){if(msg){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}}
+    };
+
+    container.querySelectorAll('.staff-inline-input,.staff-select').forEach(el=>{
+      el.addEventListener('change',async()=>{
+        const idx=+el.dataset.idx,field=el.dataset.field;
+        const val=field==='weeklyHours'?(parseFloat(el.value)||0):el.value;
+        staff[idx][field]=val;
+        await saveRoster(staff);
+        if(field==='status'||field==='weeklyHours'||field==='role')renderStaffRoster(container);
+      });
+    });
+    container.querySelectorAll('.btn-del-staff').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const idx=+btn.dataset.delIdx;
+        if(!confirm(`¿Eliminar a ${staff[idx].name} de la plantilla?`))return;
+        staff.splice(idx,1);
+        await saveRoster(staff);
+        renderStaffRoster(container);
+      });
+    });
+    const btnAdd=container.querySelector('#btnAddPerson');
+    if(btnAdd)btnAdd.addEventListener('click',async()=>{
+      staff.push({name:'Nueva persona',role:'',weeklyHours:40,status:'activo',note:''});
+      await saveRoster(staff);
+      renderStaffRoster(container);
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+// ── PESTAÑA: HORARIO (semana tipo editable) ───────────────────────
+async function renderStaffSchedule(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando horario…</span></div>`;
+  try{
+    const {staff,schedule}=await loadStaffData();
+    const activeStaff=staff.filter(p=>(p.status||'activo')!=='inactivo');
+    if(!activeStaff.length){container.innerHTML=`<div class="empty-state"><p>Añade personas en la pestaña "Plantilla" primero</p></div>`;return;}
+
+    const optHtml=v=>SHIFT_OPTIONS.map(o=>`<option value="${o}" ${v===o?'selected':''}>${o||'—'}</option>`).join('');
+    const rows=activeStaff.map(p=>{
+      const cells=WEEKDAYS.map((d,di)=>{
+        const key=`${p.name}|${di}`;
+        return`<td><select class="sched-select" data-key="${escapeHtml(key)}">${optHtml(schedule[key]||'')}</select></td>`;
+      }).join('');
+      const assigned=WEEKDAYS.reduce((s,d,di)=>s+(SHIFT_HOURS[schedule[`${p.name}|${di}`]]||0),0);
+      const diff=assigned-(p.weeklyHours||0);
+      const diffCls=Math.abs(diff)<0.5?'':(diff>0?'style="color:var(--alert-red-fg)"':'style="color:var(--alert-amber-fg)"');
+      return`<tr>
+        <td class="sched-name">${escapeHtml(p.name)}<br><span style="font-size:10px;color:var(--text-tertiary)">${escapeHtml(p.role||'')}</span></td>
+        ${cells}
+        <td class="sched-total" ${diffCls}>${assigned}h<br><span style="font-size:10px">de ${p.weeklyHours||0}h</span></td>
+      </tr>`;
+    }).join('');
+
+    // Cobertura por día
+    const coverage=WEEKDAYS.map((d,di)=>{
+      const working=activeStaff.filter(p=>{
+        const v=schedule[`${p.name}|${di}`];
+        return v&&!['LIBRE','VACACIONES','BAJA',''].includes(v);
+      }).length;
+      return{day:d,working};
+    });
+    const gaps=coverage.filter(c=>c.working===0&&['Lunes','Martes','Miércoles','Jueves','Viernes'].includes(c.day));
+
+    container.innerHTML=`
+    ${gaps.length?renderAlerts(gaps.map(g=>({type:'red',msg:`Sin cobertura · ${g.day}: nadie asignado a turno`}))):''}
+    <p class="section-label">Semana tipo · los cambios se guardan automáticamente</p>
+    <div class="sched-wrap">
+      <table class="sched-table">
+        <thead><tr><th class="sched-name">Persona</th>${WEEKDAYS.map(d=>`<th>${d.slice(0,3)}</th>`).join('')}<th class="sched-total">Asignado</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td class="sched-name">Personas por día</td>${coverage.map(c=>`<td style="text-align:center;font-weight:600;${c.working===0?'color:var(--alert-red-fg)':''}">${c.working}</td>`).join('')}<td></td></tr></tfoot>
+      </table>
+    </div>
+    <p style="font-size:12px;color:var(--text-secondary);margin-top:12px;line-height:1.5">
+      ℹ️ Esta es la <strong>semana tipo</strong> que se repite. Las excepciones puntuales (vacaciones, bajas) se registran en la pestaña Calendario y prevalecen sobre este horario.
+    </p>
+    <p id="schedMsg" style="font-size:12px;margin-top:8px"></p>`;
+
+    container.querySelectorAll('.sched-select').forEach(sel=>{
+      sel.addEventListener('change',async()=>{
+        schedule[sel.dataset.key]=sel.value;
+        const msg=container.querySelector('#schedMsg');
+        try{
+          await setDoc(doc(db,'staff_config','schedule'),{grid:schedule,updatedAt:Timestamp.now()});
+          renderStaffSchedule(container);
+        }catch(e){if(msg){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}}
+      });
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+// ── PESTAÑA: CALENDARIO DE AUSENCIAS ──────────────────────────────
+let calRefDate=new Date();
+async function renderStaffCalendar(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando calendario…</span></div>`;
+  try{
+    const {staff,absences}=await loadStaffData();
+    const monthStart=startOfMonth(calRefDate),monthEnd=endOfMonth(calRefDate);
+    const daysInMonth=monthEnd.getDate();
+    const today=localISODate(new Date());
+
+    const inMonth=absences.filter(a=>{
+      const s=new Date(a.start+'T12:00:00'),e=new Date(a.end+'T12:00:00');
+      return s<=monthEnd&&e>=monthStart;
+    });
+
+    const dayHeaders=Array.from({length:daysInMonth},(_,i)=>{
+      const d=new Date(calRefDate.getFullYear(),calRefDate.getMonth(),i+1);
+      const isWeekend=[0,6].includes(d.getDay());
+      return`<th class="${isWeekend?'cal-weekend':''}">${i+1}</th>`;
+    }).join('');
+
+    const personRows=staff.filter(p=>(p.status||'activo')!=='inactivo').map(p=>{
+      const cells=Array.from({length:daysInMonth},(_,i)=>{
+        const dStr=localISODate(new Date(calRefDate.getFullYear(),calRefDate.getMonth(),i+1));
+        const abs=inMonth.find(a=>a.person===p.name&&a.start<=dStr&&a.end>=dStr);
+        const isToday=dStr===today;
+        if(!abs)return`<td class="${isToday?'cal-today':''}"></td>`;
+        const cls=abs.type==='vacaciones'?'cal-vac':abs.type==='baja'?'cal-baja':'cal-other';
+        return`<td class="${cls} ${isToday?'cal-today':''}" title="${escapeHtml(abs.type)}"></td>`;
+      }).join('');
+      return`<tr><td class="sched-name">${escapeHtml(p.name)}</td>${cells}</tr>`;
+    }).join('');
+
+    const staffOptions=staff.map(p=>`<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
+    const absList=absences.slice().sort((a,b)=>a.start.localeCompare(b.start)).map((a,i)=>{
+      const s=new Date(a.start+'T12:00:00'),e=new Date(a.end+'T12:00:00');
+      const lbl=a.type==='vacaciones'?'🏖️':a.type==='baja'?'🏥':'📌';
+      return`<div class="history-item" style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12.5px">${lbl} <strong>${escapeHtml(a.person)}</strong> · ${escapeHtml(a.type)} · ${s.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'})}</span>
+        <button class="btn-del-staff" data-del-abs="${i}" title="Eliminar">✕</button>
+      </div>`;
+    }).join('');
+
+    container.innerHTML=`
+    <div class="cumulative-controls">
+      <div class="date-nav" style="margin:0">
+        <button class="date-nav-btn" id="calPrev">◀</button>
+        <span class="date-nav-label" style="cursor:default">${calRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</span>
+        <button class="date-nav-btn" id="calNext">▶</button>
+      </div>
+      <span style="font-size:11px;color:var(--text-tertiary)">
+        <span class="cal-legend cal-vac"></span> Vacaciones
+        <span class="cal-legend cal-baja"></span> Baja
+        <span class="cal-legend cal-other"></span> Otra
+      </span>
+    </div>
+    <div class="sched-wrap" style="margin-top:10px">
+      <table class="sched-table cal-table">
+        <thead><tr><th class="sched-name">Persona</th>${dayHeaders}</tr></thead>
+        <tbody>${personRows}</tbody>
+      </table>
+    </div>
+    <div class="audit-section" style="margin-top:14px">
+      <h3>Registrar ausencia</h3>
       <div class="form-grid">
         <div class="form-group"><label>Persona</label><select id="absPerson">${staffOptions}</select></div>
         <div class="form-group"><label>Tipo</label><select id="absType">
@@ -2173,14 +2417,13 @@ async function renderStaff(container){
         <div class="form-group"><label>Desde</label><input type="date" id="absStart" value="${localISODate(new Date())}"></div>
         <div class="form-group"><label>Hasta</label><input type="date" id="absEnd" value="${localISODate(new Date())}"></div>
       </div>
-      <button class="btn-primary" id="btnSaveAbsence" style="max-width:240px">Guardar</button>
+      <button class="btn-primary" id="btnSaveAbsence" style="max-width:200px">Guardar</button>
       <p id="absMsg" style="font-size:12px;margin-top:10px"></p>
     </div>
-    <div class="alert alert-amber" style="margin-bottom:16px">
-      <span>⚠️ Los costes/hora son <strong>estimaciones orientativas</strong>, no las tablas oficiales del convenio de colectividades de Cataluña. Sustitúyelos por los valores reales cuando los tengas.</span>
-    </div>
-    <p class="section-label">Plantilla</p>
-    <div class="orders">${rows}</div>`;
+    ${absences.length?`<p class="section-label">Todas las ausencias registradas</p>${absList}`:''}`;
+
+    container.querySelector('#calPrev').addEventListener('click',()=>{calRefDate=new Date(calRefDate.getFullYear(),calRefDate.getMonth()-1,1);renderStaffCalendar(container);});
+    container.querySelector('#calNext').addEventListener('click',()=>{calRefDate=new Date(calRefDate.getFullYear(),calRefDate.getMonth()+1,1);renderStaffCalendar(container);});
 
     const btnAbs=container.querySelector('#btnSaveAbsence');
     if(btnAbs)btnAbs.addEventListener('click',async()=>{
@@ -2193,17 +2436,193 @@ async function renderStaff(container){
       if(end<start){msg.textContent='La fecha final no puede ser anterior a la inicial';msg.style.color='var(--alert-red-fg)';return;}
       btnAbs.disabled=true;btnAbs.textContent='Guardando…';
       try{
-        const updated=[...absences,{person,type,start,end}];
-        await setDoc(doc(db,'staff_config','absences'),{list:updated,updatedAt:Timestamp.now()});
-        msg.textContent='✓ Guardado';msg.style.color='var(--ok-fg)';
-        setTimeout(()=>renderStaff(container),700);
+        await setDoc(doc(db,'staff_config','absences'),{list:[...absences,{person,type,start,end}],updatedAt:Timestamp.now()});
+        renderStaffCalendar(container);
       }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
       btnAbs.disabled=false;btnAbs.textContent='Guardar';
+    });
+    container.querySelectorAll('[data-del-abs]').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const sorted=absences.slice().sort((a,b)=>a.start.localeCompare(b.start));
+        const target=sorted[+btn.dataset.delAbs];
+        if(!confirm(`¿Eliminar la ausencia de ${target.person}?`))return;
+        const updated=absences.filter(a=>!(a.person===target.person&&a.start===target.start&&a.end===target.end&&a.type===target.type));
+        await setDoc(doc(db,'staff_config','absences'),{list:updated,updatedAt:Timestamp.now()});
+        renderStaffCalendar(container);
+      });
     });
   }catch(e){
     container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
   }
 }
+
+// ── PESTAÑA: ETT ──────────────────────────────────────────────────
+async function renderStaffEtt(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando ETT…</span></div>`;
+  try{
+    const {staff,ettList}=await loadStaffData();
+    const today=startOfDay(new Date());
+    const active=ettList.filter(e=>{
+      const s=new Date(e.start+'T12:00:00'),en=new Date(e.end+'T12:00:00');
+      return s<=today&&en>=today;
+    });
+    const totalMonthlyEtt=active.reduce((s,e)=>s+(e.monthlyCost||0),0);
+    const staffOptions=staff.map(p=>`<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
+
+    const rows=ettList.slice().sort((a,b)=>b.start.localeCompare(a.start)).map((e,i)=>{
+      const s=new Date(e.start+'T12:00:00'),en=new Date(e.end+'T12:00:00');
+      const isActive=s<=today&&en>=today;
+      const isFuture=s>today;
+      return`<div class="order-card">
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${escapeHtml(e.ettName||'ETT sin nombre')}</span>
+            <span class="order-loc">${e.covers?`Cubre a ${escapeHtml(e.covers)}`:'Refuerzo (no sustituye a nadie)'}</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill ${isActive?'pill-ok':isFuture?'pill-break':'pill-other'}">${isActive?'Activa':isFuture?'Programada':'Finalizada'}</span>
+            <button class="btn-del-staff" data-del-ett="${i}" title="Eliminar">✕</button>
+          </div>
+        </div>
+        <div class="order-meta">
+          <span class="meta-item">${s.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${en.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'})}</span>
+          <span class="meta-item">${fmtMoney(e.monthlyCost||0)}/mes</span>
+          ${e.role?`<span class="meta-item">${escapeHtml(e.role)}</span>`:''}
+        </div>
+      </div>`;
+    }).join('');
+
+    container.innerHTML=`<div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">ETT activas hoy</div><div class="kpi-value">${active.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Coste mensual ETT</div><div class="kpi-value">${fmtMoney(totalMonthlyEtt)}</div><div class="kpi-sub">solo las activas</div></div>
+      <div class="kpi-card"><div class="kpi-label">Registros totales</div><div class="kpi-value">${ettList.length}</div></div>
+    </div>
+    <div class="alert alert-blue" style="margin-bottom:14px;background:var(--break-bg);border-color:var(--break-fg);color:var(--break-fg)">
+      <span>ℹ️ El coste de ETT se <strong>suma</strong> al de la plantilla: la persona sustituida sigue generando coste según el % configurado en la pestaña Costes.</span>
+    </div>
+    <div class="audit-section">
+      <h3>Registrar ETT</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Nombre de la ETT / persona</label><input type="text" id="ettName" placeholder="Ej. Randstad — Juan P."></div>
+        <div class="form-group"><label>Puesto que ocupa</label><input type="text" id="ettRole" placeholder="Ej. Aux. colectividades"></div>
+        <div class="form-group"><label>¿A quién cubre?</label><select id="ettCovers"><option value="">Nadie (refuerzo)</option>${staffOptions}</select></div>
+        <div class="form-group"><label>Coste mensual (€)</label><input type="number" id="ettCost" value="0" min="0" step="50"></div>
+        <div class="form-group"><label>Desde</label><input type="date" id="ettStart" value="${localISODate(new Date())}"></div>
+        <div class="form-group"><label>Hasta</label><input type="date" id="ettEnd" value="${localISODate(new Date())}"></div>
+      </div>
+      <button class="btn-primary" id="btnSaveEtt" style="max-width:200px">Guardar ETT</button>
+      <p id="ettMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+    ${ettList.length?`<p class="section-label">ETT registradas</p><div class="orders">${rows}</div>`:''}`;
+
+    const btnEtt=container.querySelector('#btnSaveEtt');
+    if(btnEtt)btnEtt.addEventListener('click',async()=>{
+      const msg=container.querySelector('#ettMsg');
+      const ettName=container.querySelector('#ettName').value.trim();
+      const role=container.querySelector('#ettRole').value.trim();
+      const covers=container.querySelector('#ettCovers').value;
+      const monthlyCost=parseFloat(container.querySelector('#ettCost').value)||0;
+      const start=container.querySelector('#ettStart').value;
+      const end=container.querySelector('#ettEnd').value;
+      if(!ettName||!start||!end){msg.textContent='Rellena al menos nombre y fechas';msg.style.color='var(--alert-red-fg)';return;}
+      if(end<start){msg.textContent='La fecha final no puede ser anterior a la inicial';msg.style.color='var(--alert-red-fg)';return;}
+      btnEtt.disabled=true;btnEtt.textContent='Guardando…';
+      try{
+        await setDoc(doc(db,'staff_config','ett'),{list:[...ettList,{ettName,role,covers,monthlyCost,start,end}],updatedAt:Timestamp.now()});
+        renderStaffEtt(container);
+      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
+      btnEtt.disabled=false;btnEtt.textContent='Guardar ETT';
+    });
+    container.querySelectorAll('[data-del-ett]').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const sorted=ettList.slice().sort((a,b)=>b.start.localeCompare(a.start));
+        const target=sorted[+btn.dataset.delEtt];
+        if(!confirm(`¿Eliminar el registro de ${target.ettName}?`))return;
+        const updated=ettList.filter(e=>!(e.ettName===target.ettName&&e.start===target.start&&e.end===target.end));
+        await setDoc(doc(db,'staff_config','ett'),{list:updated,updatedAt:Timestamp.now()});
+        renderStaffEtt(container);
+      });
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+// ── PESTAÑA: COSTES ───────────────────────────────────────────────
+async function renderStaffCosts(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando…</span></div>`;
+  try{
+    const {staff,costs,ettList}=await loadStaffData();
+    const cb=computeStaffCost(staff,costs,ettList);
+    const mx=Math.max(cb.payrollMonthly,cb.onLeaveMonthly,cb.ettMonthly,1);
+    const row=(l,v,color)=>`<div class="bar-row"><span class="bar-label">${l}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v/mx*100).toFixed(0)}%;background:${color}"></div></div><span class="bar-val">${fmtMoney(v)}</span></div>`;
+    const rateRows=Object.entries(CONVENIO_RATES).filter(([k])=>k!=='DEFECTO').map(([k,v])=>`<div class="audit-row"><span class="audit-req">${k}</span><span class="pnl-val">${v.toFixed(2)} €/h</span></div>`).join('');
+
+    container.innerHTML=`
+    <div class="stats-grid" style="grid-template-columns:1fr">
+      <div class="stat-card">
+        <h3>Desglose del coste mensual de personal</h3>
+        <span class="scope-label">Plantilla actual + ETT activas hoy</span>
+        <div class="bar-chart">
+          ${row('Plantilla activa',cb.payrollMonthly,'var(--text-primary)')}
+          ${row(`Bajas (${cb.leavePct}% del coste)`,cb.onLeaveMonthly,'var(--alert-amber-border)')}
+          ${row('ETT (suma, no sustituye)',cb.ettMonthly,'var(--break-fg)')}
+        </div>
+        <p style="font-size:13px;font-weight:600;margin-top:12px">Total: ${fmtMoney(cb.totalMonthly)}/mes</p>
+      </div>
+    </div>
+    <div class="audit-section">
+      <h3>Parámetros de coste</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Coste asumido durante una baja (%)</label>
+          <input type="number" id="staffLeavePct" value="${cb.leavePct}" min="0" max="100" step="5">
+        </div>
+      </div>
+      <button class="btn-primary" id="btnSaveStaffCosts" style="max-width:220px">Guardar</button>
+      <p id="staffCostMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+    <div class="audit-section">
+      <h3>Tarifas por rol (estimadas)</h3>
+      ${rateRows}
+      <p style="font-size:12px;color:var(--alert-amber-fg);margin-top:12px;line-height:1.5">
+        ⚠️ Estas tarifas son <strong>estimaciones orientativas</strong>, no las tablas oficiales del convenio de colectividades de Cataluña. Cuando dispongas de los valores reales, indícalos para sustituirlos.
+      </p>
+    </div>`;
+
+    const btn=container.querySelector('#btnSaveStaffCosts');
+    if(btn)btn.addEventListener('click',async()=>{
+      const msg=container.querySelector('#staffCostMsg');
+      const leavePct=parseFloat(container.querySelector('#staffLeavePct').value)||0;
+      btn.disabled=true;btn.textContent='Guardando…';
+      try{
+        await setDoc(doc(db,'pnl_config','costs'),{leaveCostPct:leavePct},{merge:true});
+        msg.textContent='✓ Guardado';msg.style.color='var(--ok-fg)';
+        setTimeout(()=>renderStaffCosts(container),700);
+      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
+      btn.disabled=false;btn.textContent='Guardar';
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function renderStaff(container){
+  if(currentStaffView==='schedule')renderStaffSchedule(container);
+  else if(currentStaffView==='calendar')renderStaffCalendar(container);
+  else if(currentStaffView==='ett')renderStaffEtt(container);
+  else if(currentStaffView==='costs')renderStaffCosts(container);
+  else renderStaffRoster(container);
+}
+
+document.getElementById('staffTabs').addEventListener('click',e=>{
+  const tab=e.target.closest('.tab');
+  if(!tab)return;
+  document.querySelectorAll('#staffTabs .tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  currentStaffView=tab.dataset.staffView;
+  renderStaff(document.getElementById('staffContent'));
+});
 
 function parseStaffXLSX(arrayBuffer){
   const wb=XLSX.read(arrayBuffer,{type:'array'});
@@ -2226,11 +2645,18 @@ function parseStaffXLSX(arrayBuffer){
     const name=String(names[c]||'').trim();
     if(!name||EXCLUDE.includes(name.toUpperCase()))continue;
     const h=hours[c];
+    const note=String(comments[c]||'').trim();
+    const combined=`${name} ${note}`.toLowerCase();
+    let status='activo';
+    if(combined.includes('baja'))status='baja';
+    else if(combined.includes('vacacion'))status='vacaciones';
+    else if(combined.includes('no cubierto')||combined.includes('falta'))status='inactivo';
     staff.push({
       name,
       role:String(roles[c]||'').trim(),
       weeklyHours:(typeof h==='number')?h:(parseFloat(String(h).replace(',','.'))||0),
-      note:String(comments[c]||'').trim()
+      status,
+      note
     });
   }
   return staff;
@@ -2282,7 +2708,7 @@ function pnlLine(label,value,revenue,opts={}){
   </div>`;
 }
 
-function computePnl(cateringOrders,revenueRows,staff,costs,from,to){
+function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList){
   const inRange=d=>!from||!to||(d&&d>=from&&d<=to);
   const cateringActive=cateringOrders.filter(o=>o.orderStatus!=='CANCELADO'&&inRange(toDate(o.deliveryAt)));
   const cateringRevenue=cateringActive.reduce((s,o)=>s+(o.priceTotal||0),0);
@@ -2302,28 +2728,39 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to){
   if(from&&to){
     months=Math.max(1,(to.getFullYear()-from.getFullYear())*12+(to.getMonth()-from.getMonth())+1);
   }
-  const staffMonthly=staff.reduce((s,p)=>s+(p.weeklyHours||0)*rateForRole(p.role),0)*4.33;
-  const labourCost=-(staffMonthly*months);
-  const costOfSales=-(revenue*(costs.purchasePct/100));
+  const sc=computeStaffCost(staff,costs,ettList);
+  const labourCost=-(sc.totalMonthly*months);
+  const labourPayroll=-(sc.payrollMonthly*months);
+  const labourLeave=-(sc.onLeaveMonthly*months);
+  const labourEtt=-(sc.ettMonthly*months);
+  // MMPP: materias primas (alimentación), como % sobre ingresos
+  const mmpp=-(revenue*((costs.mmppPct!==undefined?costs.mmppPct:costs.purchasePct||35)/100));
+  const costOfSales=mmpp;
   const grossProfit=revenue+costOfSales;
-  const otherCost=-((costs.otherMonthly||0)*months);
-  const unitProfit=grossProfit+labourCost+otherCost;
-  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,costOfSales,grossProfit,labourCost,otherCost,unitProfit,months,
+  // IUO: gastos indirectos de la unidad (seguros, mkt, central, licencias, no alimentario, uniformes)
+  const iuoPct=costs.iuoPct!==undefined?costs.iuoPct:0;
+  const iuoFromPct=-(revenue*(iuoPct/100));
+  const iuoFixed=-((costs.iuoMonthly||costs.otherMonthly||0)*months);
+  const iuo=iuoFromPct+iuoFixed;
+  const unitProfit=grossProfit+labourCost+iuo;
+  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,unitProfit,months,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
 
 async function renderPnl(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Calculando cuenta de explotación…</span></div>`;
   try{
-    const [revSnap,staffSnap,costSnap,cateringOrders]=await Promise.all([
+    const [revSnap,staffSnap,costSnap,ettSnapP,cateringOrders]=await Promise.all([
       getDoc(doc(db,'pnl_config','revenue')),
       getDoc(doc(db,'staff_config','roster')),
       getDoc(doc(db,'pnl_config','costs')),
+      getDoc(doc(db,'staff_config','ett')),
       getOrders()
     ]);
     const revenueRows=revSnap.exists()?(revSnap.data().rows||[]):[];
     const staff=staffSnap.exists()?(staffSnap.data().staff||[]):[];
-    const costs=costSnap.exists()?costSnap.data():{purchasePct:35,otherMonthly:0};
+    const costs=costSnap.exists()?costSnap.data():{mmppPct:35,iuoPct:0,iuoMonthly:0};
+    const ettList=ettSnapP.exists()?(ettSnapP.data().list||[]):[];
 
     const r=pnlRange;
     let from=r.from,to=r.to;
@@ -2343,8 +2780,8 @@ async function renderPnl(container){
       } else if(ct==='custom'){cFrom=r.compareFrom;cTo=r.compareTo;cLabel='rango personalizado';}
     }
 
-    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to);
-    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo):null;
+    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList);
+    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList):null;
 
     const varOf=(a,b)=>b?((a-b)/Math.abs(b)*100):0;
     const varTxt=(a,b)=>{if(!b)return'';const v=varOf(a,b);return`${v>=0?'+':''}${v.toFixed(1)}%`;};
@@ -2409,10 +2846,13 @@ async function renderPnl(container){
       ${L('Catering',cur.cateringRevenue,cmp?cmp.cateringRevenue:0,{indent:true})}
       ${L('Comedor',cur.comedor.billed,cmp?cmp.comedor.billed:0,{indent:true})}
       ${L('Cafetería',cur.cafeteria.billed,cmp?cmp.cafeteria.billed:0,{indent:true})}
-      ${L('Cost of Sales (Compras)',cur.costOfSales,cmp?cmp.costOfSales:0)}
+      ${L('MMPP (Materias primas)',cur.mmpp,cmp?cmp.mmpp:0)}
       ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true})}
       ${L('Labour Cost (Personal)',cur.labourCost,cmp?cmp.labourCost:0)}
-      ${L('Otros costes',cur.otherCost,cmp?cmp.otherCost:0)}
+      ${L('Plantilla activa',cur.labourPayroll,cmp?cmp.labourPayroll:0,{indent:true})}
+      ${cur.labourLeave!==0||(cmp&&cmp.labourLeave!==0)?L('Bajas',cur.labourLeave,cmp?cmp.labourLeave:0,{indent:true}):''}
+      ${cur.labourEtt!==0||(cmp&&cmp.labourEtt!==0)?L('ETT (adicional)',cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true}):''}
+      ${L('IUO (Gastos indirectos)',cur.iuo,cmp?cmp.iuo:0)}
       ${L('Unit Profit (Resultado)',cur.unitProfit,cmp?cmp.unitProfit:0,{bold:true})}
     </div>
 
@@ -2424,14 +2864,24 @@ async function renderPnl(container){
     </div>
 
     <div class="alert alert-amber" style="margin-top:16px">
-      <span>⚠️ Cifras <strong>orientativas</strong>: el coste de personal usa tarifas estimadas de convenio (no oficiales) y se prorratea sobre ${cur.months} mes${cur.months>1?'es':''} del período. Compras es un % configurable, no facturas reales.</span>
+      <span>⚠️ Cifras <strong>orientativas</strong>: el personal usa tarifas estimadas de convenio (no oficiales), prorrateadas sobre ${cur.months} mes${cur.months>1?'es':''} del período. MMPP e IUO son parámetros configurables, no facturas reales.</span>
     </div>
 
     <div class="audit-section" style="margin-top:14px">
       <h3>Parámetros de coste</h3>
       <div class="form-grid">
-        <div class="form-group"><label>Coste de compras (% sobre ingresos)</label><input type="number" id="pnlPurchasePct" value="${costs.purchasePct}" min="0" max="100" step="0.5"></div>
-        <div class="form-group"><label>Otros costes mensuales (€)</label><input type="number" id="pnlOtherMonthly" value="${costs.otherMonthly||0}" min="0" step="50"></div>
+        <div class="form-group">
+          <label>MMPP — Materias primas (% sobre ingresos)</label>
+          <input type="number" id="pnlMmppPct" value="${costs.mmppPct!==undefined?costs.mmppPct:(costs.purchasePct||35)}" min="0" max="100" step="0.5">
+        </div>
+        <div class="form-group">
+          <label>IUO variable (% sobre ingresos)</label>
+          <input type="number" id="pnlIuoPct" value="${costs.iuoPct||0}" min="0" max="100" step="0.5">
+        </div>
+        <div class="form-group form-group-full">
+          <label>IUO fijo mensual (€) — seguros, marketing, central, licencias, no alimentario, uniformes</label>
+          <input type="number" id="pnlIuoMonthly" value="${costs.iuoMonthly!==undefined?costs.iuoMonthly:(costs.otherMonthly||0)}" min="0" step="50">
+        </div>
       </div>
       <button class="btn-primary" id="btnSavePnlCosts" style="max-width:240px">Guardar parámetros</button>
       <p id="pnlSaveMsg" style="font-size:12px;margin-top:10px"></p>
@@ -2493,11 +2943,12 @@ function bindPnlControls(container){
   const btn=container.querySelector('#btnSavePnlCosts');
   if(btn)btn.addEventListener('click',async()=>{
     const msg=container.querySelector('#pnlSaveMsg');
-    const pct=parseFloat(container.querySelector('#pnlPurchasePct').value)||0;
-    const other=parseFloat(container.querySelector('#pnlOtherMonthly').value)||0;
+    const mmppPct=parseFloat(container.querySelector('#pnlMmppPct').value)||0;
+    const iuoPct=parseFloat(container.querySelector('#pnlIuoPct').value)||0;
+    const iuoMonthly=parseFloat(container.querySelector('#pnlIuoMonthly').value)||0;
     btn.disabled=true;btn.textContent='Guardando…';
     try{
-      await setDoc(doc(db,'pnl_config','costs'),{purchasePct:pct,otherMonthly:other},{merge:true});
+      await setDoc(doc(db,'pnl_config','costs'),{mmppPct,iuoPct,iuoMonthly},{merge:true});
       msg.textContent='✓ Guardado';msg.style.color='var(--ok-fg)';
       setTimeout(()=>renderPnl(container),700);
     }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
