@@ -350,9 +350,13 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
       <span class="logo">Cuenta de explotación</span>
     </div>
     <div class="topbar-actions">
-      <button class="btn-action" id="btnImportRevenue">
+      <button class="btn-action" id="btnImportComedor">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Importar ventas
+        Importar comedor
+      </button>
+      <button class="btn-action" id="btnImportCafeteria">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Importar cafetería
       </button>
       <button class="btn-theme" id="btnThemePnl" title="Modo noche">🌙</button>
       <button class="btn-logout" id="btnLogoutPnl">Cerrar sesión</button>
@@ -2561,12 +2565,12 @@ staffFileInput.addEventListener('change',async e=>{
 
 // Importar ventas de comedor / cafetería
 const revenueFileInput=document.getElementById('revenueFileInput');
-document.getElementById('btnImportRevenue').addEventListener('click',()=>{
-  const channel=prompt('¿Qué canal estás importando?\n\nEscribe "comedor" o "cafeteria"');
-  if(!channel)return;
-  const norm=channel.toLowerCase().trim();
-  if(norm!=='comedor'&&norm!=='cafeteria'){alert('Escribe exactamente "comedor" o "cafeteria"');return;}
-  revenueFileInput.dataset.channel=norm;
+document.getElementById('btnImportComedor').addEventListener('click',()=>{
+  revenueFileInput.dataset.channel='comedor';
+  revenueFileInput.click();
+});
+document.getElementById('btnImportCafeteria').addEventListener('click',()=>{
+  revenueFileInput.dataset.channel='cafeteria';
   revenueFileInput.click();
 });
 revenueFileInput.addEventListener('change',async e=>{
