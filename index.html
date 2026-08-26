@@ -276,17 +276,17 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
         <p>Listas de comprobación APPCC por departamento, con registro de resultados e historial de auditorías.</p>
         <span class="hub-status ready">Activo</span>
       </div>
-      <div class="hub-card disabled" data-module="pnl">
+      <div class="hub-card" data-module="pnl">
         <div class="hub-icon">📊</div>
         <h3>Cuenta de explotación</h3>
-        <p>Ingresos, costes de materia prima, personal y estructura. Margen por centro y evolución mensual.</p>
-        <span class="hub-status soon">Próximamente</span>
+        <p>Ingresos de catering, comedor y cafetería. Costes de compras y personal. Margen y evolución mensual.</p>
+        <span class="hub-status ready">Activo</span>
       </div>
-      <div class="hub-card disabled" data-module="staff">
+      <div class="hub-card" data-module="staff">
         <div class="hub-icon">👥</div>
         <h3>Personal</h3>
-        <p>Turnos, cobertura por servicio, formación en manipulación de alimentos y control de vencimientos.</p>
-        <span class="hub-status soon">Próximamente</span>
+        <p>Plantilla, horas semanales, cobertura de puestos y coste estimado según convenio.</p>
+        <span class="hub-status ready">Activo</span>
       </div>
     </div>
   </main>
@@ -309,6 +309,46 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
     </div>
   </header>
   <main class="main" id="auditContent"></main>
+</div>
+
+<!-- ══ MÓDULO PERSONAL ══ -->
+<div id="staffScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromStaff">← Hub</button>
+      <span class="logo">Personal</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-action" id="btnImportStaff">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Importar horario
+      </button>
+      <button class="btn-theme" id="btnThemeStaff" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutStaff">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main" id="staffContent"></main>
+  <input type="file" id="staffFileInput" accept=".xlsx,.xls" hidden />
+</div>
+
+<!-- ══ MÓDULO CUENTA DE EXPLOTACIÓN ══ -->
+<div id="pnlScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromPnl">← Hub</button>
+      <span class="logo">Cuenta de explotación</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-action" id="btnImportRevenue">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Importar ventas
+      </button>
+      <button class="btn-theme" id="btnThemePnl" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutPnl">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main" id="pnlContent"></main>
+  <input type="file" id="revenueFileInput" accept=".csv" hidden />
 </div>
 
 <div id="app" hidden>
@@ -1708,7 +1748,7 @@ async function renderLogic(container){
 
 // ── MODO NOCHE ────────────────────────────────────────────────────
 const root=document.documentElement;
-const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit'].map(id=>document.getElementById(id)).filter(Boolean);
+const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit','btnThemeStaff','btnThemePnl'].map(id=>document.getElementById(id)).filter(Boolean);
 function syncThemeIcons(isDark){themeButtons.forEach(b=>b.textContent=isDark?'☀️':'🌙');}
 if(localStorage.getItem('theme')==='dark'){root.classList.add('dark');syncThemeIcons(true);}
 themeButtons.forEach(btn=>btn.addEventListener('click',()=>{
@@ -2001,13 +2041,266 @@ document.getElementById('auditTabs').addEventListener('click',e=>{
   renderAuditView(currentAuditView);
 });
 
+// ══ MÓDULO PERSONAL ═══════════════════════════════════════════════
+// Costes/hora ESTIMADOS según convenio de colectividades de Cataluña.
+// IMPORTANTE: son valores de referencia orientativos — sustituir por las tablas reales del convenio vigente.
+const CONVENIO_RATES={
+  'RESPONSABLE DE CENTRO':16.5,
+  'JEFE COCINA':15.0,
+  'SEGUNDO JEFE COCINA':13.5,
+  'COCINERO':12.5,
+  'CAMARERO':11.5,
+  'AUX COLECTIVIDADES':11.0,
+  'CATERING':11.5,
+  'PRACTICAS':8.0,
+  'DEFECTO':11.0
+};
+function rateForRole(role){
+  const r=(role||'').toUpperCase();
+  for(const key of Object.keys(CONVENIO_RATES)){
+    if(key!=='DEFECTO'&&r.includes(key))return CONVENIO_RATES[key];
+  }
+  return CONVENIO_RATES['DEFECTO'];
+}
+function staffStatus(s){
+  const txt=`${s.name} ${s.note}`.toLowerCase();
+  if(txt.includes('baja'))return{label:'De baja',cls:'pill-cancel'};
+  if(txt.includes('no cubierto')||txt.includes('falta'))return{label:'Sin cubrir',cls:'pill-pax-amber'};
+  if(txt.includes('practica'))return{label:'Prácticas',cls:'pill-break'};
+  return{label:'Activo',cls:'pill-ok'};
+}
+
+async function renderStaff(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando plantilla…</span></div>`;
+  try{
+    const snap=await getDoc(doc(db,'staff_config','roster'));
+    const staff=snap.exists()?(snap.data().staff||[]):[];
+    if(!staff.length){
+      container.innerHTML=`<div class="empty-state"><p>Aún no hay plantilla cargada</p><p style="font-size:12px;margin-top:6px">Usa "Importar horario" para subir el Excel de horarios</p></div>`;
+      return;
+    }
+    const totalHours=staff.reduce((s,p)=>s+(p.weeklyHours||0),0);
+    const totalCost=staff.reduce((s,p)=>s+(p.weeklyHours||0)*rateForRole(p.role),0);
+    const active=staff.filter(p=>staffStatus(p).label==='Activo');
+    const uncovered=staff.filter(p=>staffStatus(p).label==='Sin cubrir');
+    const onLeave=staff.filter(p=>staffStatus(p).label==='De baja');
+
+    const rows=staff.map(p=>{
+      const st=staffStatus(p);
+      const rate=rateForRole(p.role);
+      const weekCost=(p.weeklyHours||0)*rate;
+      return`<div class="order-card">
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${escapeHtml(p.name)}</span>
+            <span class="order-loc">${escapeHtml(p.role||'Sin rol asignado')}</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill ${st.cls}">${st.label}</span>
+            <span class="pill pill-other">${p.weeklyHours||0}h/sem</span>
+          </div>
+        </div>
+        <div class="order-meta">
+          <span class="meta-item">${rate.toFixed(2)}€/h estimado</span>
+          <span class="meta-item">${fmtMoney(weekCost)}/semana</span>
+          <span class="meta-item">${fmtMoney(weekCost*4.33)}/mes aprox.</span>
+          ${p.note?`<span class="meta-item" style="color:var(--alert-amber-fg)">${escapeHtml(p.note)}</span>`:''}
+        </div>
+      </div>`;
+    }).join('');
+
+    container.innerHTML=`<div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Personas en plantilla</div><div class="kpi-value">${staff.length}</div><div class="kpi-sub">${active.length} activas</div></div>
+      <div class="kpi-card"><div class="kpi-label">Horas semanales</div><div class="kpi-value">${totalHours}</div><div class="kpi-sub">${(totalHours/40).toFixed(1)} FTE</div></div>
+      <div class="kpi-card"><div class="kpi-label">Coste semanal estimado</div><div class="kpi-value">${fmtMoney(totalCost)}</div><div class="kpi-sub">${fmtMoney(totalCost*4.33)}/mes</div></div>
+      <div class="kpi-card"><div class="kpi-label">Puestos a cubrir</div><div class="kpi-value ${uncovered.length+onLeave.length>0?'alert':''}">${uncovered.length+onLeave.length}</div><div class="kpi-sub">${onLeave.length} bajas · ${uncovered.length} sin cubrir</div></div>
+    </div>
+    <div class="alert alert-amber" style="margin-bottom:16px">
+      <span>⚠️ Los costes/hora son <strong>estimaciones orientativas</strong>, no las tablas oficiales del convenio de colectividades de Cataluña. Sustitúyelos por los valores reales cuando los tengas para que la cuenta de explotación sea fiable.</span>
+    </div>
+    <p class="section-label">Plantilla</p>
+    <div class="orders">${rows}</div>`;
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function parseStaffXLSX(arrayBuffer){
+  const wb=XLSX.read(arrayBuffer,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  // Localizar filas clave: la que contiene 'PERSONA' y la de 'HORAS SEMANALES'
+  let nameRow=-1,hoursRow=-1,commentRow=-1;
+  rows.forEach((r,i)=>{
+    const first=String(r[0]||'').toUpperCase().trim();
+    if(first==='PERSONA')nameRow=i;
+    if(first==='HORAS SEMANALES')hoursRow=i;
+    if(first==='COMENTARIOS')commentRow=i;
+  });
+  if(nameRow===-1)throw new Error('No se encontró la fila "PERSONA" en el Excel');
+  const roleRow=nameRow-1;
+  const names=rows[nameRow],roles=rows[roleRow]||[],hours=rows[hoursRow]||[],comments=rows[commentRow]||[];
+  const EXCLUDE=["FTE'S",'ACTUAL','DIF','CAJA','ETT','COCINERO'];
+  const staff=[];
+  for(let c=1;c<names.length;c++){
+    const name=String(names[c]||'').trim();
+    if(!name||EXCLUDE.includes(name.toUpperCase()))continue;
+    const h=hours[c];
+    staff.push({
+      name,
+      role:String(roles[c]||'').trim(),
+      weeklyHours:(typeof h==='number')?h:(parseFloat(String(h).replace(',','.'))||0),
+      note:String(comments[c]||'').trim()
+    });
+  }
+  return staff;
+}
+
+// ══ MÓDULO CUENTA DE EXPLOTACIÓN ══════════════════════════════════
+const SPANISH_MONTHS={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,set:8,oct:9,nov:10,dic:11};
+function parseSpanishShortDate(str){
+  const m=String(str||'').trim().match(/^(\d{1,2})\s+([a-záéíóú]{3,4})\s+(\d{4})$/i);
+  if(!m)return null;
+  const mo=SPANISH_MONTHS[m[2].toLowerCase().slice(0,3)];
+  if(mo===undefined)return null;
+  return new Date(+m[3],mo,+m[1]);
+}
+
+function parseRevenueCSV(text,channel){
+  const lines=text.replace(/^\uFEFF/,'').trim().split('\n').map(l=>l.trim()).filter(Boolean);
+  if(lines.length<2)throw new Error('CSV vacío');
+  const sep=lines[0].includes(';')?';':',';
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const cells=lines[i].split(sep).map(c=>c.replace(/"/g,'').trim());
+    const date=parseSpanishShortDate(cells[0]);
+    if(!date)continue;
+    const tickets=parseInt(cells[1]||'0',10)||0;
+    const billed=parseFloat((cells[2]||'0').replace(',','.'))||0;
+    rows.push({date,tickets,billed,channel});
+  }
+  return rows;
+}
+
+async function renderPnl(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Calculando cuenta de explotación…</span></div>`;
+  try{
+    const [revSnap,staffSnap,costSnap,cateringOrders]=await Promise.all([
+      getDoc(doc(db,'pnl_config','revenue')),
+      getDoc(doc(db,'staff_config','roster')),
+      getDoc(doc(db,'pnl_config','costs')),
+      getOrders()
+    ]);
+    const revenue=revSnap.exists()?(revSnap.data().rows||[]):[];
+    const staff=staffSnap.exists()?(staffSnap.data().staff||[]):[];
+    const savedCosts=costSnap.exists()?costSnap.data():{purchasePct:35,otherMonthly:0};
+
+    // Ingresos de catering (del módulo de Catering)
+    const cateringActive=cateringOrders.filter(o=>o.orderStatus!=='CANCELADO');
+    const cateringRevenue=cateringActive.reduce((s,o)=>s+(o.priceTotal||0),0);
+    const cateringPax=cateringActive.reduce((s,o)=>s+(o.pax||0),0);
+
+    // Ingresos de comedor y cafetería (importados)
+    const byChannel={};
+    revenue.forEach(r=>{
+      if(!byChannel[r.channel])byChannel[r.channel]={billed:0,tickets:0};
+      byChannel[r.channel].billed+=r.billed||0;
+      byChannel[r.channel].tickets+=r.tickets||0;
+    });
+    const comedor=byChannel['comedor']||{billed:0,tickets:0};
+    const cafeteria=byChannel['cafeteria']||{billed:0,tickets:0};
+
+    const totalRevenue=cateringRevenue+comedor.billed+cafeteria.billed;
+    const staffMonthlyCost=staff.reduce((s,p)=>s+(p.weeklyHours||0)*rateForRole(p.role),0)*4.33;
+    const purchaseCost=totalRevenue*(savedCosts.purchasePct/100);
+    const otherCost=savedCosts.otherMonthly||0;
+    const totalCosts=staffMonthlyCost+purchaseCost+otherCost;
+    const margin=totalRevenue-totalCosts;
+    const marginPct=totalRevenue?(margin/totalRevenue*100):0;
+
+    const maxRev=Math.max(cateringRevenue,comedor.billed,cafeteria.billed,1);
+    const revRow=(label,val,tickets)=>`<div class="bar-row"><span class="bar-label">${label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(val/maxRev*100).toFixed(0)}%;background:#1A5C38"></div></div><span class="bar-val">${fmtMoney(val)}${tickets?` · ${tickets} tickets`:''}</span></div>`;
+
+    const maxCost=Math.max(staffMonthlyCost,purchaseCost,otherCost,1);
+    const costRow=(label,val)=>`<div class="bar-row"><span class="bar-label">${label}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(val/maxCost*100).toFixed(0)}%;background:var(--alert-red-border)"></div></div><span class="bar-val">${fmtMoney(val)}</span></div>`;
+
+    container.innerHTML=`<div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Ingresos totales</div><div class="kpi-value">${fmtMoney(totalRevenue)}</div><div class="kpi-sub">3 canales</div></div>
+      <div class="kpi-card"><div class="kpi-label">Costes estimados</div><div class="kpi-value">${fmtMoney(totalCosts)}</div><div class="kpi-sub">personal + compras</div></div>
+      <div class="kpi-card"><div class="kpi-label">Margen</div><div class="kpi-value ${margin<0?'alert':''}">${fmtMoney(margin)}</div><div class="kpi-sub">${marginPct.toFixed(1)}% sobre ingresos</div></div>
+      <div class="kpi-card"><div class="kpi-label">Comensales totales</div><div class="kpi-value">${cateringPax+comedor.tickets+cafeteria.tickets}</div><div class="kpi-sub">catering + comedor + cafetería</div></div>
+    </div>
+
+    <div class="alert alert-amber" style="margin-bottom:16px">
+      <span>⚠️ Cifras <strong>orientativas</strong>. Los costes de personal usan tarifas estimadas de convenio (no oficiales) y el coste de compras es un porcentaje configurable, no datos reales de facturas.</span>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Ingresos por canal</h3>
+        <span class="scope-label">Acumulado de todos los datos cargados</span>
+        <div class="bar-chart">
+          ${revRow('Catering',cateringRevenue,0)}
+          ${revRow('Comedor',comedor.billed,comedor.tickets)}
+          ${revRow('Cafetería',cafeteria.billed,cafeteria.tickets)}
+        </div>
+      </div>
+      <div class="stat-card">
+        <h3>Estructura de costes (mensual)</h3>
+        <span class="scope-label">Estimación según parámetros configurados</span>
+        <div class="bar-chart">
+          ${costRow('Personal',staffMonthlyCost)}
+          ${costRow('Compras',purchaseCost)}
+          ${costRow('Otros',otherCost)}
+        </div>
+      </div>
+    </div>
+
+    <div class="audit-section">
+      <h3>Parámetros de coste</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Coste de compras (% sobre ingresos)</label>
+          <input type="number" id="pnlPurchasePct" value="${savedCosts.purchasePct}" min="0" max="100" step="0.5">
+        </div>
+        <div class="form-group">
+          <label>Otros costes mensuales (€)</label>
+          <input type="number" id="pnlOtherMonthly" value="${savedCosts.otherMonthly}" min="0" step="50">
+        </div>
+      </div>
+      <button class="btn-primary" id="btnSavePnlCosts" style="max-width:240px">Guardar parámetros</button>
+      <p id="pnlSaveMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>`;
+
+    const btnSaveCosts=container.querySelector('#btnSavePnlCosts');
+    if(btnSaveCosts)btnSaveCosts.addEventListener('click',async()=>{
+      const msg=container.querySelector('#pnlSaveMsg');
+      const pct=parseFloat(container.querySelector('#pnlPurchasePct').value)||0;
+      const other=parseFloat(container.querySelector('#pnlOtherMonthly').value)||0;
+      btnSaveCosts.disabled=true;btnSaveCosts.textContent='Guardando…';
+      try{
+        await setDoc(doc(db,'pnl_config','costs'),{purchasePct:pct,otherMonthly:other},{merge:true});
+        msg.textContent='✓ Guardado';msg.style.color='var(--ok-fg)';
+        setTimeout(()=>renderPnl(container),800);
+      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
+      btnSaveCosts.disabled=false;btnSaveCosts.textContent='Guardar parámetros';
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
 // ══ NAVEGACIÓN DEL HUB ════════════════════════════════════════════
 const hubScreen=document.getElementById('hubScreen');
 const auditScreen=document.getElementById('auditScreen');
+const staffScreen=document.getElementById('staffScreen');
+const pnlScreen=document.getElementById('pnlScreen');
 
 function showScreen(name){
   hubScreen.hidden=name!=='hub';
   auditScreen.hidden=name!=='audit';
+  staffScreen.hidden=name!=='staff';
+  pnlScreen.hidden=name!=='pnl';
   document.getElementById('app').hidden=name!=='catering';
 }
 
@@ -2021,12 +2314,69 @@ document.querySelectorAll('.hub-card').forEach(card=>{
     } else if(mod==='audit'){
       showScreen('audit');
       renderAuditView(currentAuditView);
+    } else if(mod==='staff'){
+      showScreen('staff');
+      renderStaff(document.getElementById('staffContent'));
+    } else if(mod==='pnl'){
+      showScreen('pnl');
+      renderPnl(document.getElementById('pnlContent'));
     }
   });
 });
 
 document.getElementById('btnBackFromCatering').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromAudit').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromStaff').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromPnl').addEventListener('click',()=>showScreen('hub'));
+
+// Importar horario de personal
+const staffFileInput=document.getElementById('staffFileInput');
+document.getElementById('btnImportStaff').addEventListener('click',()=>staffFileInput.click());
+staffFileInput.addEventListener('change',async e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  const container=document.getElementById('staffContent');
+  try{
+    const buffer=await file.arrayBuffer();
+    const staff=parseStaffXLSX(buffer);
+    if(!staff.length)throw new Error('No se encontró personal en el archivo');
+    await setDoc(doc(db,'staff_config','roster'),{staff,updatedAt:Timestamp.now()});
+    alert(`✓ ${staff.length} personas importadas correctamente`);
+    renderStaff(container);
+  }catch(err){alert('Error al importar el horario: '+err.message);}
+  staffFileInput.value='';
+});
+
+// Importar ventas de comedor / cafetería
+const revenueFileInput=document.getElementById('revenueFileInput');
+document.getElementById('btnImportRevenue').addEventListener('click',()=>{
+  const channel=prompt('¿Qué canal estás importando?\n\nEscribe "comedor" o "cafeteria"');
+  if(!channel)return;
+  const norm=channel.toLowerCase().trim();
+  if(norm!=='comedor'&&norm!=='cafeteria'){alert('Escribe exactamente "comedor" o "cafeteria"');return;}
+  revenueFileInput.dataset.channel=norm;
+  revenueFileInput.click();
+});
+revenueFileInput.addEventListener('change',async e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  const channel=revenueFileInput.dataset.channel;
+  const container=document.getElementById('pnlContent');
+  try{
+    const text=await file.text();
+    const newRows=parseRevenueCSV(text,channel);
+    if(!newRows.length)throw new Error('No se encontraron filas válidas');
+    const snap=await getDoc(doc(db,'pnl_config','revenue'));
+    const existing=snap.exists()?(snap.data().rows||[]):[];
+    // Sustituye las filas de ese canal, conserva las del otro
+    const kept=existing.filter(r=>r.channel!==channel);
+    const merged=[...kept,...newRows.map(r=>({date:localISODate(r.date),tickets:r.tickets,billed:r.billed,channel:r.channel}))];
+    await setDoc(doc(db,'pnl_config','revenue'),{rows:merged,updatedAt:Timestamp.now()});
+    alert(`✓ ${newRows.length} días importados en "${channel}"`);
+    renderPnl(container);
+  }catch(err){alert('Error al importar: '+err.message);}
+  revenueFileInput.value='';
+});
 
 async function startApp(){
   await ensureConfigSeeded();
@@ -2056,6 +2406,8 @@ onAuthStateChanged(auth, user=>{
     loginScreen.hidden=false;
     hubScreen.hidden=true;
     auditScreen.hidden=true;
+    staffScreen.hidden=true;
+    pnlScreen.hidden=true;
     appEl.hidden=true;
   }
 });
@@ -2107,7 +2459,7 @@ document.getElementById('btnForgotPassword').addEventListener('click', async(e)=
 loginPassword.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 loginEmail.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-['btnLogout','btnLogoutHub','btnLogoutAudit'].forEach(id=>{
+['btnLogout','btnLogoutHub','btnLogoutAudit','btnLogoutStaff','btnLogoutPnl'].forEach(id=>{
   const b=document.getElementById(id);
   if(b)b.addEventListener('click',async()=>{await signOut(auth);});
 });
