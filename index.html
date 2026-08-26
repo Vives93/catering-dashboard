@@ -33,6 +33,34 @@
   --alert-amber-bg:#2A1F0E;--alert-amber-border:#8B6020;--alert-amber-fg:#FAC97A;
   --alert-purple-bg:#241A30;--alert-purple-border:#7A4FA8;--alert-purple-fg:#D9BBF5;
 }
+.btn-back{background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:5px 12px;cursor:pointer;font-size:12.5px;font-family:var(--font-sans);color:var(--text-secondary);transition:all .15s}
+.btn-back:hover{border-color:var(--text-primary);color:var(--text-primary)}
+.hub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.hub-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:20px;cursor:pointer;transition:all .18s;position:relative}
+.hub-card:hover:not(.disabled){border-color:var(--text-primary);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.06)}
+.hub-card.disabled{opacity:.55;cursor:default}
+.hub-icon{font-size:28px;margin-bottom:10px}
+.hub-card h3{font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text-primary)}
+.hub-card p{font-size:12.5px;color:var(--text-secondary);line-height:1.5;margin-bottom:12px}
+.hub-status{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500}
+.hub-status.ready{background:var(--ok-bg);color:var(--ok-fg)}
+.hub-status.soon{background:var(--other-bg);color:var(--other-fg)}
+.audit-section{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:18px;margin-bottom:14px}
+.audit-section h3{font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-primary)}
+.audit-row{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--border-soft)}
+.audit-row:first-of-type{border-top:none}
+.audit-req{flex:1;font-size:12.5px;line-height:1.5;color:var(--text-primary)}
+.audit-marks{display:flex;gap:6px;flex-shrink:0}
+.audit-mark{width:34px;height:28px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);cursor:pointer;font-size:11px;font-weight:600;color:var(--text-tertiary);transition:all .15s}
+.audit-mark:hover{border-color:var(--text-secondary)}
+.audit-mark.sel-ok{background:var(--ok-bg);border-color:#8FD455;color:var(--ok-fg)}
+.audit-mark.sel-ob{background:var(--alert-amber-bg);border-color:var(--alert-amber-border);color:var(--alert-amber-fg)}
+.audit-mark.sel-nc{background:var(--alert-red-bg);border-color:var(--alert-red-border);color:var(--alert-red-fg)}
+.audit-comment{width:180px;flex-shrink:0}
+.audit-comment input{width:100%;font-family:var(--font-sans);font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary)}
+.audit-summary{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;padding:12px 16px;background:var(--bg);border-radius:var(--radius-md);margin-bottom:14px}
+.history-item{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+.history-item:hover{border-color:var(--border)}
 .btn-theme{background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:6px 10px;cursor:pointer;font-size:15px;color:var(--text-secondary);transition:all .15s}
 .login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:500}
 .login-screen[hidden]{display:none}
@@ -142,7 +170,9 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 .compare-flat{background:var(--other-bg);color:var(--other-fg)}
 .stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px}
 .stat-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:16px}
-.stat-card h3{font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.stat-card h3{font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.scope-label{font-size:11px;color:var(--text-tertiary);margin-bottom:12px;font-style:italic;display:block}
+.scope-label.comparing{color:#1A5C38;font-style:normal;font-weight:500}
 .bar-chart{display:flex;flex-direction:column;gap:8px}
 .bar-row{display:flex;align-items:center;gap:10px;font-size:12px}
 .bar-label{width:130px;flex-shrink:0;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -219,9 +249,72 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
   </div>
 </div>
 
+<!-- ══ HUB PRINCIPAL ══ -->
+<div id="hubScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="logo">Gestión Operativa</span>
+      <span class="topbar-date" id="hubDate"></span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-theme" id="btnThemeHub" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutHub">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main">
+    <p class="section-label" style="margin-bottom:14px">Módulos disponibles</p>
+    <div class="hub-grid">
+      <div class="hub-card" data-module="catering">
+        <div class="hub-icon">🍽️</div>
+        <h3>Catering</h3>
+        <p>Gestión operativa diaria de pedidos, alertas de solapamiento y carga, análisis acumulado y facturación.</p>
+        <span class="hub-status ready">Activo</span>
+      </div>
+      <div class="hub-card" data-module="audit">
+        <div class="hub-icon">✅</div>
+        <h3>Auditoría</h3>
+        <p>Listas de comprobación APPCC por departamento, con registro de resultados e historial de auditorías.</p>
+        <span class="hub-status ready">Activo</span>
+      </div>
+      <div class="hub-card disabled" data-module="pnl">
+        <div class="hub-icon">📊</div>
+        <h3>Cuenta de explotación</h3>
+        <p>Ingresos, costes de materia prima, personal y estructura. Margen por centro y evolución mensual.</p>
+        <span class="hub-status soon">Próximamente</span>
+      </div>
+      <div class="hub-card disabled" data-module="staff">
+        <div class="hub-icon">👥</div>
+        <h3>Personal</h3>
+        <p>Turnos, cobertura por servicio, formación en manipulación de alimentos y control de vencimientos.</p>
+        <span class="hub-status soon">Próximamente</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══ MÓDULO AUDITORÍA ══ -->
+<div id="auditScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromAudit">← Hub</button>
+      <span class="logo">Auditoría</span>
+    </div>
+    <nav class="tabs" id="auditTabs">
+      <button class="tab active" data-audit-view="form">Nueva auditoría</button>
+      <button class="tab" data-audit-view="history">Historial</button>
+    </nav>
+    <div class="topbar-actions">
+      <button class="btn-theme" id="btnThemeAudit" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutAudit">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main" id="auditContent"></main>
+</div>
+
 <div id="app" hidden>
   <header class="topbar">
     <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromCatering">← Hub</button>
       <span class="logo">Catering</span>
       <span class="topbar-date" id="currentDate"></span>
       <span class="topbar-date" id="lastImportLabel" style="color:var(--text-tertiary)"></span>
@@ -1007,7 +1100,7 @@ function compareBadge(current,previous){
   const diff=((current-previous)/previous*100);
   const cls=diff>2?'compare-up':diff<-2?'compare-down':'compare-flat';
   const arrow=diff>2?'↑':diff<-2?'↓':'→';
-  return`<span class="compare-badge ${cls}">${arrow} ${Math.abs(diff).toFixed(0)}% vs anterior</span>`;
+  return`<span class="compare-badge ${cls}">${arrow} ${Math.abs(diff).toFixed(0)}%</span>`;
 }
 
 function buildPeriodLabel(type,refDate){
@@ -1314,19 +1407,13 @@ async function renderCumulative(container){
       <span class="bar-val">${fmtMoney(curPrice)} / ${fmtMoney(prevPrice)}</span>
     </div>`;
   }).join('')+(hasMonthComparison?`<div style="font-size:11px;color:var(--text-tertiary);margin-top:8px"><span class="legend-dot" style="background:#1A5C38"></span>Este período &nbsp;&nbsp;<span class="legend-dot" style="background:var(--text-tertiary)"></span>Período de comparación</div>`:'');
-  // Tendencia de facturación: misma lógica que la de pedidos, pero con importes
+
+  // Resumen de facturación: se basa en la comparación real elegida por el usuario (si hay alguna activa)
   let billingTrendInsight='';
-  if(monthKeys.length>=2){
-    const mid2=Math.floor(monthKeys.length/2);
-    const firstHalfKeys2=monthKeys.slice(0,mid2||1);
-    const secondHalfKeys2=monthKeys.slice(mid2);
-    const monthLabel=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'short',year:'numeric'});};
-    const firstRange2=firstHalfKeys2.length>1?`${monthLabel(firstHalfKeys2[0])} – ${monthLabel(firstHalfKeys2[firstHalfKeys2.length-1])}`:monthLabel(firstHalfKeys2[0]);
-    const secondRange2=secondHalfKeys2.length>1?`${monthLabel(secondHalfKeys2[0])} – ${monthLabel(secondHalfKeys2[secondHalfKeys2.length-1])}`:monthLabel(secondHalfKeys2[0]);
-    const firstHalfPriceAvg=firstHalfKeys2.reduce((s,k)=>s+byMonth[k].price,0)/firstHalfKeys2.length;
-    const secondHalfPriceAvg=secondHalfKeys2.reduce((s,k)=>s+byMonth[k].price,0)/secondHalfKeys2.length;
-    const billingChangePct=firstHalfPriceAvg?((secondHalfPriceAvg-firstHalfPriceAvg)/firstHalfPriceAvg*100):0;
-    const baseMsg2=`media de ${fmtMoney(firstHalfPriceAvg)}/mes en ${firstRange2} → ${fmtMoney(secondHalfPriceAvg)}/mes en ${secondRange2}`;
+  if(range.compare&&compareRangeLabel){
+    const curTotal=totalPrice,prevTotal=byMonthPrev?Object.values(byMonthPrev).reduce((s,v)=>s+v.price,0):0;
+    const billingChangePct=prevTotal?((curTotal-prevTotal)/prevTotal*100):0;
+    const baseMsg2=`${fmtMoney(curTotal)} en este período · ${fmtMoney(prevTotal)} en el período de comparación (${compareRangeLabel.replace('vs ','')})`;
     if(billingChangePct>10){
       billingTrendInsight=`📈 Facturación <strong>creciente</strong> · ${baseMsg2} (+${billingChangePct.toFixed(0)}%)`;
     } else if(billingChangePct<-10){
@@ -1335,19 +1422,13 @@ async function renderCumulative(container){
       billingTrendInsight=`➡️ Facturación <strong>estable</strong> · ${baseMsg2}`;
     }
   }
-  // Tendencia: comparar la primera mitad de meses vs la segunda mitad para determinar dirección
+
+  // Resumen de pedidos: misma lógica, basada en la comparación real elegida
   let trendInsight='';
-  if(monthKeys.length>=2){
-    const mid=Math.floor(monthKeys.length/2);
-    const firstHalfKeys=monthKeys.slice(0,mid||1);
-    const secondHalfKeys=monthKeys.slice(mid);
-    const monthLabelP=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'short',year:'numeric'});};
-    const firstRange=firstHalfKeys.length>1?`${monthLabelP(firstHalfKeys[0])} – ${monthLabelP(firstHalfKeys[firstHalfKeys.length-1])}`:monthLabelP(firstHalfKeys[0]);
-    const secondRange=secondHalfKeys.length>1?`${monthLabelP(secondHalfKeys[0])} – ${monthLabelP(secondHalfKeys[secondHalfKeys.length-1])}`:monthLabelP(secondHalfKeys[0]);
-    const firstHalfAvg=firstHalfKeys.reduce((s,k)=>s+byMonth[k].count,0)/firstHalfKeys.length;
-    const secondHalfAvg=secondHalfKeys.reduce((s,k)=>s+byMonth[k].count,0)/secondHalfKeys.length;
-    const changePct=firstHalfAvg?((secondHalfAvg-firstHalfAvg)/firstHalfAvg*100):0;
-    const baseMsg=`media de ${firstHalfAvg.toFixed(1)} pedidos/mes en ${firstRange} → ${secondHalfAvg.toFixed(1)} pedidos/mes en ${secondRange}`;
+  if(range.compare&&compareRangeLabel){
+    const curCount=active.length,prevCount=byMonthPrev?Object.values(byMonthPrev).reduce((s,v)=>s+v.count,0):0;
+    const changePct=prevCount?((curCount-prevCount)/prevCount*100):0;
+    const baseMsg=`${curCount} pedidos en este período · ${prevCount} pedidos en el período de comparación (${compareRangeLabel.replace('vs ','')})`;
     if(changePct>10){
       trendInsight=`📈 Tendencia <strong>creciente</strong> · ${baseMsg} (+${changePct.toFixed(0)}%)`;
     } else if(changePct<-10){
@@ -1357,45 +1438,54 @@ async function renderCumulative(container){
     }
   }
 
-  container.innerHTML=controlsHtml+(compareRangeLabel?`<p style="font-size:11px;color:var(--text-tertiary);margin:-4px 0 10px">Comparativa: ${compareRangeLabel}</p>`:'')+`<div class="kpi-grid">
+  // Etiquetas de alcance para cada gráfica, para que siempre quede claro qué muestra
+  const fmtShortLbl=d=>d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+  const currentPeriodText=(from&&to)?`${fmtShortLbl(from)} – ${fmtShortLbl(to)}`:'todo el histórico';
+  const scopeOnly=`<span class="scope-label">Solo período actual: ${currentPeriodText} · sin comparación</span>`;
+  const scopeCompare=hasMonthComparison?`<span class="scope-label comparing">Comparando: ${currentPeriodText} ${compareRangeLabel}</span>`:`<span class="scope-label">Solo período actual: ${currentPeriodText} · sin comparación</span>`;
+
+  container.innerHTML=controlsHtml+(compareRangeLabel?`<p style="font-size:11px;color:var(--text-tertiary);margin:-4px 0 10px">Comparando con: ${compareRangeLabel}</p>`:'')+`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${compareCount}</div></div>
     <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div><div class="kpi-sub">${comparePax}</div></div>
     <div class="kpi-card"><div class="kpi-label">Importe total sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div><div class="kpi-sub">${comparePrice}</div></div>
     <div class="kpi-card"><div class="kpi-label">Media pax / servicio</div><div class="kpi-value">${Math.round(totalPax/active.length)}</div></div>
   </div>
-  <p class="section-label">Cancelaciones</p>
+  <p class="section-label">Cancelaciones · ${currentPeriodText}</p>
   <div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Cateringes cancelados</div><div class="kpi-value alert">${cancelledCount}</div></div>
     <div class="kpi-card"><div class="kpi-label">Tasa de cancelación</div><div class="kpi-value">${cancelRate.toFixed(1)}%</div></div>
     <div class="kpi-card"><div class="kpi-label">Valor perdido (no facturado)</div><div class="kpi-value alert">${fmtMoney(lostValue)}</div></div>
   </div>
   <div class="stats-grid">
-    <div class="stat-card"><h3>Quién cancela más (top 10)</h3><div class="bar-chart">${cancelCustomerRows||'<div style="font-size:12px;color:var(--text-tertiary)">Sin cancelaciones en este período</div>'}</div></div>
+    <div class="stat-card"><h3>Quién cancela más (top 10)</h3>${scopeOnly}<div class="bar-chart">${cancelCustomerRows||'<div style="font-size:12px;color:var(--text-tertiary)">Sin cancelaciones en este período</div>'}</div></div>
     <div class="stat-card">
       <h3>Demanda por día de la semana</h3>
+      ${scopeOnly}
       <div class="bar-chart">${weekdayRows}</div>
       <p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${weekdayInsight}</p>
     </div>
   </div>
-  <p class="section-label">Patrones a lo largo del tiempo ${range.type==='all'?'(histórico completo)':'(dentro del rango seleccionado)'}</p>
+  <p class="section-label">Patrones a lo largo del tiempo</p>
   <div class="stats-grid">
     <div class="stat-card">
       <h3>Tendencia mensual (nº de pedidos)</h3>
+      ${scopeCompare}
       <div class="bar-chart">${monthRows||'<div style="font-size:12px;color:var(--text-tertiary)">Aún no hay suficientes meses de datos</div>'}</div>
       ${trendInsight?`<p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${trendInsight}</p>`:''}
     </div>
     <div class="stat-card">
       <h3>Tendencia mensual (facturación)</h3>
+      ${scopeCompare}
       <div class="bar-chart">${monthBillingRows||'<div style="font-size:12px;color:var(--text-tertiary)">Aún no hay suficientes meses de datos</div>'}</div>
       ${billingTrendInsight?`<p style="font-size:12px;color:var(--text-secondary);margin-top:10px;line-height:1.5">${billingTrendInsight}</p>`:''}
     </div>
   </div>
   <div class="stats-grid">
-    <div class="stat-card"><h3>Demanda por tipo de servicio (nº de pedidos)</h3><div class="bar-chart">${typeRows}</div></div>
-    <div class="stat-card"><h3>Clientes que más consumen — por facturación (top 10)</h3><div class="bar-chart">${custRows}</div></div>
-    <div class="stat-card"><h3>Salas con más pedidos (top 10)</h3><div class="bar-chart">${roomRows}</div></div>
-    <div class="stat-card"><h3>${pickupWithHour>0?'Franja horaria: entregas vs recogidas':'Demanda por franja horaria'}</h3><div class="bar-chart">${hourRows}</div></div>
-    <div class="stat-card"><h3>Resumen operativo</h3><div class="bar-chart">
+    <div class="stat-card"><h3>Demanda por tipo de servicio (nº de pedidos)</h3>${scopeOnly}<div class="bar-chart">${typeRows}</div></div>
+    <div class="stat-card"><h3>Clientes que más consumen — por facturación (top 10)</h3>${scopeOnly}<div class="bar-chart">${custRows}</div></div>
+    <div class="stat-card"><h3>Salas con más pedidos (top 10)</h3>${scopeOnly}<div class="bar-chart">${roomRows}</div></div>
+    <div class="stat-card"><h3>${pickupWithHour>0?'Franja horaria: entregas vs recogidas':'Demanda por franja horaria'}</h3>${scopeOnly}<div class="bar-chart">${hourRows}</div></div>
+    <div class="stat-card"><h3>Resumen operativo</h3>${scopeOnly}<div class="bar-chart">
       <div class="bar-row"><span class="bar-label">Con foto entrega</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(active.filter(o=>o.hasDeliveryPhoto).length/active.length*100).toFixed(0)}%"></div></div><span class="bar-val">${active.filter(o=>o.hasDeliveryPhoto).length}</span></div>
       <div class="bar-row"><span class="bar-label">Con foto recogida</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(active.filter(o=>o.hasPickupPhoto).length/active.length*100).toFixed(0)}%"></div></div><span class="bar-val">${active.filter(o=>o.hasPickupPhoto).length}</span></div>
       <div class="bar-row"><span class="bar-label">Con retraso</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(active.filter(o=>o.isLate).length/active.length*100).toFixed(0)}%"></div></div><span class="bar-val">${active.filter(o=>o.isLate).length}</span></div>
@@ -1617,14 +1707,15 @@ async function renderLogic(container){
 }
 
 // ── MODO NOCHE ────────────────────────────────────────────────────
-const btnTheme=document.getElementById('btnTheme');
 const root=document.documentElement;
-if(localStorage.getItem('theme')==='dark'){root.classList.add('dark');btnTheme.textContent='☀️';}
-btnTheme.addEventListener('click',()=>{
+const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit'].map(id=>document.getElementById(id)).filter(Boolean);
+function syncThemeIcons(isDark){themeButtons.forEach(b=>b.textContent=isDark?'☀️':'🌙');}
+if(localStorage.getItem('theme')==='dark'){root.classList.add('dark');syncThemeIcons(true);}
+themeButtons.forEach(btn=>btn.addEventListener('click',()=>{
   const isDark=root.classList.toggle('dark');
-  btnTheme.textContent=isDark?'☀️':'🌙';
+  syncThemeIcons(isDark);
   localStorage.setItem('theme',isDark?'dark':'light');
-});
+}));
 
 // ── NAVEGADOR DE FECHAS ───────────────────────────────────────────
 let selectedDate = new Date();
@@ -1733,6 +1824,210 @@ async function ensureConfigSeeded(){
   }catch(e){console.warn('No se pudo sincronizar la lista de exclusión:',e.message);}
 }
 
+// ══ MÓDULO AUDITORÍA ══════════════════════════════════════════════
+const AUDIT_CHECKLIST=[
+  {group:'Documentación y planificación',items:[
+    'Comprobar Manual APPCC y Catálogo de dietas de Ballesol',
+    'Menú Mensual firmado, lo cumplen y conocen el número diario de dietas a realizar de cada tipo',
+    'Modificaciones aprobadas',
+    'Fichas técnicas de preparación',
+    'Control de Alérgenos',
+  ]},
+  {group:'Recepción y trazabilidad',items:[
+    'Control de recepción (albaranes y Aplicación)',
+    'Trazabilidad',
+    'Verificación de termómetros (anual)',
+  ]},
+  {group:'Registros APPCC',items:[
+    'Elaboración (T≥65°C)',
+    'Enfriamiento (2 horas de 60 a 10°C)',
+    'Temperatura de Cámaras (4°C, -18°C)',
+    'Limpieza y desinfección',
+    'Control polares (<25%) y cambios de aceite',
+    'Higienización vegetales (dosis controlada)',
+    'Control de agua (0,2-1 ppm)',
+  ]},
+  {group:'Formación y muestras',items:[
+    'Formación manipuladores de alimentos',
+    'Muestras testigo (7 días en frío)',
+  ]},
+  {group:'Almacenamiento',items:[
+    'Almacenamiento (seco, frío + y −): orden, productos protegidos, etiquetas, T Cámaras y Caducidades Secundarias',
+  ]},
+  {group:'Limpieza e instalaciones',items:[
+    'L+D zonas comunes y sensibles (cortafiambre, batidoras y texturizadoras, cajones de útiles)',
+    'Cubos de basura con tapa y accionamiento no manual',
+    'Lavamanos con accionamiento no manual, papel y jabón',
+    'Tablas de corte y menaje limpio sin humedad',
+  ]},
+];
+
+let auditState={department:'COCINA',auditedPerson:'',date:localISODate(new Date()),marks:{},comments:{}};
+let currentAuditView='form';
+
+function renderAuditForm(container){
+  let itemIdx=0;
+  const sectionsHtml=AUDIT_CHECKLIST.map(section=>{
+    const rows=section.items.map(item=>{
+      const id='i'+(itemIdx++);
+      const mark=auditState.marks[id]||'';
+      return`<div class="audit-row">
+        <span class="audit-req">${escapeHtml(item)}</span>
+        <div class="audit-marks">
+          <button class="audit-mark ${mark==='OK'?'sel-ok':''}" data-audit-id="${id}" data-mark="OK" title="Correcto">OK</button>
+          <button class="audit-mark ${mark==='OB'?'sel-ob':''}" data-audit-id="${id}" data-mark="OB" title="Observación">OB</button>
+          <button class="audit-mark ${mark==='NC'?'sel-nc':''}" data-audit-id="${id}" data-mark="NC" title="No conformidad">N.C</button>
+        </div>
+        <div class="audit-comment"><input type="text" placeholder="Comentario…" data-comment-id="${id}" value="${escapeHtml(auditState.comments[id]||'')}"></div>
+      </div>`;
+    }).join('');
+    return`<div class="audit-section"><h3>${escapeHtml(section.group)}</h3>${rows}</div>`;
+  }).join('');
+
+  const totalItems=AUDIT_CHECKLIST.reduce((s,g)=>s+g.items.length,0);
+  const answered=Object.keys(auditState.marks).length;
+  const okCount=Object.values(auditState.marks).filter(m=>m==='OK').length;
+  const obCount=Object.values(auditState.marks).filter(m=>m==='OB').length;
+  const ncCount=Object.values(auditState.marks).filter(m=>m==='NC').length;
+
+  container.innerHTML=`
+  <div class="audit-section">
+    <h3>Datos de la auditoría</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Departamento / Actividad</label><input type="text" id="auditDept" value="${escapeHtml(auditState.department)}"></div>
+      <div class="form-group"><label>Personal auditado</label><input type="text" id="auditPerson" placeholder="Nombre" value="${escapeHtml(auditState.auditedPerson)}"></div>
+      <div class="form-group"><label>Fecha</label><input type="date" id="auditDate" value="${auditState.date}"></div>
+    </div>
+  </div>
+  <div class="audit-summary">
+    <span><strong>${answered}</strong> / ${totalItems} respondidos</span>
+    <span style="color:var(--ok-fg)">OK: <strong>${okCount}</strong></span>
+    <span style="color:var(--alert-amber-fg)">Observaciones: <strong>${obCount}</strong></span>
+    <span style="color:var(--alert-red-fg)">No conformidades: <strong>${ncCount}</strong></span>
+  </div>
+  ${sectionsHtml}
+  <button class="btn-primary" id="btnSaveAudit" style="max-width:280px">Guardar auditoría</button>
+  <p id="auditSaveMsg" style="font-size:12px;margin-top:10px"></p>`;
+
+  container.querySelectorAll('.audit-mark').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const id=btn.dataset.auditId,mark=btn.dataset.mark;
+      if(auditState.marks[id]===mark)delete auditState.marks[id];
+      else auditState.marks[id]=mark;
+      renderAuditForm(container);
+    });
+  });
+  container.querySelectorAll('[data-comment-id]').forEach(inp=>{
+    inp.addEventListener('input',()=>{auditState.comments[inp.dataset.commentId]=inp.value;});
+  });
+  const deptInp=container.querySelector('#auditDept');
+  const personInp=container.querySelector('#auditPerson');
+  const dateInp=container.querySelector('#auditDate');
+  if(deptInp)deptInp.addEventListener('input',()=>{auditState.department=deptInp.value;});
+  if(personInp)personInp.addEventListener('input',()=>{auditState.auditedPerson=personInp.value;});
+  if(dateInp)dateInp.addEventListener('change',()=>{auditState.date=dateInp.value;});
+
+  const btnSave=container.querySelector('#btnSaveAudit');
+  if(btnSave)btnSave.addEventListener('click',async()=>{
+    const msg=container.querySelector('#auditSaveMsg');
+    btnSave.disabled=true;btnSave.textContent='Guardando…';
+    try{
+      const auditId='AUD-'+Date.now();
+      const detailed=[];
+      let idx=0;
+      AUDIT_CHECKLIST.forEach(section=>{
+        section.items.forEach(item=>{
+          const id='i'+(idx++);
+          detailed.push({group:section.group,requirement:item,mark:auditState.marks[id]||'',comment:auditState.comments[id]||''});
+        });
+      });
+      await setDoc(doc(db,'audits',auditId),{
+        auditId,department:auditState.department,auditedPerson:auditState.auditedPerson,
+        auditDate:auditState.date,items:detailed,
+        okCount,obCount,ncCount,answered,totalItems,
+        createdAt:Timestamp.now()
+      });
+      msg.textContent='✓ Auditoría guardada correctamente';
+      msg.style.color='var(--ok-fg)';
+      auditState={department:'COCINA',auditedPerson:'',date:localISODate(new Date()),marks:{},comments:{}};
+      setTimeout(()=>renderAuditForm(container),1200);
+    }catch(e){
+      msg.textContent='Error al guardar: '+e.message;
+      msg.style.color='var(--alert-red-fg)';
+    }
+    btnSave.disabled=false;btnSave.textContent='Guardar auditoría';
+  });
+}
+
+async function renderAuditHistory(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando historial…</span></div>`;
+  try{
+    const snap=await getDocs(query(collection(db,'audits'),orderBy('createdAt','desc')));
+    const audits=snap.docs.map(d=>d.data());
+    if(!audits.length){container.innerHTML=`<div class="empty-state"><p>Aún no hay auditorías guardadas</p></div>`;return;}
+    container.innerHTML=audits.map(a=>{
+      const d=a.auditDate?new Date(a.auditDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):'—';
+      const ncBadge=a.ncCount>0?`<span class="pill pill-cancel">${a.ncCount} N.C</span>`:'';
+      const obBadge=a.obCount>0?`<span class="pill pill-pax-amber">${a.obCount} obs.</span>`:'';
+      return`<div class="history-item">
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${escapeHtml(a.department||'—')}${a.auditedPerson?' · '+escapeHtml(a.auditedPerson):''}</span>
+            <span class="order-loc">${d} · ${a.answered||0}/${a.totalItems||0} requisitos revisados</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill pill-ok">${a.okCount||0} OK</span>${obBadge}${ncBadge}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar el historial: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function renderAuditView(view){
+  const container=document.getElementById('auditContent');
+  if(view==='history')renderAuditHistory(container);
+  else renderAuditForm(container);
+}
+
+document.getElementById('auditTabs').addEventListener('click',e=>{
+  const tab=e.target.closest('.tab');
+  if(!tab)return;
+  document.querySelectorAll('#auditTabs .tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  currentAuditView=tab.dataset.auditView;
+  renderAuditView(currentAuditView);
+});
+
+// ══ NAVEGACIÓN DEL HUB ════════════════════════════════════════════
+const hubScreen=document.getElementById('hubScreen');
+const auditScreen=document.getElementById('auditScreen');
+
+function showScreen(name){
+  hubScreen.hidden=name!=='hub';
+  auditScreen.hidden=name!=='audit';
+  document.getElementById('app').hidden=name!=='catering';
+}
+
+document.querySelectorAll('.hub-card').forEach(card=>{
+  card.addEventListener('click',()=>{
+    if(card.classList.contains('disabled'))return;
+    const mod=card.dataset.module;
+    if(mod==='catering'){
+      showScreen('catering');
+      if(!appStarted){appStarted=true;startApp();}
+    } else if(mod==='audit'){
+      showScreen('audit');
+      renderAuditView(currentAuditView);
+    }
+  });
+});
+
+document.getElementById('btnBackFromCatering').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromAudit').addEventListener('click',()=>showScreen('hub'));
+
 async function startApp(){
   await ensureConfigSeeded();
   currentDate.textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -1755,10 +2050,12 @@ let appStarted=false;
 onAuthStateChanged(auth, user=>{
   if(user){
     loginScreen.hidden=true;
-    appEl.hidden=false;
-    if(!appStarted){appStarted=true;startApp();}
+    hubScreen.hidden=false;
+    document.getElementById('hubDate').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   } else {
     loginScreen.hidden=false;
+    hubScreen.hidden=true;
+    auditScreen.hidden=true;
     appEl.hidden=true;
   }
 });
@@ -1810,14 +2107,15 @@ document.getElementById('btnForgotPassword').addEventListener('click', async(e)=
 loginPassword.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 loginEmail.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-btnLogout.addEventListener('click',async()=>{
-  await signOut(auth);
+['btnLogout','btnLogoutHub','btnLogoutAudit'].forEach(id=>{
+  const b=document.getElementById(id);
+  if(b)b.addEventListener('click',async()=>{await signOut(auth);});
 });
 
 mainTabs.addEventListener('click',e=>{
   const tab=e.target.closest('.tab');
   if(!tab)return;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  mainTabs.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   tab.classList.add('active');
   currentView=tab.dataset.view;
   selectedDate=new Date();
