@@ -33,7 +33,35 @@
   --alert-amber-bg:#2A1F0E;--alert-amber-border:#8B6020;--alert-amber-fg:#FAC97A;
   --alert-purple-bg:#241A30;--alert-purple-border:#7A4FA8;--alert-purple-fg:#D9BBF5;
 }
-.pnl-table{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);overflow:hidden}
+/* En modo noche los acentos de las tarjetas del hub se aclaran para mantener el contraste */
+.dark .hub-card[data-module="catering"]{--accent:#FAC97A;--accent-bg:#2A1F0E}
+.dark .hub-card[data-module="audit"]{--accent:#8FD455;--accent-bg:#122008}
+.dark .hub-card[data-module="pnl"]{--accent:#7AAFF5;--accent-bg:#0E1828}
+.dark .hub-card[data-module="staff"]{--accent:#D9BBF5;--accent-bg:#241A30}
+.dark .hub-card[data-module="billing"]{--accent:#F5A5A5;--accent-bg:#220E0E}
+.dark .hub-card[data-module="forecast"]{--accent:#6DBF95;--accent-bg:#0E2018}
+.dark .hub-card:hover:not(.disabled) .hub-icon{color:#141412}
+.dark .pnl-fc{color:#6DBF95}
+.dark .pnl-row.header .pnl-fc{color:#6DBF95}
+.pnl-table{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);overflow-x:auto}
+.pnl-fc{color:#1A5C38}
+.pnl-row.header .pnl-fc{color:#1A5C38;font-weight:600}
+.fc-table th{font-size:10px;padding:5px 3px;text-align:center;white-space:nowrap}
+.fc-table th.fc-head-group{background:var(--bg);border-bottom:1px solid var(--border)}
+.fc-table td{text-align:center;padding:3px;font-size:11.5px}
+.fc-table td.fc-day{text-align:left;font-family:var(--font-mono);font-size:11px;min-width:44px;position:sticky;left:0;background:var(--bg-card);z-index:1}
+.fc-wd{color:var(--text-tertiary);font-size:9px;margin-left:4px}
+.fc-table tr.fc-weekend{background:var(--bg)}
+.fc-table tr.fc-weekend td.fc-day{background:var(--bg)}
+.fc-input{width:66px;font-family:var(--font-mono);font-size:11px;padding:3px 4px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary);text-align:right}
+.fc-input:focus{border-color:var(--text-primary);background:var(--bg-card);outline:none}
+.fc-real{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary)}
+.fc-sep{border-left:2px solid var(--border)!important;font-family:var(--font-mono);font-size:11px;font-weight:500}
+.fc-acc{font-family:var(--font-mono);font-size:11px;font-weight:600;border-left:1px solid var(--border)}
+@media(max-width:768px){
+  .pnl-val{width:88px}.pnl-pct{width:56px}
+  .fc-input{width:54px}
+}
 .pnl-row{display:flex;align-items:center;padding:10px 16px;border-top:1px solid var(--border-soft);font-size:13px;gap:8px}
 .pnl-row:first-child{border-top:none}
 .pnl-row.header{background:var(--bg);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary);font-weight:500}
@@ -68,18 +96,40 @@
 .cal-other{background:#FAC97A}
 .cal-today{outline:2px solid var(--text-primary);outline-offset:-2px}
 .cal-legend{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 8px;vertical-align:-1px}
+.evo-chart{display:flex;align-items:flex-end;gap:6px;height:150px;padding-top:8px}
+.evo-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;min-width:32px}
+.evo-bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end}
+.evo-bar{width:100%;border-radius:3px 3px 0 0;transition:height .4s ease;min-height:4px}
+.evo-val{font-size:10px;font-family:var(--font-mono);color:var(--text-secondary);margin-top:4px}
+.evo-lbl{font-size:9px;color:var(--text-tertiary);margin-top:2px;white-space:nowrap}
+@media(max-width:768px){
+  .audit-row{flex-wrap:wrap;gap:8px}
+  .audit-req{width:100%;flex:none;font-size:13px}
+  .audit-marks{gap:8px}
+  .audit-mark{width:52px;height:38px;font-size:12px}
+  .audit-comment{width:100%}
+  .audit-summary{gap:10px;font-size:12px}
+  .evo-lbl{display:none}
+}
 .btn-back{background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:5px 12px;cursor:pointer;font-size:12.5px;font-family:var(--font-sans);color:var(--text-secondary);transition:all .15s}
 .btn-back:hover{border-color:var(--text-primary);color:var(--text-primary)}
-.hub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
-.hub-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:20px;cursor:pointer;transition:all .18s;position:relative}
-.hub-card:hover:not(.disabled){border-color:var(--text-primary);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.06)}
-.hub-card.disabled{opacity:.55;cursor:default}
-.hub-icon{font-size:28px;margin-bottom:10px}
-.hub-card h3{font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text-primary)}
-.hub-card p{font-size:12.5px;color:var(--text-secondary);line-height:1.5;margin-bottom:12px}
-.hub-status{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500}
-.hub-status.ready{background:var(--ok-bg);color:var(--ok-fg)}
-.hub-status.soon{background:var(--other-bg);color:var(--other-fg)}
+.hub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.hub-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:22px 20px 20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.hub-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent);opacity:.85}
+.hub-card:hover:not(.disabled){border-color:var(--accent);transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,.08)}
+.hub-card:hover:not(.disabled) .hub-arrow{opacity:1;transform:translateX(0)}
+.hub-card:hover:not(.disabled) .hub-icon{background:var(--accent);color:#fff}
+.hub-card.disabled{opacity:.5;cursor:default}
+.hub-icon{width:42px;height:42px;border-radius:10px;background:var(--accent-bg);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:14px;transition:all .2s}
+.hub-icon svg{width:21px;height:21px}
+.hub-card h3{font-size:15.5px;font-weight:600;margin-bottom:6px;color:var(--text-primary);letter-spacing:-.01em}
+.hub-card p{font-size:12.5px;color:var(--text-secondary);line-height:1.55;margin:0}
+.hub-arrow{position:absolute;right:18px;bottom:18px;font-size:16px;color:var(--accent);opacity:0;transform:translateX(-6px);transition:all .2s}
+@media(max-width:768px){
+  .hub-grid{grid-template-columns:1fr;gap:10px}
+  .hub-card{padding:18px 16px 16px}
+  .hub-arrow{opacity:.5;transform:translateX(0)}
+}
 .audit-section{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:18px;margin-bottom:14px}
 .audit-section h3{font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-primary)}
 .audit-row{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--border-soft)}
@@ -92,7 +142,14 @@
 .audit-mark.sel-ob{background:var(--alert-amber-bg);border-color:var(--alert-amber-border);color:var(--alert-amber-fg)}
 .audit-mark.sel-nc{background:var(--alert-red-bg);border-color:var(--alert-red-border);color:var(--alert-red-fg)}
 .audit-comment{width:180px;flex-shrink:0}
-.audit-comment input{width:100%;font-family:var(--font-sans);font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary)}
+.audit-comment{display:flex;gap:4px;align-items:center}
+.audit-comment input{flex:1;min-width:0;font-family:var(--font-sans);font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary)}
+.audit-comment input.input-required{border-color:var(--alert-red-border);background:var(--alert-red-bg)}
+.audit-comment input.input-required::placeholder{color:var(--alert-red-fg);opacity:.7}
+.btn-photo{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 7px;cursor:pointer;font-size:13px;flex-shrink:0;line-height:1}
+.btn-photo:hover{border-color:var(--text-primary)}
+.audit-row-missing{background:var(--alert-red-bg)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
 .audit-summary{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;padding:12px 16px;background:var(--bg);border-radius:var(--radius-md);margin-bottom:14px}
 .history-item{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
 .history-item:hover{border-color:var(--border)}
@@ -297,31 +354,60 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
     </div>
   </header>
   <main class="main">
-    <p class="section-label" style="margin-bottom:14px">Módulos disponibles</p>
+    <p class="section-label" style="margin-bottom:14px">Módulos</p>
     <div class="hub-grid">
-      <div class="hub-card" data-module="catering">
-        <div class="hub-icon">🍽️</div>
+      <div class="hub-card" data-module="catering" style="--accent:#7A4410;--accent-bg:#FEF3E2">
+        <div class="hub-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 2v7c0 1.1.9 2 2 2h1a2 2 0 0 0 2-2V2"/><path d="M5.5 2v9"/><path d="M8 2v20"/><path d="M18 2a4 4 0 0 0-4 4v5a2 2 0 0 0 2 2h4V6a4 4 0 0 0-2-4z"/><path d="M18 13v9"/></svg>
+        </div>
         <h3>Catering</h3>
-        <p>Gestión operativa diaria de pedidos, alertas de solapamiento y carga, análisis acumulado y facturación.</p>
-        <span class="hub-status ready">Activo</span>
+        <p>Pedidos del día, alertas de solapamiento y aforo, análisis acumulado y facturación.</p>
+        <span class="hub-arrow">→</span>
       </div>
-      <div class="hub-card" data-module="audit">
-        <div class="hub-icon">✅</div>
+
+      <div class="hub-card" data-module="audit" style="--accent:#2D6A0A;--accent-bg:#EBF5E0">
+        <div class="hub-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
         <h3>Auditoría</h3>
-        <p>Listas de comprobación APPCC por departamento, con registro de resultados e historial de auditorías.</p>
-        <span class="hub-status ready">Activo</span>
+        <p>Listas APPCC con nota automática, historial y evolución de resultados.</p>
+        <span class="hub-arrow">→</span>
       </div>
-      <div class="hub-card" data-module="pnl">
-        <div class="hub-icon">📊</div>
+
+      <div class="hub-card" data-module="pnl" style="--accent:#1E3A7A;--accent-bg:#E8F0FC">
+        <div class="hub-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>
+        </div>
         <h3>Cuenta de explotación</h3>
-        <p>Ingresos de catering, comedor y cafetería. Costes de compras y personal. Margen y evolución mensual.</p>
-        <span class="hub-status ready">Activo</span>
+        <p>Ingresos por canal, costes de compras y personal, margen y comparativas.</p>
+        <span class="hub-arrow">→</span>
       </div>
-      <div class="hub-card" data-module="staff">
-        <div class="hub-icon">👥</div>
+
+      <div class="hub-card" data-module="staff" style="--accent:#5B2E8C;--accent-bg:#F3E8FD">
+        <div class="hub-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
         <h3>Personal</h3>
-        <p>Plantilla, horas semanales, cobertura de puestos y coste estimado según convenio.</p>
-        <span class="hub-status ready">Activo</span>
+        <p>Plantilla, horario semanal, calendario de ausencias, ETT y costes.</p>
+        <span class="hub-arrow">→</span>
+      </div>
+
+      <div class="hub-card" data-module="billing" style="--accent:#8B1F1F;--accent-bg:#FDEDED">
+        <div class="hub-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>
+        </div>
+        <h3>Facturación</h3>
+        <p>Facturaciones extra fuera del sistema, con control de cobros pendientes.</p>
+        <span class="hub-arrow">→</span>
+      </div>
+
+      <div class="hub-card" data-module="forecast" style="--accent:#1A5C38;--accent-bg:#E8F5EE">
+        <div class="hub-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/><path d="M3 21h18"/></svg>
+        </div>
+        <h3>Forecast</h3>
+        <p>Previsión diaria de ventas, compras y ocupación con desviación acumulada.</p>
+        <span class="hub-arrow">→</span>
       </div>
     </div>
   </main>
@@ -374,16 +460,47 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 </div>
 
 <!-- ══ MÓDULO CUENTA DE EXPLOTACIÓN ══ -->
+<!-- ══ MÓDULO FORECAST ══ -->
+<div id="forecastScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromForecast">← Hub</button>
+      <span class="logo">Forecast</span>
+    </div>
+    <nav class="tabs" id="forecastTabs">
+      <button class="tab active" data-fc-view="sales">Ventas</button>
+      <button class="tab" data-fc-view="purchases">Compras</button>
+      <button class="tab" data-fc-view="occupancy">Ocupación</button>
+    </nav>
+    <div class="topbar-actions">
+      <button class="btn-theme" id="btnThemeForecast" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutForecast">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main" id="forecastContent"></main>
+</div>
+
+<!-- ══ MÓDULO FACTURACIÓN ══ -->
+<div id="billingScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromBilling">← Hub</button>
+      <span class="logo">Facturación</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-theme" id="btnThemeBilling" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutBilling">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main" id="billingContent"></main>
+</div>
+
 <div id="pnlScreen" hidden>
   <header class="topbar">
     <div class="topbar-left">
       <button class="btn-back" id="btnBackFromPnl">← Hub</button>
       <span class="logo">Cuenta de explotación</span>
     </div>
-    <nav class="tabs" id="pnlTabs">
-      <button class="tab active" data-pnl-view="pnl">Cuenta de explotación</button>
-      <button class="tab" data-pnl-view="extras">Facturación extra</button>
-    </nav>
     <div class="topbar-actions">
       <button class="btn-action" id="btnImportComedor">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -505,8 +622,8 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDocs, getDoc, query, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, getDocs, getDoc, deleteDoc, query, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 // ── FIREBASE ──────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -1798,7 +1915,7 @@ async function renderLogic(container){
 
 // ── MODO NOCHE ────────────────────────────────────────────────────
 const root=document.documentElement;
-const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit','btnThemeStaff','btnThemePnl'].map(id=>document.getElementById(id)).filter(Boolean);
+const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit','btnThemeStaff','btnThemePnl','btnThemeBilling','btnThemeForecast'].map(id=>document.getElementById(id)).filter(Boolean);
 function syncThemeIcons(isDark){themeButtons.forEach(b=>b.textContent=isDark?'☀️':'🌙');}
 if(localStorage.getItem('theme')==='dark'){root.classList.add('dark');syncThemeIcons(true);}
 themeButtons.forEach(btn=>btn.addEventListener('click',()=>{
@@ -1916,19 +2033,18 @@ async function ensureConfigSeeded(){
 
 // ══ MÓDULO AUDITORÍA ══════════════════════════════════════════════
 const AUDIT_CHECKLIST=[
-  {group:'Documentación y planificación',items:[
-    'Comprobar Manual APPCC y Catálogo de dietas de Ballesol',
-    'Menú Mensual firmado, lo cumplen y conocen el número diario de dietas a realizar de cada tipo',
-    'Modificaciones aprobadas',
-    'Fichas técnicas de preparación',
+  {group:'Documentación y planificación',weight:3,items:[
+    'Comprobar Manual APPCC',
+    'Menús de la semana y fichas técnicas correspondientes',
+    'Modificaciones aprobadas del menú',
     'Control de Alérgenos',
   ]},
-  {group:'Recepción y trazabilidad',items:[
+  {group:'Recepción y trazabilidad',weight:3,pending:true,items:[
     'Control de recepción (albaranes y Aplicación)',
     'Trazabilidad',
     'Verificación de termómetros (anual)',
   ]},
-  {group:'Registros APPCC',items:[
+  {group:'Registros APPCC',weight:3,items:[
     'Elaboración (T≥65°C)',
     'Enfriamiento (2 horas de 60 a 10°C)',
     'Temperatura de Cámaras (4°C, -18°C)',
@@ -1937,22 +2053,43 @@ const AUDIT_CHECKLIST=[
     'Higienización vegetales (dosis controlada)',
     'Control de agua (0,2-1 ppm)',
   ]},
-  {group:'Formación y muestras',items:[
+  {group:'Formación y muestras',weight:1,items:[
     'Formación manipuladores de alimentos',
     'Muestras testigo (7 días en frío)',
   ]},
-  {group:'Almacenamiento',items:[
+  {group:'Almacenamiento',weight:1,items:[
     'Almacenamiento (seco, frío + y −): orden, productos protegidos, etiquetas, T Cámaras y Caducidades Secundarias',
   ]},
-  {group:'Limpieza e instalaciones',items:[
+  {group:'Limpieza e instalaciones',weight:1,items:[
     'L+D zonas comunes y sensibles (cortafiambre, batidoras y texturizadoras, cajones de útiles)',
     'Cubos de basura con tapa y accionamiento no manual',
     'Lavamanos con accionamiento no manual, papel y jabón',
     'Tablas de corte y menaje limpio sin humedad',
   ]},
 ];
+const AUDIT_CENTERS=['Nestlé'];
 
-let auditState={department:'COCINA',auditedPerson:'',date:localISODate(new Date()),marks:{},comments:{}};
+// Nota 0-10 ponderada: OK=1, OB=0,5, NC=0. Los grupos con más peso influyen más.
+function computeAuditScore(marks){
+  let totalWeight=0,earned=0,answered=0,totalItems=0;
+  let idx=0;
+  AUDIT_CHECKLIST.forEach(section=>{
+    section.items.forEach(()=>{
+      const id='i'+(idx++);
+      totalItems++;
+      const m=marks[id];
+      if(!m)return;
+      answered++;
+      const w=section.weight||1;
+      totalWeight+=w;
+      earned+=w*(m==='OK'?1:m==='OB'?0.5:0);
+    });
+  });
+  const score=totalWeight?(earned/totalWeight*10):0;
+  return{score:Math.round(score*10)/10,answered,totalItems};
+}
+
+let auditState={center:'Nestlé',auditor:'',marks:{},comments:{}};
 let currentAuditView='form';
 
 function renderAuditForm(container){
@@ -1961,42 +2098,57 @@ function renderAuditForm(container){
     const rows=section.items.map(item=>{
       const id='i'+(itemIdx++);
       const mark=auditState.marks[id]||'';
-      return`<div class="audit-row">
+      const needsComment=(mark==='OB'||mark==='NC');
+      const hasComment=!!(auditState.comments[id]||'').trim();
+      const missingComment=needsComment&&!hasComment;
+      return`<div class="audit-row ${missingComment?'audit-row-missing':''}">
         <span class="audit-req">${escapeHtml(item)}</span>
         <div class="audit-marks">
           <button class="audit-mark ${mark==='OK'?'sel-ok':''}" data-audit-id="${id}" data-mark="OK" title="Correcto">OK</button>
           <button class="audit-mark ${mark==='OB'?'sel-ob':''}" data-audit-id="${id}" data-mark="OB" title="Observación">OB</button>
           <button class="audit-mark ${mark==='NC'?'sel-nc':''}" data-audit-id="${id}" data-mark="NC" title="No conformidad">N.C</button>
         </div>
-        <div class="audit-comment"><input type="text" placeholder="Comentario…" data-comment-id="${id}" value="${escapeHtml(auditState.comments[id]||'')}"></div>
+        <div class="audit-comment">
+          <input type="text" placeholder="${needsComment?'Comentario obligatorio *':'Comentario…'}" data-comment-id="${id}" value="${escapeHtml(auditState.comments[id]||'')}" class="${missingComment?'input-required':''}">
+          <button class="btn-photo" data-photo-id="${id}" title="Adjuntar foto (en desarrollo)">📷</button>
+        </div>
       </div>`;
     }).join('');
-    return`<div class="audit-section"><h3>${escapeHtml(section.group)}</h3>${rows}</div>`;
+    const pendingBadge=section.pending?`<span class="pill pill-pax-amber" style="margin-left:8px;font-size:10px">Pendiente de registro de producción</span>`:'';
+    const weightBadge=`<span style="font-size:10px;color:var(--text-tertiary);font-weight:400;margin-left:8px">peso ×${section.weight||1}</span>`;
+    return`<div class="audit-section"><h3>${escapeHtml(section.group)}${weightBadge}${pendingBadge}</h3>${rows}</div>`;
   }).join('');
 
-  const totalItems=AUDIT_CHECKLIST.reduce((s,g)=>s+g.items.length,0);
-  const answered=Object.keys(auditState.marks).length;
+  const {score,answered,totalItems}=computeAuditScore(auditState.marks);
   const okCount=Object.values(auditState.marks).filter(m=>m==='OK').length;
   const obCount=Object.values(auditState.marks).filter(m=>m==='OB').length;
   const ncCount=Object.values(auditState.marks).filter(m=>m==='NC').length;
+  const scoreColor=score>=8?'var(--ok-fg)':score>=6?'var(--alert-amber-fg)':'var(--alert-red-fg)';
+  // Requisitos marcados OB o NC que aún no tienen comentario
+  const missingComments=Object.entries(auditState.marks).filter(([id,m])=>
+    (m==='OB'||m==='NC')&&!(auditState.comments[id]||'').trim()
+  ).length;
 
   container.innerHTML=`
   <div class="audit-section">
     <h3>Datos de la auditoría</h3>
     <div class="form-grid">
-      <div class="form-group"><label>Departamento / Actividad</label><input type="text" id="auditDept" value="${escapeHtml(auditState.department)}"></div>
-      <div class="form-group"><label>Personal auditado</label><input type="text" id="auditPerson" placeholder="Nombre" value="${escapeHtml(auditState.auditedPerson)}"></div>
-      <div class="form-group"><label>Fecha</label><input type="date" id="auditDate" value="${auditState.date}"></div>
+      <div class="form-group"><label>Centro auditado</label><select id="auditCenter">${AUDIT_CENTERS.map(c=>`<option value="${c}" ${auditState.center===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Persona que audita *</label><input type="text" id="auditAuditor" placeholder="Nombre y apellido" value="${escapeHtml(auditState.auditor)}"></div>
     </div>
+    <p style="font-size:12px;color:var(--text-tertiary);margin-top:4px">La fecha y hora se registran automáticamente al guardar.</p>
   </div>
   <div class="audit-summary">
+    <span style="font-size:15px;font-weight:600;color:${scoreColor}">Nota: ${score.toFixed(1)}/10</span>
     <span><strong>${answered}</strong> / ${totalItems} respondidos</span>
     <span style="color:var(--ok-fg)">OK: <strong>${okCount}</strong></span>
-    <span style="color:var(--alert-amber-fg)">Observaciones: <strong>${obCount}</strong></span>
-    <span style="color:var(--alert-red-fg)">No conformidades: <strong>${ncCount}</strong></span>
+    <span style="color:var(--alert-amber-fg)">Obs.: <strong>${obCount}</strong></span>
+    <span style="color:var(--alert-red-fg)">N.C: <strong>${ncCount}</strong></span>
+    ${missingComments>0?`<span style="color:var(--alert-red-fg);font-weight:600">⚠ ${missingComments} sin comentar</span>`:''}
   </div>
+  ${missingComments>0?`<div class="alert alert-red" style="margin-bottom:14px"><span>Toda observación (OB) o no conformidad (N.C) requiere un comentario que la justifique. Faltan <strong>${missingComments}</strong>.</span></div>`:''}
   ${sectionsHtml}
-  <button class="btn-primary" id="btnSaveAudit" style="max-width:280px">Guardar auditoría</button>
+  <button class="btn-primary" id="btnSaveAudit" style="max-width:280px" ${missingComments>0?'disabled':''}>Guardar auditoría</button>
   <p id="auditSaveMsg" style="font-size:12px;margin-top:10px"></p>`;
 
   container.querySelectorAll('.audit-mark').forEach(btn=>{
@@ -2009,38 +2161,59 @@ function renderAuditForm(container){
   });
   container.querySelectorAll('[data-comment-id]').forEach(inp=>{
     inp.addEventListener('input',()=>{auditState.comments[inp.dataset.commentId]=inp.value;});
+    // Al salir del campo se refresca para actualizar avisos y el botón de guardar
+    inp.addEventListener('blur',()=>{
+      const id=inp.dataset.commentId;
+      const m=auditState.marks[id];
+      if(m==='OB'||m==='NC')renderAuditForm(container);
+    });
   });
-  const deptInp=container.querySelector('#auditDept');
-  const personInp=container.querySelector('#auditPerson');
-  const dateInp=container.querySelector('#auditDate');
-  if(deptInp)deptInp.addEventListener('input',()=>{auditState.department=deptInp.value;});
-  if(personInp)personInp.addEventListener('input',()=>{auditState.auditedPerson=personInp.value;});
-  if(dateInp)dateInp.addEventListener('change',()=>{auditState.date=dateInp.value;});
+  container.querySelectorAll('[data-photo-id]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      alert('Adjuntar fotos es una función en desarrollo.\n\nDe momento, describe la incidencia en el comentario.');
+    });
+  });
+  const centerSel=container.querySelector('#auditCenter');
+  const auditorInp=container.querySelector('#auditAuditor');
+  if(centerSel)centerSel.addEventListener('change',()=>{auditState.center=centerSel.value;});
+  if(auditorInp)auditorInp.addEventListener('input',()=>{auditState.auditor=auditorInp.value;});
 
   const btnSave=container.querySelector('#btnSaveAudit');
   if(btnSave)btnSave.addEventListener('click',async()=>{
     const msg=container.querySelector('#auditSaveMsg');
+    if(!auditState.auditor.trim()){
+      msg.textContent='Indica el nombre de la persona que audita';
+      msg.style.color='var(--alert-red-fg)';
+      return;
+    }
+    if(missingComments>0){
+      msg.textContent=`Faltan ${missingComments} comentario${missingComments>1?'s':''} en observaciones o no conformidades`;
+      msg.style.color='var(--alert-red-fg)';
+      return;
+    }
     btnSave.disabled=true;btnSave.textContent='Guardando…';
     try{
+      const now=new Date();
       const auditId='AUD-'+Date.now();
       const detailed=[];
       let idx=0;
       AUDIT_CHECKLIST.forEach(section=>{
         section.items.forEach(item=>{
           const id='i'+(idx++);
-          detailed.push({group:section.group,requirement:item,mark:auditState.marks[id]||'',comment:auditState.comments[id]||''});
+          detailed.push({group:section.group,weight:section.weight||1,pending:!!section.pending,requirement:item,mark:auditState.marks[id]||'',comment:auditState.comments[id]||''});
         });
       });
       await setDoc(doc(db,'audits',auditId),{
-        auditId,department:auditState.department,auditedPerson:auditState.auditedPerson,
-        auditDate:auditState.date,items:detailed,
-        okCount,obCount,ncCount,answered,totalItems,
+        auditId,center:auditState.center,auditor:auditState.auditor.trim(),
+        auditDate:localISODate(now),
+        auditTime:now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}),
+        items:detailed,score,okCount,obCount,ncCount,answered,totalItems,
         createdAt:Timestamp.now()
       });
-      msg.textContent='✓ Auditoría guardada correctamente';
+      msg.textContent=`✓ Auditoría guardada · Nota ${score.toFixed(1)}/10`;
       msg.style.color='var(--ok-fg)';
-      auditState={department:'COCINA',auditedPerson:'',date:localISODate(new Date()),marks:{},comments:{}};
-      setTimeout(()=>renderAuditForm(container),1200);
+      auditState={center:'Nestlé',auditor:'',marks:{},comments:{}};
+      setTimeout(()=>renderAuditForm(container),1500);
     }catch(e){
       msg.textContent='Error al guardar: '+e.message;
       msg.style.color='var(--alert-red-fg)';
@@ -2053,27 +2226,116 @@ async function renderAuditHistory(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando historial…</span></div>`;
   try{
     const snap=await getDocs(query(collection(db,'audits'),orderBy('createdAt','desc')));
-    const audits=snap.docs.map(d=>d.data());
+    const audits=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(!audits.length){container.innerHTML=`<div class="empty-state"><p>Aún no hay auditorías guardadas</p></div>`;return;}
-    container.innerHTML=audits.map(a=>{
+
+    const withScore=audits.filter(a=>typeof a.score==='number');
+    const last=withScore[0];
+    const prev=withScore[1];
+    const avg=withScore.length?withScore.reduce((s,a)=>s+a.score,0)/withScore.length:0;
+    const trend=(last&&prev)?last.score-prev.score:0;
+    const scoreColor=s=>s>=8?'var(--ok-fg)':s>=6?'var(--alert-amber-fg)':'var(--alert-red-fg)';
+
+    // Gráfica de evolución (orden cronológico ascendente)
+    const chrono=withScore.slice().reverse();
+    const maxBars=12;
+    const shown=chrono.slice(-maxBars);
+    const evoBars=shown.map(a=>{
+      const h=Math.max(4,(a.score/10*100));
+      const d=a.auditDate?new Date(a.auditDate+'T12:00:00'):null;
+      const lbl=d?d.toLocaleDateString('es-ES',{day:'numeric',month:'short'}):'—';
+      return`<div class="evo-col" title="${lbl}: ${a.score.toFixed(1)}/10">
+        <div class="evo-bar-wrap"><div class="evo-bar" style="height:${h}%;background:${scoreColor(a.score)}"></div></div>
+        <span class="evo-val">${a.score.toFixed(1)}</span>
+        <span class="evo-lbl">${lbl}</span>
+      </div>`;
+    }).join('');
+
+    const rows=audits.map(a=>{
       const d=a.auditDate?new Date(a.auditDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):'—';
       const ncBadge=a.ncCount>0?`<span class="pill pill-cancel">${a.ncCount} N.C</span>`:'';
       const obBadge=a.obCount>0?`<span class="pill pill-pax-amber">${a.obCount} obs.</span>`:'';
-      return`<div class="history-item">
+      const sc=typeof a.score==='number'?a.score:null;
+      return`<div class="order-card">
         <div class="order-top">
           <div class="order-who">
-            <span class="order-name">${escapeHtml(a.department||'—')}${a.auditedPerson?' · '+escapeHtml(a.auditedPerson):''}</span>
-            <span class="order-loc">${d} · ${a.answered||0}/${a.totalItems||0} requisitos revisados</span>
+            <span class="order-name">${escapeHtml(a.center||a.department||'—')}${a.auditor?` · ${escapeHtml(a.auditor)}`:''}</span>
+            <span class="order-loc">${d}${a.auditTime?` · ${escapeHtml(a.auditTime)}`:''} · ${a.answered||0}/${a.totalItems||0} requisitos</span>
           </div>
           <div class="order-pills">
+            ${sc!==null?`<span class="pill" style="background:${scoreColor(sc)};color:#fff;font-weight:600;font-family:var(--font-mono)">${sc.toFixed(1)}/10</span>`:''}
             <span class="pill pill-ok">${a.okCount||0} OK</span>${obBadge}${ncBadge}
+            <button class="btn-del-staff" data-del-audit="${escapeHtml(a.id)}" title="Eliminar (requiere contraseña)">✕</button>
           </div>
         </div>
       </div>`;
     }).join('');
+
+    container.innerHTML=`<div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Última nota</div><div class="kpi-value" style="color:${last?scoreColor(last.score):''}">${last?last.score.toFixed(1):'—'}</div><div class="kpi-sub">${last&&last.auditDate?new Date(last.auditDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'}):''}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Tendencia</div><div class="kpi-value" style="color:${trend>0.2?'var(--ok-fg)':trend<-0.2?'var(--alert-red-fg)':''}">${trend>0.2?'↑':trend<-0.2?'↓':'→'} ${Math.abs(trend).toFixed(1)}</div><div class="kpi-sub">vs auditoría anterior</div></div>
+      <div class="kpi-card"><div class="kpi-label">Nota media</div><div class="kpi-value">${avg.toFixed(1)}</div><div class="kpi-sub">${withScore.length} auditoría${withScore.length!==1?'s':''}</div></div>
+      <div class="kpi-card"><div class="kpi-label">N.C acumuladas</div><div class="kpi-value ${audits.reduce((s,a)=>s+(a.ncCount||0),0)>0?'alert':''}">${audits.reduce((s,a)=>s+(a.ncCount||0),0)}</div></div>
+    </div>
+    ${shown.length>1?`<div class="stats-grid" style="grid-template-columns:1fr">
+      <div class="stat-card">
+        <h3>Evolución de la nota</h3>
+        <span class="scope-label">Últimas ${shown.length} auditorías en orden cronológico</span>
+        <div class="evo-chart">${evoBars}</div>
+      </div>
+    </div>`:''}
+    <p class="section-label">Historial completo</p>
+    <div class="orders">${rows}</div>`;
+
+    container.querySelectorAll('[data-del-audit]').forEach(btn=>{
+      btn.addEventListener('click',()=>promptDeleteAudit(btn.dataset.delAudit,container));
+    });
   }catch(e){
     container.innerHTML=`<div class="empty-state"><p>Error al cargar el historial: ${escapeHtml(e.message)}</p></div>`;
   }
+}
+
+// Borrado protegido: exige reautenticación con la contraseña de la cuenta
+function promptDeleteAudit(auditId,container){
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';
+  overlay.innerHTML=`<div class="modal" style="max-width:380px">
+    <div class="modal-header"><h2 class="modal-title">Confirmar eliminación</h2><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">Esta acción es irreversible. Introduce tu contraseña para confirmar.</p>
+      <div class="form-group"><label>Contraseña</label><input type="password" id="delAuditPass" placeholder="••••••••" autocomplete="current-password"></div>
+      <button class="btn-primary" id="delAuditConfirm" style="margin-top:14px;background:var(--alert-red-fg)">Eliminar auditoría</button>
+      <p id="delAuditMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelector('[data-close]').addEventListener('click',close);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+  const passInput=overlay.querySelector('#delAuditPass');
+  passInput.focus();
+  const doDelete=async()=>{
+    const msg=overlay.querySelector('#delAuditMsg');
+    const btn=overlay.querySelector('#delAuditConfirm');
+    const pass=passInput.value;
+    if(!pass){msg.textContent='Introduce tu contraseña';msg.style.color='var(--alert-red-fg)';return;}
+    btn.disabled=true;btn.textContent='Verificando…';
+    try{
+      const user=auth.currentUser;
+      if(!user)throw new Error('Sesión no válida');
+      const cred=EmailAuthProvider.credential(user.email,pass);
+      await reauthenticateWithCredential(user,cred);
+      await deleteDoc(doc(db,'audits',auditId));
+      close();
+      renderAuditHistory(container);
+    }catch(e){
+      msg.textContent=e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'?'Contraseña incorrecta':'Error: '+e.message;
+      msg.style.color='var(--alert-red-fg)';
+      btn.disabled=false;btn.textContent='Eliminar auditoría';
+    }
+  };
+  overlay.querySelector('#delAuditConfirm').addEventListener('click',doDelete);
+  passInput.addEventListener('keydown',e=>{if(e.key==='Enter')doDelete();});
 }
 
 function renderAuditView(view){
@@ -2669,7 +2931,6 @@ function parseStaffXLSX(arrayBuffer){
 // ══ FACTURACIÓN EXTRA ═════════════════════════════════════════════
 const EXTRA_CATEGORIES=['Pedido de producto','Invitaciones','Servicio extra','Alquiler de material','Otros'];
 const PAYMENT_STATES=['Pendiente','Facturado','Cobrado'];
-let currentPnlView='pnl';
 let extraFilter={category:'',state:'',from:null,to:null};
 
 async function renderExtras(container){
@@ -2839,20 +3100,6 @@ async function renderExtras(container){
   }
 }
 
-function renderPnlModule(container){
-  if(currentPnlView==='extras')renderExtras(container);
-  else renderPnl(container);
-}
-
-document.getElementById('pnlTabs').addEventListener('click',e=>{
-  const tab=e.target.closest('.tab');
-  if(!tab)return;
-  document.querySelectorAll('#pnlTabs .tab').forEach(t=>t.classList.remove('active'));
-  tab.classList.add('active');
-  currentPnlView=tab.dataset.pnlView;
-  renderPnlModule(document.getElementById('pnlContent'));
-});
-
 // ══ MÓDULO CUENTA DE EXPLOTACIÓN ══════════════════════════════════
 const SPANISH_MONTHS={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,set:8,oct:9,nov:10,dic:11};
 function parseSpanishShortDate(str){
@@ -2881,7 +3128,7 @@ function parseRevenueCSV(text,channel){
 
 
 // ══ CUENTA DE EXPLOTACIÓN (P&L) ═══════════════════════════════════
-let pnlRange={type:'month',refDate:new Date(),from:null,to:null,compare:false,compareType:null,compareRefDate:null,compareFrom:null,compareTo:null};
+let pnlRange={type:'month',refDate:new Date(),from:null,to:null,compare:true,compareType:'month',compareRefDate:(()=>{const d=new Date();d.setMonth(d.getMonth()-1);return d;})(),compareFrom:null,compareTo:null};
 
 function pnlLine(label,value,revenue,opts={}){
   const pct=revenue?(value/revenue*100):0;
@@ -2890,12 +3137,16 @@ function pnlLine(label,value,revenue,opts={}){
   const pctDisplay=`${isNeg?'(':''}${Math.abs(pct).toFixed(1)}%${isNeg?')':''}`;
   const cls=opts.bold?'pnl-row bold':'pnl-row';
   const indent=opts.indent2?'style="padding-left:36px;font-size:12px;color:var(--text-secondary)"':(opts.indent?'style="padding-left:18px"':'');
+  const fmtCell=v=>v<0?`(${fmtMoney(Math.abs(v))})`:fmtMoney(v);
+  const fmtPctCell=(v,base)=>{const p=base?(v/base*100):0;return`${v<0?'(':''}${Math.abs(p).toFixed(1)}%${v<0?')':''}`;};
   return `<div class="${cls}">
     <span class="pnl-label" ${indent}>${escapeHtml(label)}</span>
     <span class="pnl-val">${display}</span>
     <span class="pnl-pct">${pctDisplay}</span>
-    ${opts.cmp!==undefined?`<span class="pnl-val">${opts.cmp<0?`(${fmtMoney(Math.abs(opts.cmp))})`:fmtMoney(opts.cmp)}</span>
-    <span class="pnl-var ${opts.varPositive?'up':'down'}">${opts.varText||''}</span>`:''}
+    ${opts.cmp!==undefined?`<span class="pnl-val">${fmtCell(opts.cmp)}</span>
+    <span class="pnl-pct">${fmtPctCell(opts.cmp,opts.cmpRevenue||0)}</span>`:''}
+    ${opts.fc!==undefined?`<span class="pnl-val pnl-fc">${opts.fc?fmtCell(opts.fc):'—'}</span>
+    <span class="pnl-pct pnl-fc">${opts.fc?fmtPctCell(opts.fc,opts.fcRevenue||0):'—'}</span>`:''}
   </div>`;
 }
 
@@ -3026,41 +3277,78 @@ async function renderPnl(container){
       </div>
     </div>`:''}`;
 
-    const header=cmp?`<div class="pnl-row header">
+    // Forecast agregado del período seleccionado (suma de los meses que abarca)
+    let fcAgg=null;
+    if(from&&to){
+      const monthKeys=[];
+      const cursor=new Date(from.getFullYear(),from.getMonth(),1);
+      while(cursor<=to){
+        monthKeys.push(`${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,'0')}`);
+        cursor.setMonth(cursor.getMonth()+1);
+      }
+      const fcDocs=await Promise.all(monthKeys.map(k=>getDoc(doc(db,'forecast_config',k))));
+      let fcCatering=0,fcComedor=0,fcCafeteria=0,fcExtra=0,fcPurchases=0;
+      fcDocs.forEach(snap=>{
+        if(!snap.exists())return;
+        const d=snap.data();
+        Object.entries(d.sales||{}).forEach(([day,v])=>{
+          const dd=new Date(day+'T12:00:00');
+          if(dd<from||dd>to)return;
+          fcCatering+=v.catering||0;fcComedor+=v.comedor||0;
+          fcCafeteria+=v.cafeteria||0;fcExtra+=v.extra||0;
+        });
+        Object.entries(d.purchases||{}).forEach(([day,v])=>{
+          const dd=new Date(day+'T12:00:00');
+          if(dd<from||dd>to)return;
+          fcPurchases+=v||0;
+        });
+      });
+      const fcRevenue=fcCatering+fcComedor+fcCafeteria+fcExtra;
+      if(fcRevenue>0||fcPurchases>0){
+        const fcMmpp=fcPurchases>0?-fcPurchases:-(fcRevenue*((costs.mmppPct!==undefined?costs.mmppPct:35)/100));
+        const fcGross=fcRevenue+fcMmpp;
+        const fcLabour=cur.labourCost; // el coste de personal previsto es el mismo estructural
+        const fcIuo=cur.iuo;
+        fcAgg={revenue:fcRevenue,catering:fcCatering,comedor:fcComedor,cafeteria:fcCafeteria,extra:fcExtra,
+          mmpp:fcMmpp,grossProfit:fcGross,labourCost:fcLabour,iuo:fcIuo,unitProfit:fcGross+fcLabour+fcIuo};
+      }
+    }
+
+    const header=`<div class="pnl-row header">
       <span class="pnl-label">Concepto</span><span class="pnl-val">Actual</span><span class="pnl-pct">% Rev</span>
-      <span class="pnl-val">Comparación</span><span class="pnl-var">Var %</span>
-    </div>`:`<div class="pnl-row header">
-      <span class="pnl-label">Concepto</span><span class="pnl-val">Actual</span><span class="pnl-pct">% Rev</span>
+      ${cmp?`<span class="pnl-val">Comparación</span><span class="pnl-pct">% Rev</span>`:''}
+      ${fcAgg?`<span class="pnl-val pnl-fc">Forecast</span><span class="pnl-pct pnl-fc">% Rev</span>`:''}
     </div>`;
 
     const L=(label,curVal,cmpVal,opts={})=>pnlLine(label,curVal,cur.revenue,{
       ...opts,
-      ...(cmp?{cmp:cmpVal,varText:varTxt(curVal,cmpVal),varPositive:curVal>=cmpVal}:{})
+      ...(cmp?{cmp:cmpVal,cmpRevenue:cmp.revenue}:{}),
+      ...(fcAgg&&opts.fcVal!==undefined?{fc:opts.fcVal,fcRevenue:fcAgg.revenue}:{})
     });
 
     container.innerHTML=controls+`
     <p class="section-label" style="margin-top:12px">Cuenta de explotación · ${periodLabel}${cmp?` vs ${cLabel}`:''}</p>
     <div class="pnl-table">
       ${header}
-      ${L('Revenue (Ingresos)',cur.revenue,cmp?cmp.revenue:0,{bold:true})}
-      ${L('Catering',cur.cateringRevenue,cmp?cmp.cateringRevenue:0,{indent:true})}
-      ${L('Comedor',cur.comedor.billed,cmp?cmp.comedor.billed:0,{indent:true})}
-      ${L('Cafetería',cur.cafeteria.billed,cmp?cmp.cafeteria.billed:0,{indent:true})}
-      ${cur.extrasRevenue!==0||(cmp&&cmp.extrasRevenue!==0)?L('Facturación extra',cur.extrasRevenue,cmp?cmp.extrasRevenue:0,{indent:true}):''}
+      ${L('Revenue (Ingresos)',cur.revenue,cmp?cmp.revenue:0,{bold:true,fcVal:fcAgg?fcAgg.revenue:undefined})}
+      ${L('Catering',cur.cateringRevenue,cmp?cmp.cateringRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.catering:undefined})}
+      ${L('Comedor',cur.comedor.billed,cmp?cmp.comedor.billed:0,{indent:true,fcVal:fcAgg?fcAgg.comedor:undefined})}
+      ${L('Cafetería',cur.cafeteria.billed,cmp?cmp.cafeteria.billed:0,{indent:true,fcVal:fcAgg?fcAgg.cafeteria:undefined})}
+      ${cur.extrasRevenue!==0||(cmp&&cmp.extrasRevenue!==0)?L('Facturación extra',cur.extrasRevenue,cmp?cmp.extrasRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.extra:undefined}):''}
       ${(()=>{
         const cats=new Set([...Object.keys(cur.extrasByCategory||{}),...(cmp?Object.keys(cmp.extrasByCategory||{}):[])]);
         return [...cats].sort().map(c=>L(c,cur.extrasByCategory[c]||0,cmp?(cmp.extrasByCategory[c]||0):0,{indent2:true})).join('');
       })()}
-      ${L('MMPP (Materias primas)',cur.mmpp,cmp?cmp.mmpp:0)}
-      ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true})}
-      ${L('Labour Cost (Personal)',cur.labourCost,cmp?cmp.labourCost:0)}
+      ${L('MMPP (Materias primas)',cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
+      ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
+      ${L('Labour Cost (Personal)',cur.labourCost,cmp?cmp.labourCost:0,{fcVal:fcAgg?fcAgg.labourCost:undefined})}
       ${L('Plantilla activa',cur.labourPayroll,cmp?cmp.labourPayroll:0,{indent:true})}
       ${cur.labourLeave!==0||(cmp&&cmp.labourLeave!==0)?L('Bajas',cur.labourLeave,cmp?cmp.labourLeave:0,{indent:true}):''}
       ${cur.labourEtt!==0||(cmp&&cmp.labourEtt!==0)?L('ETT (adicional)',cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true}):''}
-      ${L('IUO (Gastos indirectos)',cur.iuo,cmp?cmp.iuo:0)}
+      ${L('IUO (Gastos indirectos)',cur.iuo,cmp?cmp.iuo:0,{fcVal:fcAgg?fcAgg.iuo:undefined})}
       ${cur.iuoFromPct!==0?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
       ${cur.iuoFixed!==0?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
-      ${L('Unit Profit (Resultado)',cur.unitProfit,cmp?cmp.unitProfit:0,{bold:true})}
+      ${L('Unit Profit (Resultado)',cur.unitProfit,cmp?cmp.unitProfit:0,{bold:true,fcVal:fcAgg?fcAgg.unitProfit:undefined})}
     </div>
 
     <div class="audit-section" style="margin-top:14px">
@@ -3175,17 +3463,347 @@ function bindPnlControls(container){
 }
 
 
+// ══ MÓDULO FORECAST ═══════════════════════════════════════════════
+let currentFcView='sales';
+let fcRefDate=new Date();
+
+async function loadForecastData(){
+  const monthKey=`${fcRefDate.getFullYear()}-${String(fcRefDate.getMonth()+1).padStart(2,'0')}`;
+  const [fcSnap,revSnap,extrasSnap,costSnap,cateringOrders]=await Promise.all([
+    getDoc(doc(db,'forecast_config',monthKey)),
+    getDoc(doc(db,'pnl_config','revenue')),
+    getDoc(doc(db,'pnl_config','extras')),
+    getDoc(doc(db,'pnl_config','costs')),
+    getOrders()
+  ]);
+  return{
+    monthKey,
+    fc:fcSnap.exists()?fcSnap.data():{sales:{},purchases:{},occupancy:{}},
+    revenueRows:revSnap.exists()?(revSnap.data().rows||[]):[],
+    extras:extrasSnap.exists()?(extrasSnap.data().list||[]):[],
+    costs:costSnap.exists()?costSnap.data():{mmppPct:35},
+    cateringOrders
+  };
+}
+
+async function saveForecast(monthKey,section,data){
+  await setDoc(doc(db,'forecast_config',monthKey),{[section]:data,updatedAt:Timestamp.now()},{merge:true});
+}
+
+function monthDays(refDate){
+  const last=endOfMonth(refDate).getDate();
+  return Array.from({length:last},(_,i)=>{
+    const d=new Date(refDate.getFullYear(),refDate.getMonth(),i+1);
+    return{day:i+1,date:localISODate(d),weekday:d.getDay(),isWeekend:[0,6].includes(d.getDay())};
+  });
+}
+
+function devBadge(real,fcast){
+  if(!fcast)return'<span style="color:var(--text-tertiary)">—</span>';
+  const pct=(real-fcast)/fcast*100;
+  const cls=pct>=0?'var(--ok-fg)':'var(--alert-red-fg)';
+  return`<span style="color:${cls};font-family:var(--font-mono);font-size:11px">${pct>=0?'+':''}${pct.toFixed(0)}%</span>`;
+}
+
+function fcNav(label){
+  return`<div class="cumulative-controls">
+    <div class="date-nav" style="margin:0">
+      <button class="date-nav-btn" id="fcPrev">◀</button>
+      <span class="date-nav-label" style="cursor:default;min-width:130px">${label}</span>
+      <button class="date-nav-btn" id="fcNext">▶</button>
+    </div>
+  </div>`;
+}
+
+function bindFcNav(container){
+  const p=container.querySelector('#fcPrev'),n=container.querySelector('#fcNext');
+  if(p)p.addEventListener('click',()=>{fcRefDate=new Date(fcRefDate.getFullYear(),fcRefDate.getMonth()-1,1);renderForecast(container);});
+  if(n)n.addEventListener('click',()=>{fcRefDate=new Date(fcRefDate.getFullYear(),fcRefDate.getMonth()+1,1);renderForecast(container);});
+}
+
+// ── VENTAS ────────────────────────────────────────────────────────
+async function renderFcSales(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando previsión…</span></div>`;
+  try{
+    const {monthKey,fc,revenueRows,extras,cateringOrders}=await loadForecastData();
+    const sales=fc.sales||{};
+    const days=monthDays(fcRefDate);
+    const channels=[{k:'catering',lbl:'Catering'},{k:'comedor',lbl:'Comedor'},{k:'cafeteria',lbl:'Cafetería'},{k:'extra',lbl:'Extra'}];
+
+    // Reales por día
+    const realByDay={};
+    days.forEach(d=>{realByDay[d.date]={catering:0,comedor:0,cafeteria:0,extra:0};});
+    cateringOrders.filter(o=>o.orderStatus!=='CANCELADO').forEach(o=>{
+      const dt=toDate(o.deliveryAt);if(!dt)return;
+      const k=localISODate(dt);
+      if(realByDay[k])realByDay[k].catering+=o.priceTotal||0;
+    });
+    revenueRows.forEach(r=>{if(realByDay[r.date]&&realByDay[r.date][r.channel]!==undefined)realByDay[r.date][r.channel]+=r.billed||0;});
+    extras.forEach(e=>{if(realByDay[e.date])realByDay[e.date].extra+=e.amount||0;});
+
+    let accFc=0,accReal=0;
+    const rows=days.map(d=>{
+      const fcDay=sales[d.date]||{};
+      const fcTotal=channels.reduce((s,c)=>s+(fcDay[c.k]||0),0);
+      const realDay=realByDay[d.date];
+      const realTotal=channels.reduce((s,c)=>s+(realDay[c.k]||0),0);
+      accFc+=fcTotal;accReal+=realTotal;
+      const accDev=accFc?((accReal-accFc)/accFc*100):0;
+      const inputs=channels.map(c=>`<td><input type="number" class="fc-input" data-fc-day="${d.date}" data-fc-ch="${c.k}" value="${fcDay[c.k]||''}" placeholder="0" step="10" min="0"></td>`).join('');
+      const reals=channels.map(c=>`<td class="fc-real">${realDay[c.k]?fmtMoney(realDay[c.k]):'—'}</td>`).join('');
+      return`<tr class="${d.isWeekend?'fc-weekend':''}">
+        <td class="fc-day">${d.day}<span class="fc-wd">${['D','L','M','X','J','V','S'][d.weekday]}</span></td>
+        ${inputs}
+        <td class="fc-sep">${fcTotal?fmtMoney(fcTotal):'—'}</td>
+        ${reals}
+        <td class="fc-sep">${realTotal?fmtMoney(realTotal):'—'}</td>
+        <td>${devBadge(realTotal,fcTotal)}</td>
+        <td class="fc-acc" style="color:${accDev>=0?'var(--ok-fg)':'var(--alert-red-fg)'}">${accFc?`${accDev>=0?'+':''}${accDev.toFixed(0)}%`:'—'}</td>
+      </tr>`;
+    }).join('');
+
+    const totalFc=accFc,totalReal=accReal;
+    const monthDev=totalFc?((totalReal-totalFc)/totalFc*100):0;
+
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}))+`
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Previsión del mes</div><div class="kpi-value">${fmtMoney(totalFc)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Real acumulado</div><div class="kpi-value">${fmtMoney(totalReal)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Desviación</div><div class="kpi-value ${monthDev<0?'alert':''}" style="${monthDev>=0?'color:var(--ok-fg)':''}">${totalFc?`${monthDev>=0?'+':''}${monthDev.toFixed(1)}%`:'—'}</div><div class="kpi-sub">${fmtMoney(totalReal-totalFc)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Días con previsión</div><div class="kpi-value">${Object.keys(sales).filter(k=>k.startsWith(monthKey)).length}</div><div class="kpi-sub">de ${days.length}</div></div>
+    </div>
+    <p class="section-label">Previsión (editable) y real por día · los cambios se guardan al salir de la celda</p>
+    <div class="sched-wrap">
+      <table class="sched-table fc-table">
+        <thead>
+          <tr>
+            <th rowspan="2" class="fc-day">Día</th>
+            <th colspan="${channels.length}" class="fc-head-group">Previsión (€)</th>
+            <th rowspan="2" class="fc-sep">Prev. total</th>
+            <th colspan="${channels.length}" class="fc-head-group">Real (€)</th>
+            <th rowspan="2" class="fc-sep">Real total</th>
+            <th rowspan="2">Desv. día</th>
+            <th rowspan="2" class="fc-acc">Desv. acum.</th>
+          </tr>
+          <tr>${channels.map(c=>`<th>${c.lbl}</th>`).join('')}${channels.map(c=>`<th>${c.lbl}</th>`).join('')}</tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p id="fcMsg" style="font-size:12px;margin-top:10px"></p>`;
+
+    bindFcNav(container);
+    container.querySelectorAll('.fc-input').forEach(inp=>{
+      inp.addEventListener('change',async()=>{
+        const day=inp.dataset.fcDay,ch=inp.dataset.fcCh;
+        if(!sales[day])sales[day]={};
+        const v=parseFloat(inp.value);
+        if(isNaN(v)||v===0)delete sales[day][ch];else sales[day][ch]=v;
+        if(Object.keys(sales[day]).length===0)delete sales[day];
+        try{await saveForecast(monthKey,'sales',sales);renderForecast(container);}
+        catch(e){const m=container.querySelector('#fcMsg');if(m){m.textContent='Error: '+e.message;m.style.color='var(--alert-red-fg)';}}
+      });
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+// ── COMPRAS ───────────────────────────────────────────────────────
+async function renderFcPurchases(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando compras…</span></div>`;
+  try{
+    const {monthKey,fc,costs}=await loadForecastData();
+    const sales=fc.sales||{};
+    const purchases=fc.purchases||{};
+    const targetPct=costs.mmppPct!==undefined?costs.mmppPct:35;
+    const days=monthDays(fcRefDate);
+
+    let accTarget=0,accReal=0;
+    const rows=days.map(d=>{
+      const fcDay=sales[d.date]||{};
+      const salesFc=['catering','comedor','cafeteria','extra'].reduce((s,c)=>s+(fcDay[c]||0),0);
+      const target=salesFc*(targetPct/100);
+      const real=purchases[d.date]||0;
+      accTarget+=target;accReal+=real;
+      const accDev=accTarget?((accReal-accTarget)/accTarget*100):0;
+      const realPct=salesFc?(real/salesFc*100):0;
+      // En compras, gastar MENOS del objetivo es bueno (verde), más es malo (rojo)
+      const dayDevColor=real<=target?'var(--ok-fg)':'var(--alert-red-fg)';
+      return`<tr class="${d.isWeekend?'fc-weekend':''}">
+        <td class="fc-day">${d.day}<span class="fc-wd">${['D','L','M','X','J','V','S'][d.weekday]}</span></td>
+        <td class="fc-real">${salesFc?fmtMoney(salesFc):'—'}</td>
+        <td class="fc-sep">${target?fmtMoney(target):'—'}</td>
+        <td><input type="number" class="fc-input" data-fc-pur="${d.date}" value="${real||''}" placeholder="0" step="10" min="0"></td>
+        <td style="color:${dayDevColor};font-family:var(--font-mono);font-size:11px">${target?`${real-target>=0?'+':''}${fmtMoney(real-target)}`:'—'}</td>
+        <td class="fc-real" style="${realPct>targetPct?'color:var(--alert-red-fg);font-weight:500':''}">${salesFc&&real?`${realPct.toFixed(1)}%`:'—'}</td>
+        <td class="fc-acc" style="color:${accReal<=accTarget?'var(--ok-fg)':'var(--alert-red-fg)'}">${accTarget?`${accDev>=0?'+':''}${accDev.toFixed(0)}%`:'—'}</td>
+      </tr>`;
+    }).join('');
+
+    const monthDev=accTarget?((accReal-accTarget)/accTarget*100):0;
+    const globalPct=(()=>{
+      const totalSalesFc=days.reduce((s,d)=>{const f=sales[d.date]||{};return s+['catering','comedor','cafeteria','extra'].reduce((a,c)=>a+(f[c]||0),0);},0);
+      return totalSalesFc?(accReal/totalSalesFc*100):0;
+    })();
+
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}))+`
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Objetivo del mes</div><div class="kpi-value">${fmtMoney(accTarget)}</div><div class="kpi-sub">${targetPct}% de la venta prevista</div></div>
+      <div class="kpi-card"><div class="kpi-label">Gasto real</div><div class="kpi-value">${fmtMoney(accReal)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Desviación</div><div class="kpi-value ${accReal>accTarget?'alert':''}" style="${accReal<=accTarget?'color:var(--ok-fg)':''}">${accTarget?`${monthDev>=0?'+':''}${monthDev.toFixed(1)}%`:'—'}</div><div class="kpi-sub">${fmtMoney(accReal-accTarget)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">% real sobre venta</div><div class="kpi-value ${globalPct>targetPct?'alert':''}">${globalPct?globalPct.toFixed(1)+'%':'—'}</div><div class="kpi-sub">objetivo ${targetPct}%</div></div>
+    </div>
+    <div class="alert alert-amber" style="margin-bottom:14px">
+      <span>ℹ️ El objetivo se calcula como <strong>${targetPct}% de la venta prevista</strong> de cada día (parámetro MMPP de la Cuenta de explotación). En compras, gastar por debajo del objetivo es favorable.</span>
+    </div>
+    <p class="section-label">Objetivo y gasto real por día</p>
+    <div class="sched-wrap">
+      <table class="sched-table fc-table">
+        <thead><tr>
+          <th class="fc-day">Día</th><th>Venta prev.</th><th class="fc-sep">Objetivo ${targetPct}%</th>
+          <th>Gasto real (€)</th><th>Desv. día</th><th>% real</th><th class="fc-acc">Desv. acum.</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p id="fcMsg" style="font-size:12px;margin-top:10px"></p>`;
+
+    bindFcNav(container);
+    container.querySelectorAll('[data-fc-pur]').forEach(inp=>{
+      inp.addEventListener('change',async()=>{
+        const day=inp.dataset.fcPur;
+        const v=parseFloat(inp.value);
+        if(isNaN(v)||v===0)delete purchases[day];else purchases[day]=v;
+        try{await saveForecast(monthKey,'purchases',purchases);renderForecast(container);}
+        catch(e){const m=container.querySelector('#fcMsg');if(m){m.textContent='Error: '+e.message;m.style.color='var(--alert-red-fg)';}}
+      });
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+// ── OCUPACIÓN ─────────────────────────────────────────────────────
+async function renderFcOccupancy(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando ocupación…</span></div>`;
+  try{
+    const {monthKey,fc,revenueRows,cateringOrders}=await loadForecastData();
+    const occ=fc.occupancy||{};
+    const days=monthDays(fcRefDate);
+
+    // Real de cantina+catering lunch: tickets de comedor + pax de catering tipo lunch/comida
+    const realCantina={};
+    days.forEach(d=>{realCantina[d.date]=0;});
+    revenueRows.filter(r=>r.channel==='comedor').forEach(r=>{if(realCantina[r.date]!==undefined)realCantina[r.date]+=r.tickets||0;});
+    cateringOrders.filter(o=>o.orderStatus!=='CANCELADO'&&o.cateringCategory==='lunch').forEach(o=>{
+      const dt=toDate(o.deliveryAt);if(!dt)return;
+      const k=localISODate(dt);
+      if(realCantina[k]!==undefined)realCantina[k]+=o.pax||0;
+    });
+
+    let accCampusFc=0,accCampusReal=0,accCantFc=0,accCantReal=0;
+    const rows=days.map(d=>{
+      const o=occ[d.date]||{};
+      const campusFc=o.campusFc||0,campusReal=o.campusReal||0;
+      const cantFc=o.cantinaFc||0;
+      const cantReal=realCantina[d.date]||0;
+      accCampusFc+=campusFc;accCampusReal+=campusReal;
+      accCantFc+=cantFc;accCantReal+=cantReal;
+      const accDevCampus=accCampusFc?((accCampusReal-accCampusFc)/accCampusFc*100):0;
+      const accDevCant=accCantFc?((accCantReal-accCantFc)/accCantFc*100):0;
+      return`<tr class="${d.isWeekend?'fc-weekend':''}">
+        <td class="fc-day">${d.day}<span class="fc-wd">${['D','L','M','X','J','V','S'][d.weekday]}</span></td>
+        <td><input type="number" class="fc-input" data-occ-day="${d.date}" data-occ-f="campusFc" value="${campusFc||''}" placeholder="0" min="0"></td>
+        <td><input type="number" class="fc-input" data-occ-day="${d.date}" data-occ-f="campusReal" value="${campusReal||''}" placeholder="0" min="0"></td>
+        <td>${devBadge(campusReal,campusFc)}</td>
+        <td class="fc-acc" style="color:${accDevCampus>=0?'var(--ok-fg)':'var(--alert-red-fg)'}">${accCampusFc?`${accDevCampus>=0?'+':''}${accDevCampus.toFixed(0)}%`:'—'}</td>
+        <td class="fc-sep"><input type="number" class="fc-input" data-occ-day="${d.date}" data-occ-f="cantinaFc" value="${cantFc||''}" placeholder="0" min="0"></td>
+        <td class="fc-real">${cantReal||'—'}</td>
+        <td>${devBadge(cantReal,cantFc)}</td>
+        <td class="fc-acc" style="color:${accDevCant>=0?'var(--ok-fg)':'var(--alert-red-fg)'}">${accCantFc?`${accDevCant>=0?'+':''}${accDevCant.toFixed(0)}%`:'—'}</td>
+      </tr>`;
+    }).join('');
+
+    const devCampus=accCampusFc?((accCampusReal-accCampusFc)/accCampusFc*100):0;
+    const devCant=accCantFc?((accCantReal-accCantFc)/accCantFc*100):0;
+
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}))+`
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Campus · previsión</div><div class="kpi-value">${accCampusFc}</div><div class="kpi-sub">real: ${accCampusReal}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Campus · desviación</div><div class="kpi-value" style="color:${devCampus>=0?'var(--ok-fg)':'var(--alert-red-fg)'}">${accCampusFc?`${devCampus>=0?'+':''}${devCampus.toFixed(1)}%`:'—'}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Cantina+catering · previsión</div><div class="kpi-value">${accCantFc}</div><div class="kpi-sub">real: ${accCantReal}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Cantina+catering · desviación</div><div class="kpi-value" style="color:${devCant>=0?'var(--ok-fg)':'var(--alert-red-fg)'}">${accCantFc?`${devCant>=0?'+':''}${devCant.toFixed(1)}%`:'—'}</div></div>
+    </div>
+    <div class="alert alert-amber" style="margin-bottom:14px">
+      <span>ℹ️ El real de <strong>cantina + catering</strong> se calcula automáticamente: tickets de comedor más los pax de catering de tipo comida/lunch. La ocupación de campus la introduces manualmente.</span>
+    </div>
+    <p class="section-label">Ocupación por día</p>
+    <div class="sched-wrap">
+      <table class="sched-table fc-table">
+        <thead>
+          <tr>
+            <th rowspan="2" class="fc-day">Día</th>
+            <th colspan="4" class="fc-head-group">Ocupación campus</th>
+            <th colspan="4" class="fc-head-group">Cantina + catering (lunch)</th>
+          </tr>
+          <tr>
+            <th>Previsión</th><th>Real</th><th>Desv.</th><th class="fc-acc">Acum.</th>
+            <th class="fc-sep">Previsión</th><th>Real (auto)</th><th>Desv.</th><th class="fc-acc">Acum.</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p id="fcMsg" style="font-size:12px;margin-top:10px"></p>`;
+
+    bindFcNav(container);
+    container.querySelectorAll('[data-occ-day]').forEach(inp=>{
+      inp.addEventListener('change',async()=>{
+        const day=inp.dataset.occDay,field=inp.dataset.occF;
+        if(!occ[day])occ[day]={};
+        const v=parseFloat(inp.value);
+        if(isNaN(v)||v===0)delete occ[day][field];else occ[day][field]=v;
+        if(Object.keys(occ[day]).length===0)delete occ[day];
+        try{await saveForecast(monthKey,'occupancy',occ);renderForecast(container);}
+        catch(e){const m=container.querySelector('#fcMsg');if(m){m.textContent='Error: '+e.message;m.style.color='var(--alert-red-fg)';}}
+      });
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function renderForecast(container){
+  if(currentFcView==='purchases')renderFcPurchases(container);
+  else if(currentFcView==='occupancy')renderFcOccupancy(container);
+  else renderFcSales(container);
+}
+
+document.getElementById('forecastTabs').addEventListener('click',e=>{
+  const tab=e.target.closest('.tab');
+  if(!tab)return;
+  document.querySelectorAll('#forecastTabs .tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  currentFcView=tab.dataset.fcView;
+  renderForecast(document.getElementById('forecastContent'));
+});
+
 // ══ NAVEGACIÓN DEL HUB ════════════════════════════════════════════
 const hubScreen=document.getElementById('hubScreen');
 const auditScreen=document.getElementById('auditScreen');
 const staffScreen=document.getElementById('staffScreen');
 const pnlScreen=document.getElementById('pnlScreen');
+const billingScreen=document.getElementById('billingScreen');
+const forecastScreen=document.getElementById('forecastScreen');
 
 function showScreen(name){
   hubScreen.hidden=name!=='hub';
   auditScreen.hidden=name!=='audit';
   staffScreen.hidden=name!=='staff';
   pnlScreen.hidden=name!=='pnl';
+  billingScreen.hidden=name!=='billing';
+  forecastScreen.hidden=name!=='forecast';
   document.getElementById('app').hidden=name!=='catering';
 }
 
@@ -3204,7 +3822,13 @@ document.querySelectorAll('.hub-card').forEach(card=>{
       renderStaff(document.getElementById('staffContent'));
     } else if(mod==='pnl'){
       showScreen('pnl');
-      renderPnlModule(document.getElementById('pnlContent'));
+      renderPnl(document.getElementById('pnlContent'));
+    } else if(mod==='billing'){
+      showScreen('billing');
+      renderExtras(document.getElementById('billingContent'));
+    } else if(mod==='forecast'){
+      showScreen('forecast');
+      renderForecast(document.getElementById('forecastContent'));
     }
   });
 });
@@ -3213,6 +3837,8 @@ document.getElementById('btnBackFromCatering').addEventListener('click',()=>show
 document.getElementById('btnBackFromAudit').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromStaff').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromPnl').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromBilling').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromForecast').addEventListener('click',()=>showScreen('hub'));
 
 // Importar horario de personal
 const staffFileInput=document.getElementById('staffFileInput');
@@ -3293,6 +3919,8 @@ onAuthStateChanged(auth, user=>{
     auditScreen.hidden=true;
     staffScreen.hidden=true;
     pnlScreen.hidden=true;
+    billingScreen.hidden=true;
+    forecastScreen.hidden=true;
     appEl.hidden=true;
   }
 });
@@ -3344,7 +3972,7 @@ document.getElementById('btnForgotPassword').addEventListener('click', async(e)=
 loginPassword.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 loginEmail.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-['btnLogout','btnLogoutHub','btnLogoutAudit','btnLogoutStaff','btnLogoutPnl'].forEach(id=>{
+['btnLogout','btnLogoutHub','btnLogoutAudit','btnLogoutStaff','btnLogoutPnl','btnLogoutBilling','btnLogoutForecast'].forEach(id=>{
   const b=document.getElementById(id);
   if(b)b.addEventListener('click',async()=>{await signOut(auth);});
 });
