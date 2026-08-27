@@ -380,6 +380,10 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
       <button class="btn-back" id="btnBackFromPnl">← Hub</button>
       <span class="logo">Cuenta de explotación</span>
     </div>
+    <nav class="tabs" id="pnlTabs">
+      <button class="tab active" data-pnl-view="pnl">Cuenta de explotación</button>
+      <button class="tab" data-pnl-view="extras">Facturación extra</button>
+    </nav>
     <div class="topbar-actions">
       <button class="btn-action" id="btnImportComedor">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -2662,6 +2666,193 @@ function parseStaffXLSX(arrayBuffer){
   return staff;
 }
 
+// ══ FACTURACIÓN EXTRA ═════════════════════════════════════════════
+const EXTRA_CATEGORIES=['Pedido de producto','Invitaciones','Servicio extra','Alquiler de material','Otros'];
+const PAYMENT_STATES=['Pendiente','Facturado','Cobrado'];
+let currentPnlView='pnl';
+let extraFilter={category:'',state:'',from:null,to:null};
+
+async function renderExtras(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando facturación extra…</span></div>`;
+  try{
+    const snap=await getDoc(doc(db,'pnl_config','extras'));
+    const extras=snap.exists()?(snap.data().list||[]):[];
+
+    // Aplicar filtros
+    let filtered=extras.slice();
+    if(extraFilter.category)filtered=filtered.filter(e=>e.category===extraFilter.category);
+    if(extraFilter.state)filtered=filtered.filter(e=>(e.state||'Pendiente')===extraFilter.state);
+    if(extraFilter.from)filtered=filtered.filter(e=>e.date>=extraFilter.from);
+    if(extraFilter.to)filtered=filtered.filter(e=>e.date<=extraFilter.to);
+    filtered.sort((a,b)=>b.date.localeCompare(a.date));
+
+    const total=filtered.reduce((s,e)=>s+(e.amount||0),0);
+    const pending=filtered.filter(e=>(e.state||'Pendiente')!=='Cobrado');
+    const pendingAmount=pending.reduce((s,e)=>s+(e.amount||0),0);
+    const overdue=pending.filter(e=>e.dueDate&&e.dueDate<localISODate(new Date()));
+    const overdueAmount=overdue.reduce((s,e)=>s+(e.amount||0),0);
+
+    // Desglose por categoría
+    const byCat={};
+    filtered.forEach(e=>{const c=e.category||'Otros';byCat[c]=(byCat[c]||0)+(e.amount||0);});
+    const maxCat=Math.max(...Object.values(byCat),1);
+    const catRows=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>
+      `<div class="bar-row"><span class="bar-label">${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v/maxCat*100).toFixed(0)}%;background:#1A5C38"></div></div><span class="bar-val">${fmtMoney(v)}</span></div>`
+    ).join('');
+
+    const stateClass=s=>({Pendiente:'pill-pax-amber',Facturado:'pill-break',Cobrado:'pill-ok'}[s]||'pill-other');
+    const rows=filtered.map(e=>{
+      const realIdx=extras.findIndex(x=>x===e);
+      const isOverdue=e.dueDate&&e.dueDate<localISODate(new Date())&&(e.state||'Pendiente')!=='Cobrado';
+      return`<div class="order-card" ${isOverdue?'style="border-left:3px solid #F09595"':''}>
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${escapeHtml(e.concept||'Sin concepto')}</span>
+            <span class="order-loc">${new Date(e.date+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}${e.client?` · ${escapeHtml(e.client)}`:''}</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill pill-other">${escapeHtml(e.category||'Otros')}</span>
+            <select class="staff-select" data-extra-state="${realIdx}">
+              ${PAYMENT_STATES.map(s=>`<option value="${s}" ${(e.state||'Pendiente')===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+            <span class="pill ${stateClass(e.state||'Pendiente')}" style="font-family:var(--font-mono)">${fmtMoney(e.amount||0)}</span>
+            <button class="btn-del-staff" data-del-extra="${realIdx}" title="Eliminar">✕</button>
+          </div>
+        </div>
+        <div class="order-meta">
+          ${e.invoiceNum?`<span class="meta-item">Factura ${escapeHtml(e.invoiceNum)}</span>`:''}
+          ${e.dueDate?`<span class="meta-item" ${isOverdue?'style="color:var(--alert-red-fg);font-weight:500"':''}>Cobro: ${new Date(e.dueDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}${isOverdue?' ⚠ vencido':''}</span>`:''}
+        </div>
+        ${e.notes?`<div class="comment-internal" style="font-style:normal">📝 ${escapeHtml(e.notes)}</div>`:''}
+      </div>`;
+    }).join('');
+
+    const alerts=[];
+    if(overdue.length>0)alerts.push({type:'red',msg:`${overdue.length} factura${overdue.length>1?'s':''} con cobro vencido · ${fmtMoney(overdueAmount)} pendiente`});
+
+    container.innerHTML=`<div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Total facturado extra</div><div class="kpi-value">${fmtMoney(total)}</div><div class="kpi-sub">${filtered.length} registro${filtered.length!==1?'s':''}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Pendiente de cobro</div><div class="kpi-value ${pendingAmount>0?'warn':''}">${fmtMoney(pendingAmount)}</div><div class="kpi-sub">${pending.length} sin cobrar</div></div>
+      <div class="kpi-card"><div class="kpi-label">Vencido</div><div class="kpi-value ${overdueAmount>0?'alert':''}">${fmtMoney(overdueAmount)}</div><div class="kpi-sub">${overdue.length} factura${overdue.length!==1?'s':''}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Importe medio</div><div class="kpi-value">${filtered.length?fmtMoney(total/filtered.length):'—'}</div></div>
+    </div>
+    ${alerts.length?renderAlerts(alerts):''}
+
+    <div class="audit-section">
+      <h3>Añadir facturación extra</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Fecha *</label><input type="date" id="exDate" value="${localISODate(new Date())}"></div>
+        <div class="form-group"><label>Concepto *</label><input type="text" id="exConcept" placeholder="Ej. Pedido de leche"></div>
+        <div class="form-group"><label>Importe sin IVA (€) *</label><input type="number" id="exAmount" value="0" step="0.01" min="0"></div>
+        <div class="form-group"><label>Categoría</label><select id="exCategory">${EXTRA_CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Cliente / departamento</label><input type="text" id="exClient" placeholder="Ej. Nestlé — RRHH"></div>
+        <div class="form-group"><label>Nº de factura</label><input type="text" id="exInvoice" placeholder="Opcional"></div>
+        <div class="form-group"><label>Estado</label><select id="exState">${PAYMENT_STATES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Fecha prevista de cobro</label><input type="date" id="exDueDate"></div>
+        <div class="form-group form-group-full"><label>Notas</label><textarea id="exNotes" rows="2" placeholder="Detalles adicionales…"></textarea></div>
+      </div>
+      <button class="btn-primary" id="btnSaveExtra" style="max-width:220px">Guardar</button>
+      <p id="exMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+
+    ${extras.length?`
+    <div class="cumulative-controls">
+      <select class="range-select" id="exFilterCat">
+        <option value="">Todas las categorías</option>
+        ${EXTRA_CATEGORIES.map(c=>`<option value="${c}" ${extraFilter.category===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+      <select class="range-select" id="exFilterState">
+        <option value="">Todos los estados</option>
+        ${PAYMENT_STATES.map(s=>`<option value="${s}" ${extraFilter.state===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <div class="range-inputs">
+        <input type="date" id="exFilterFrom" value="${extraFilter.from||''}" title="Desde">
+        <span style="color:var(--text-tertiary);font-size:12px">a</span>
+        <input type="date" id="exFilterTo" value="${extraFilter.to||''}" title="Hasta">
+      </div>
+      ${(extraFilter.category||extraFilter.state||extraFilter.from||extraFilter.to)?`<button class="btn-action" id="exClearFilter">Limpiar filtros</button>`:''}
+    </div>
+    <div class="stats-grid" style="grid-template-columns:1fr;margin-top:12px">
+      <div class="stat-card">
+        <h3>Importe por categoría</h3>
+        <span class="scope-label">${filtered.length} registros según filtros aplicados</span>
+        <div class="bar-chart">${catRows||'<div style="font-size:12px;color:var(--text-tertiary)">Sin datos</div>'}</div>
+      </div>
+    </div>
+    <p class="section-label">Registros</p>
+    <div class="orders">${rows}</div>`:'<div class="empty-state"><p>Aún no hay facturación extra registrada</p></div>'}`;
+
+    const saveExtras=async list=>{
+      await setDoc(doc(db,'pnl_config','extras'),{list,updatedAt:Timestamp.now()});
+    };
+
+    const btnSave=container.querySelector('#btnSaveExtra');
+    if(btnSave)btnSave.addEventListener('click',async()=>{
+      const msg=container.querySelector('#exMsg');
+      const date=container.querySelector('#exDate').value;
+      const concept=container.querySelector('#exConcept').value.trim();
+      const amount=parseFloat(container.querySelector('#exAmount').value)||0;
+      if(!date||!concept||amount<=0){msg.textContent='Rellena fecha, concepto e importe (mayor que 0)';msg.style.color='var(--alert-red-fg)';return;}
+      btnSave.disabled=true;btnSave.textContent='Guardando…';
+      try{
+        await saveExtras([...extras,{
+          date,concept,amount,
+          category:container.querySelector('#exCategory').value,
+          client:container.querySelector('#exClient').value.trim(),
+          invoiceNum:container.querySelector('#exInvoice').value.trim(),
+          state:container.querySelector('#exState').value,
+          dueDate:container.querySelector('#exDueDate').value,
+          notes:container.querySelector('#exNotes').value.trim()
+        }]);
+        renderExtras(container);
+      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
+      btnSave.disabled=false;btnSave.textContent='Guardar';
+    });
+
+    container.querySelectorAll('[data-extra-state]').forEach(sel=>{
+      sel.addEventListener('change',async()=>{
+        const idx=+sel.dataset.extraState;
+        extras[idx].state=sel.value;
+        await saveExtras(extras);
+        renderExtras(container);
+      });
+    });
+    container.querySelectorAll('[data-del-extra]').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const idx=+btn.dataset.delExtra;
+        if(!confirm(`¿Eliminar "${extras[idx].concept}"?`))return;
+        extras.splice(idx,1);
+        await saveExtras(extras);
+        renderExtras(container);
+      });
+    });
+    const fc=container.querySelector('#exFilterCat'),fs=container.querySelector('#exFilterState');
+    const ff=container.querySelector('#exFilterFrom'),ft=container.querySelector('#exFilterTo');
+    if(fc)fc.addEventListener('change',()=>{extraFilter.category=fc.value;renderExtras(container);});
+    if(fs)fs.addEventListener('change',()=>{extraFilter.state=fs.value;renderExtras(container);});
+    if(ff)ff.addEventListener('change',()=>{extraFilter.from=ff.value||null;renderExtras(container);});
+    if(ft)ft.addEventListener('change',()=>{extraFilter.to=ft.value||null;renderExtras(container);});
+    const cl=container.querySelector('#exClearFilter');
+    if(cl)cl.addEventListener('click',()=>{extraFilter={category:'',state:'',from:null,to:null};renderExtras(container);});
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function renderPnlModule(container){
+  if(currentPnlView==='extras')renderExtras(container);
+  else renderPnl(container);
+}
+
+document.getElementById('pnlTabs').addEventListener('click',e=>{
+  const tab=e.target.closest('.tab');
+  if(!tab)return;
+  document.querySelectorAll('#pnlTabs .tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  currentPnlView=tab.dataset.pnlView;
+  renderPnlModule(document.getElementById('pnlContent'));
+});
+
 // ══ MÓDULO CUENTA DE EXPLOTACIÓN ══════════════════════════════════
 const SPANISH_MONTHS={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,set:8,oct:9,nov:10,dic:11};
 function parseSpanishShortDate(str){
@@ -2698,7 +2889,7 @@ function pnlLine(label,value,revenue,opts={}){
   const display=isNeg?`(${fmtMoney(Math.abs(value))})`:fmtMoney(value);
   const pctDisplay=`${isNeg?'(':''}${Math.abs(pct).toFixed(1)}%${isNeg?')':''}`;
   const cls=opts.bold?'pnl-row bold':'pnl-row';
-  const indent=opts.indent?'style="padding-left:18px"':'';
+  const indent=opts.indent2?'style="padding-left:36px;font-size:12px;color:var(--text-secondary)"':(opts.indent?'style="padding-left:18px"':'');
   return `<div class="${cls}">
     <span class="pnl-label" ${indent}>${escapeHtml(label)}</span>
     <span class="pnl-val">${display}</span>
@@ -2708,7 +2899,7 @@ function pnlLine(label,value,revenue,opts={}){
   </div>`;
 }
 
-function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList){
+function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras){
   const inRange=d=>!from||!to||(d&&d>=from&&d<=to);
   const cateringActive=cateringOrders.filter(o=>o.orderStatus!=='CANCELADO'&&inRange(toDate(o.deliveryAt)));
   const cateringRevenue=cateringActive.reduce((s,o)=>s+(o.priceTotal||0),0);
@@ -2722,7 +2913,14 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList){
   });
   const comedor=byCh['comedor']||{billed:0,tickets:0};
   const cafeteria=byCh['cafeteria']||{billed:0,tickets:0};
-  const revenue=cateringRevenue+comedor.billed+cafeteria.billed;
+  const extrasInRange=(extras||[]).filter(e=>inRange(new Date(e.date+'T12:00:00')));
+  const extrasRevenue=extrasInRange.reduce((s2,e)=>s2+(e.amount||0),0);
+  const extrasByCategory={};
+  extrasInRange.forEach(e=>{
+    const c=e.category||'Otros';
+    extrasByCategory[c]=(extrasByCategory[c]||0)+(e.amount||0);
+  });
+  const revenue=cateringRevenue+comedor.billed+cafeteria.billed+extrasRevenue;
   // Meses cubiertos por el rango, para prorratear costes mensuales
   let months=1;
   if(from&&to){
@@ -2743,24 +2941,26 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList){
   const iuoFixed=-((costs.iuoMonthly||costs.otherMonthly||0)*months);
   const iuo=iuoFromPct+iuoFixed;
   const unitProfit=grossProfit+labourCost+iuo;
-  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,unitProfit,months,
+  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,unitProfit,months,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
 
 async function renderPnl(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Calculando cuenta de explotación…</span></div>`;
   try{
-    const [revSnap,staffSnap,costSnap,ettSnapP,cateringOrders]=await Promise.all([
+    const [revSnap,staffSnap,costSnap,ettSnapP,extrasSnapP,cateringOrders]=await Promise.all([
       getDoc(doc(db,'pnl_config','revenue')),
       getDoc(doc(db,'staff_config','roster')),
       getDoc(doc(db,'pnl_config','costs')),
       getDoc(doc(db,'staff_config','ett')),
+      getDoc(doc(db,'pnl_config','extras')),
       getOrders()
     ]);
     const revenueRows=revSnap.exists()?(revSnap.data().rows||[]):[];
     const staff=staffSnap.exists()?(staffSnap.data().staff||[]):[];
     const costs=costSnap.exists()?costSnap.data():{mmppPct:35,iuoPct:0,iuoMonthly:0};
     const ettList=ettSnapP.exists()?(ettSnapP.data().list||[]):[];
+    const extras=extrasSnapP.exists()?(extrasSnapP.data().list||[]):[];
 
     const r=pnlRange;
     let from=r.from,to=r.to;
@@ -2780,8 +2980,8 @@ async function renderPnl(container){
       } else if(ct==='custom'){cFrom=r.compareFrom;cTo=r.compareTo;cLabel='rango personalizado';}
     }
 
-    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList);
-    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList):null;
+    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras);
+    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList,extras):null;
 
     const varOf=(a,b)=>b?((a-b)/Math.abs(b)*100):0;
     const varTxt=(a,b)=>{if(!b)return'';const v=varOf(a,b);return`${v>=0?'+':''}${v.toFixed(1)}%`;};
@@ -2846,6 +3046,11 @@ async function renderPnl(container){
       ${L('Catering',cur.cateringRevenue,cmp?cmp.cateringRevenue:0,{indent:true})}
       ${L('Comedor',cur.comedor.billed,cmp?cmp.comedor.billed:0,{indent:true})}
       ${L('Cafetería',cur.cafeteria.billed,cmp?cmp.cafeteria.billed:0,{indent:true})}
+      ${cur.extrasRevenue!==0||(cmp&&cmp.extrasRevenue!==0)?L('Facturación extra',cur.extrasRevenue,cmp?cmp.extrasRevenue:0,{indent:true}):''}
+      ${(()=>{
+        const cats=new Set([...Object.keys(cur.extrasByCategory||{}),...(cmp?Object.keys(cmp.extrasByCategory||{}):[])]);
+        return [...cats].sort().map(c=>L(c,cur.extrasByCategory[c]||0,cmp?(cmp.extrasByCategory[c]||0):0,{indent2:true})).join('');
+      })()}
       ${L('MMPP (Materias primas)',cur.mmpp,cmp?cmp.mmpp:0)}
       ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true})}
       ${L('Labour Cost (Personal)',cur.labourCost,cmp?cmp.labourCost:0)}
@@ -2853,7 +3058,20 @@ async function renderPnl(container){
       ${cur.labourLeave!==0||(cmp&&cmp.labourLeave!==0)?L('Bajas',cur.labourLeave,cmp?cmp.labourLeave:0,{indent:true}):''}
       ${cur.labourEtt!==0||(cmp&&cmp.labourEtt!==0)?L('ETT (adicional)',cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true}):''}
       ${L('IUO (Gastos indirectos)',cur.iuo,cmp?cmp.iuo:0)}
+      ${cur.iuoFromPct!==0?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
+      ${cur.iuoFixed!==0?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
       ${L('Unit Profit (Resultado)',cur.unitProfit,cmp?cmp.unitProfit:0,{bold:true})}
+    </div>
+
+    <div class="audit-section" style="margin-top:14px">
+      <h3>Origen de cada dato</h3>
+      <div class="audit-row"><span class="audit-req"><strong>Catering</strong> — importe sin IVA de pedidos no cancelados, del módulo Catering (importación CSV/Holded)</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Comedor / Cafetería</strong> — facturado de los CSV importados con los botones de la barra superior</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Facturación extra</strong> — registros introducidos manualmente en la pestaña "Facturación extra", desglosados por categoría</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — calculado como ${costs.mmppPct!==undefined?costs.mmppPct:35}% de los ingresos totales (parámetro configurable, no facturas reales)</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — horas semanales × tarifa estimada de convenio × 4,33 semanas, del módulo Personal. Las bajas al ${costs.leaveCostPct!==undefined?costs.leaveCostPct:100}% y las ETT según registros vigentes</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — parte variable como % de ingresos más una parte fija mensual, ambas configurables abajo</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Prorrateo</strong> — los costes mensuales (personal, IUO fijo) se multiplican por ${cur.months} mes${cur.months>1?'es':''} para cubrir el período seleccionado</span></div>
     </div>
 
     <div class="kpi-grid" style="margin-top:16px">
@@ -2986,7 +3204,7 @@ document.querySelectorAll('.hub-card').forEach(card=>{
       renderStaff(document.getElementById('staffContent'));
     } else if(mod==='pnl'){
       showScreen('pnl');
-      renderPnl(document.getElementById('pnlContent'));
+      renderPnlModule(document.getElementById('pnlContent'));
     }
   });
 });
