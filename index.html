@@ -144,24 +144,42 @@
 .fc-monthly-real{font-size:12px;color:var(--text-secondary)}
 .btn-back{background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:5px 12px;cursor:pointer;font-size:12.5px;font-family:var(--font-sans);color:var(--text-secondary);transition:all .15s}
 .btn-back:hover{border-color:var(--text-primary);color:var(--text-primary)}
-.hub-grid{display:flex;flex-direction:column;gap:8px;max-width:720px;margin:0 auto}
-.hub-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:16px 18px;cursor:pointer;transition:all .18s;position:relative;display:flex;align-items:center;gap:16px;overflow:hidden}
-.hub-card::before{content:'';position:absolute;top:0;bottom:0;left:0;width:4px;background:var(--accent)}
-.hub-card:hover:not(.disabled){border-color:var(--accent);background:var(--accent-bg);transform:translateX(3px)}
-.hub-card:hover:not(.disabled) .hub-arrow{opacity:1;transform:translateX(0)}
+.hub-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:900px;margin:0 auto}
+.hub-card{position:relative;border-radius:12px;padding:15px 17px;cursor:pointer;overflow:hidden;border:1px solid var(--border-soft);background:var(--bg-card);transition:transform .18s cubic-bezier(.2,.8,.3,1),border-color .18s,box-shadow .18s}
+.hub-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)}
+.hub-card:hover:not(.disabled){transform:translateY(-3px);border-color:var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.07)}
 .hub-card:hover:not(.disabled) .hub-icon{background:var(--accent);color:var(--bg-card)}
+.hub-card:hover:not(.disabled) .hub-go{opacity:1;transform:translateX(0)}
 .hub-card.disabled{opacity:.5;cursor:default}
-.hub-icon{width:40px;height:40px;border-radius:10px;background:var(--accent-bg);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s}
-.hub-icon svg{width:20px;height:20px}
-.hub-body{flex:1;min-width:0}
-.hub-card h3{font-size:15px;font-weight:600;margin:0 0 2px;color:var(--text-primary);letter-spacing:-.01em}
-.hub-card p{font-size:12.5px;color:var(--text-secondary);line-height:1.45;margin:0}
-.hub-arrow{font-size:17px;color:var(--accent);opacity:0;transform:translateX(-5px);transition:all .18s;flex-shrink:0}
-@media(max-width:768px){
-  .hub-card{padding:14px 14px;gap:12px}
-  .hub-icon{width:36px;height:36px}
-  .hub-card p{font-size:12px}
-  .hub-arrow{opacity:.45;transform:translateX(0)}
+.hub-wide{grid-column:span 2}
+.hub-top{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+.hub-icon{width:34px;height:34px;border-radius:9px;background:var(--accent-bg);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .18s,color .18s}
+.hub-icon svg{width:18px;height:18px}
+.hub-head{min-width:0}
+.hub-name{font-size:14.5px;font-weight:600;color:var(--text-primary);line-height:1.2;letter-spacing:-.01em}
+.hub-desc{font-size:11.5px;color:var(--text-secondary);line-height:1.35;margin:2px 0 0}
+.hub-badge{margin-left:auto;font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--accent-bg);color:var(--accent);white-space:nowrap;flex-shrink:0}
+.hub-badge.alert{background:var(--alert-red-bg);color:var(--alert-red-fg)}
+.hub-stats{display:flex;gap:15px;padding-top:10px;border-top:1px solid var(--border-soft);flex-wrap:wrap;min-height:38px;align-items:flex-start}
+.hub-st{display:flex;flex-direction:column;gap:1px}
+.hub-num{font-size:18px;font-weight:600;color:var(--text-primary);line-height:1.1;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.hub-num.pos{color:var(--ok-fg)}
+.hub-num.neg{color:var(--alert-red-fg)}
+.hub-num.warn{color:var(--alert-amber-fg)}
+.hub-lbl{font-size:10.5px;color:var(--text-tertiary);letter-spacing:.01em;white-space:nowrap}
+.hub-loading{font-size:11.5px;color:var(--text-tertiary)}
+.hub-empty{font-size:11.5px;color:var(--text-tertiary)}
+.hub-go{position:absolute;right:15px;bottom:12px;font-size:16px;color:var(--accent);opacity:0;transform:translateX(-5px);transition:all .18s}
+@media(max-width:900px){
+  .hub-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hub-wide{grid-column:span 2}
+}
+@media(max-width:600px){
+  .hub-grid{grid-template-columns:1fr}
+  .hub-wide{grid-column:span 1}
+  .hub-card{padding:14px 15px}
+  .hub-go{opacity:.45;transform:translateX(0)}
+  .hub-stats{gap:12px}
 }
 .audit-section{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:18px;margin-bottom:14px}
 .audit-section h3{font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-primary)}
@@ -386,73 +404,98 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
     </div>
   </header>
   <main class="main">
-    <div class="module-header"><h1 class="module-title">Gestión Operativa</h1><p class="module-sub">Selecciona un módulo</p></div>
+  <main class="main">
+    <div class="module-header">
+      <h1 class="module-title">Gestión operativa</h1>
+      <p class="module-sub" id="hubSubtitle"></p>
+    </div>
     <div class="hub-grid">
-      <div class="hub-card" data-module="catering" style="--accent:#7A4410;--accent-bg:#FEF3E2">
-        <div class="hub-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 2v7c0 1.1.9 2 2 2h1a2 2 0 0 0 2-2V2"/><path d="M5.5 2v9"/><path d="M8 2v20"/><path d="M18 2a4 4 0 0 0-4 4v5a2 2 0 0 0 2 2h4V6a4 4 0 0 0-2-4z"/><path d="M18 13v9"/></svg>
+
+      <div class="hub-card hub-wide" data-module="catering" style="--accent:#BA7517;--accent-bg:#FAEEDA">
+        <div class="hub-top">
+          <div class="hub-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 2v7c0 1.1.9 2 2 2h1a2 2 0 0 0 2-2V2"/><path d="M5.5 2v9"/><path d="M8 2v20"/><path d="M18 2a4 4 0 0 0-4 4v5a2 2 0 0 0 2 2h4V6a4 4 0 0 0-2-4z"/><path d="M18 13v9"/></svg>
+          </div>
+          <div class="hub-head">
+            <div class="hub-name">Catering</div>
+            <p class="hub-desc">Pedidos, alertas y análisis</p>
+          </div>
+          <span class="hub-badge" id="hubCateringBadge" hidden></span>
         </div>
-        <div class="hub-body">
-          <h3>Catering</h3>
-          <p>Pedidos del día, alertas de solapamiento y aforo, análisis acumulado y facturación.</p>
-        </div>
-        <span class="hub-arrow">→</span>
+        <div class="hub-stats" id="hubCateringStats"><span class="hub-loading">Cargando…</span></div>
+        <span class="hub-go">→</span>
       </div>
 
-      <div class="hub-card" data-module="audit" style="--accent:#2D6A0A;--accent-bg:#EBF5E0">
-        <div class="hub-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <div class="hub-card" data-module="audit" style="--accent:#639922;--accent-bg:#EAF3DE">
+        <div class="hub-top">
+          <div class="hub-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div class="hub-head">
+            <div class="hub-name">Auditoría</div>
+            <p class="hub-desc">Listas APPCC</p>
+          </div>
         </div>
-        <div class="hub-body">
-          <h3>Auditoría</h3>
-          <p>Listas APPCC con nota automática, historial y evolución de resultados.</p>
-        </div>
-        <span class="hub-arrow">→</span>
+        <div class="hub-stats" id="hubAuditStats"><span class="hub-loading">Cargando…</span></div>
+        <span class="hub-go">→</span>
       </div>
 
-      <div class="hub-card" data-module="pnl" style="--accent:#1E3A7A;--accent-bg:#E8F0FC">
-        <div class="hub-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>
+      <div class="hub-card" data-module="pnl" style="--accent:#378ADD;--accent-bg:#E6F1FB">
+        <div class="hub-top">
+          <div class="hub-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>
+          </div>
+          <div class="hub-head">
+            <div class="hub-name">Explotación</div>
+            <p class="hub-desc">Ingresos y margen</p>
+          </div>
         </div>
-        <div class="hub-body">
-          <h3>Cuenta de explotación</h3>
-          <p>Ingresos por canal, costes de compras y personal, margen y comparativas.</p>
-        </div>
-        <span class="hub-arrow">→</span>
+        <div class="hub-stats" id="hubPnlStats"><span class="hub-loading">Cargando…</span></div>
+        <span class="hub-go">→</span>
       </div>
 
-      <div class="hub-card" data-module="staff" style="--accent:#5B2E8C;--accent-bg:#F3E8FD">
-        <div class="hub-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <div class="hub-card" data-module="staff" style="--accent:#7F77DD;--accent-bg:#EEEDFE">
+        <div class="hub-top">
+          <div class="hub-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div class="hub-head">
+            <div class="hub-name">Personal</div>
+            <p class="hub-desc">Plantilla y turnos</p>
+          </div>
         </div>
-        <div class="hub-body">
-          <h3>Personal</h3>
-          <p>Plantilla, horario semanal, calendario de ausencias, ETT y costes.</p>
-        </div>
-        <span class="hub-arrow">→</span>
+        <div class="hub-stats" id="hubStaffStats"><span class="hub-loading">Cargando…</span></div>
+        <span class="hub-go">→</span>
       </div>
 
-      <div class="hub-card" data-module="billing" style="--accent:#8B1F1F;--accent-bg:#FDEDED">
-        <div class="hub-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>
+      <div class="hub-card" data-module="billing" style="--accent:#D85A30;--accent-bg:#FAECE7">
+        <div class="hub-top">
+          <div class="hub-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>
+          </div>
+          <div class="hub-head">
+            <div class="hub-name">Facturación</div>
+            <p class="hub-desc">Extras y cobros</p>
+          </div>
         </div>
-        <div class="hub-body">
-          <h3>Facturación</h3>
-          <p>Facturaciones extra fuera del sistema, con control de cobros pendientes.</p>
-        </div>
-        <span class="hub-arrow">→</span>
+        <div class="hub-stats" id="hubBillingStats"><span class="hub-loading">Cargando…</span></div>
+        <span class="hub-go">→</span>
       </div>
 
-      <div class="hub-card" data-module="forecast" style="--accent:#1A5C38;--accent-bg:#E8F5EE">
-        <div class="hub-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/><path d="M3 21h18"/></svg>
+      <div class="hub-card" data-module="forecast" style="--accent:#1D9E75;--accent-bg:#E1F5EE">
+        <div class="hub-top">
+          <div class="hub-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/><path d="M3 21h18"/></svg>
+          </div>
+          <div class="hub-head">
+            <div class="hub-name">Forecast</div>
+            <p class="hub-desc">Previsión y desvío</p>
+          </div>
         </div>
-        <div class="hub-body">
-          <h3>Forecast</h3>
-          <p>Previsión diaria de ventas, compras y ocupación con desviación acumulada.</p>
-        </div>
-        <span class="hub-arrow">→</span>
+        <div class="hub-stats" id="hubForecastStats"><span class="hub-loading">Cargando…</span></div>
+        <span class="hub-go">→</span>
       </div>
+
     </div>
   </main>
 </div>
@@ -4299,6 +4342,198 @@ document.getElementById('forecastTabs').addEventListener('click',e=>{
   renderForecast(document.getElementById('forecastContent'));
 });
 
+// ══ DATOS EN VIVO DEL HUB ═════════════════════════════════════════
+const st=(num,lbl,cls)=>`<div class="hub-st"><span class="hub-num ${cls||''}">${num}</span><span class="hub-lbl">${lbl}</span></div>`;
+const pct=v=>`${v>=0?'+':''}${v.toFixed(1)} %`;
+
+async function loadHubStats(){
+  const set=(id,html)=>{const el=document.getElementById(id);if(el)el.innerHTML=html;};
+  const fail=id=>set(id,'<span class="hub-empty">Sin datos</span>');
+
+  // ── Catering: servicios de hoy ──
+  (async()=>{
+    try{
+      const now=new Date();
+      const [orders,config]=await Promise.all([getOrders({from:startOfDay(now),to:endOfDay(now)}),getConfig()]);
+      const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
+      if(!active.length){set('hubCateringStats','<span class="hub-empty">Sin servicios hoy</span>');return;}
+      const pax=active.reduce((s,o)=>s+(o.pax||0),0);
+      const price=active.reduce((s,o)=>s+(o.priceTotal||0),0);
+      const withComment=active.filter(o=>o.userComment||o.internalComment).length;
+      const alerts=buildAlerts(orders,config).filter(a=>a.type==='red'||a.type==='purple');
+      set('hubCateringStats',
+        st(active.length,'servicios hoy')+
+        st(pax,'pax')+
+        st(fmtMoney(price),'facturado')+
+        (withComment?st(withComment,'con comentario','warn'):'')
+      );
+      const badge=document.getElementById('hubCateringBadge');
+      if(badge&&alerts.length){
+        badge.textContent=`${alerts.length} alerta${alerts.length>1?'s':''}`;
+        badge.classList.add('alert');
+        badge.hidden=false;
+      }
+    }catch(e){fail('hubCateringStats');}
+  })();
+
+  // ── Auditoría: última nota y tendencia ──
+  (async()=>{
+    try{
+      const snap=await getDocs(query(collection(db,'audits'),orderBy('createdAt','desc')));
+      const withScore=snap.docs.map(d=>d.data()).filter(a=>typeof a.score==='number');
+      if(!withScore.length){set('hubAuditStats','<span class="hub-empty">Sin auditorías</span>');return;}
+      const last=withScore[0],prev=withScore[1];
+      const cls=last.score>=8?'pos':last.score>=6?'warn':'neg';
+      let html=st(last.score.toFixed(1).replace('.',','),'última nota',cls);
+      if(prev){
+        const d=last.score-prev.score;
+        html+=st(`${d>=0?'↑':'↓'} ${Math.abs(d).toFixed(1).replace('.',',')}`,'tendencia',d>=0?'pos':'neg');
+      }
+      const nc=withScore[0].ncCount||0;
+      if(nc)html+=st(nc,'no conformidades','neg');
+      set('hubAuditStats',html);
+    }catch(e){fail('hubAuditStats');}
+  })();
+
+  // ── Cuenta de explotación: margen del mes y comparación ──
+  (async()=>{
+    try{
+      const now=new Date();
+      const [revSnap,staffSnap,costSnap,ettSnap,extrasSnap,orders]=await Promise.all([
+        getDoc(doc(db,'pnl_config','revenue')),
+        getDoc(doc(db,'staff_config','roster')),
+        getDoc(doc(db,'pnl_config','costs')),
+        getDoc(doc(db,'staff_config','ett')),
+        getDoc(doc(db,'pnl_config','extras')),
+        getOrders()
+      ]);
+      const rev=revSnap.exists()?(revSnap.data().rows||[]):[];
+      const staff=staffSnap.exists()?(staffSnap.data().staff||[]):[];
+      const costs=costSnap.exists()?costSnap.data():{mmppPct:35};
+      const ett=ettSnap.exists()?(ettSnap.data().list||[]):[];
+      const extras=extrasSnap.exists()?(extrasSnap.data().list||[]):[];
+      const cur=computePnl(orders,rev,staff,costs,startOfMonth(now),endOfMonth(now),ett,extras);
+      const prevM=new Date(now);prevM.setMonth(prevM.getMonth()-1);
+      const prev=computePnl(orders,rev,staff,costs,startOfMonth(prevM),endOfMonth(prevM),ett,extras);
+      if(!cur.revenue){set('hubPnlStats','<span class="hub-empty">Sin ingresos este mes</span>');return;}
+      const margin=cur.unitProfit/cur.revenue*100;
+      const prevMargin=prev.revenue?prev.unitProfit/prev.revenue*100:null;
+      let html=st(fmtMoney(cur.revenue),'ingresos mes')+
+        st(`${margin.toFixed(1).replace('.',',')} %`,'margen',margin>=0?'pos':'neg');
+      if(prevMargin!==null){
+        const d=margin-prevMargin;
+        html+=st(pct(d).replace('.',','),'vs mes ant.',d>=0?'pos':'neg');
+      }
+      set('hubPnlStats',html);
+    }catch(e){fail('hubPnlStats');}
+  })();
+
+  // ── Personal: plantilla, ausencias y próximo cumpleaños ──
+  (async()=>{
+    try{
+      const {staff,absences,costs,ettList}=await loadStaffData();
+      if(!staff.length){set('hubStaffStats','<span class="hub-empty">Sin plantilla</span>');return;}
+      const today=startOfDay(new Date());
+      const activeList=staff.filter(p=>(p.status||'activo')!=='inactivo');
+      const onLeave=staff.filter(p=>p.status==='baja').length;
+      const onVac=staff.filter(p=>p.status==='vacaciones').length;
+      const activeEtt=ettList.filter(e=>{
+        if(e.status==='inactivo')return false;
+        const s=new Date(e.start+'T12:00:00'),en=new Date(e.end+'T12:00:00');
+        return s<=today&&en>=today;
+      }).length;
+      // Próximo cumpleaños
+      let nearest=null;
+      activeList.forEach(p=>{
+        if(!p.birthDate)return;
+        const bd=new Date(p.birthDate+'T12:00:00');
+        if(isNaN(bd))return;
+        let next=new Date(today.getFullYear(),bd.getMonth(),bd.getDate());
+        if(next<today)next=new Date(today.getFullYear()+1,bd.getMonth(),bd.getDate());
+        const days=Math.round((next-today)/86400000);
+        if(!nearest||days<nearest.days)nearest={days,name:p.name};
+      });
+      let html=st(activeList.length,'en plantilla');
+      if(onLeave)html+=st(onLeave,onLeave>1?'bajas':'baja','warn');
+      if(onVac)html+=st(onVac,'vacaciones','warn');
+      if(activeEtt)html+=st(`+${activeEtt}`,'ETT hoy');
+      if(nearest)html+=st(nearest.days===0?'hoy':`${nearest.days} d`,'próx. cumpleaños',nearest.days<=7?'warn':'');
+      set('hubStaffStats',html);
+    }catch(e){fail('hubStaffStats');}
+  })();
+
+  // ── Facturación: pendiente de cobro y vencidas ──
+  (async()=>{
+    try{
+      const snap=await getDoc(doc(db,'pnl_config','extras'));
+      const extras=snap.exists()?(snap.data().list||[]):[];
+      if(!extras.length){set('hubBillingStats','<span class="hub-empty">Sin registros</span>');return;}
+      const todayStr=localISODate(new Date());
+      const pending=extras.filter(e=>(e.state||'Pendiente')!=='Cobrado');
+      const pendingAmount=pending.reduce((s,e)=>s+(e.amount||0),0);
+      const overdue=pending.filter(e=>e.dueDate&&e.dueDate<todayStr);
+      const total=extras.reduce((s,e)=>s+(e.amount||0),0);
+      let html=st(fmtMoney(total),'total extra');
+      if(pendingAmount)html+=st(fmtMoney(pendingAmount),'pendiente','warn');
+      if(overdue.length)html+=st(overdue.length,overdue.length>1?'vencidas':'vencida','neg');
+      set('hubBillingStats',html);
+    }catch(e){fail('hubBillingStats');}
+  })();
+
+  // ── Forecast: desviación del mes en curso ──
+  (async()=>{
+    try{
+      const now=new Date();
+      const monthKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      const [fcSnap,revSnap,extrasSnap,costSnap,orders]=await Promise.all([
+        getDoc(doc(db,'forecast_config',monthKey)),
+        getDoc(doc(db,'pnl_config','revenue')),
+        getDoc(doc(db,'pnl_config','extras')),
+        getDoc(doc(db,'pnl_config','costs')),
+        getOrders()
+      ]);
+      if(!fcSnap.exists()){set('hubForecastStats','<span class="hub-empty">Sin previsión este mes</span>');return;}
+      const fc=fcSnap.data();
+      const sales=fc.sales||{},salesMonthly=fc.salesMonthly||{},purchases=fc.purchases||{};
+      const costs=costSnap.exists()?costSnap.data():{mmppPct:35};
+      const rev=revSnap.exists()?(revSnap.data().rows||[]):[];
+      const extras=extrasSnap.exists()?(extrasSnap.data().list||[]):[];
+      const from=startOfMonth(now),to=endOfMonth(now);
+      // Previsión total del mes
+      let fcTotal=(salesMonthly.catering||0)+(salesMonthly.cafeteria||0);
+      Object.entries(sales).forEach(([d,v])=>{
+        const dd=new Date(d+'T12:00:00');
+        if(dd>=from&&dd<=to)fcTotal+=(v.comedor||0)+(v.extra||0);
+      });
+      // Real del mes
+      let realTotal=0;
+      orders.filter(o=>o.orderStatus!=='CANCELADO').forEach(o=>{
+        const d=toDate(o.deliveryAt);
+        if(d&&d>=from&&d<=to)realTotal+=o.priceTotal||0;
+      });
+      rev.forEach(r=>{const d=new Date(r.date+'T12:00:00');if(d>=from&&d<=to)realTotal+=r.billed||0;});
+      extras.forEach(e=>{const d=new Date(e.date+'T12:00:00');if(d>=from&&d<=to)realTotal+=e.amount||0;});
+      let html='';
+      if(fcTotal>0){
+        const dev=(realTotal-fcTotal)/fcTotal*100;
+        html+=st(pct(dev).replace('.',','),'vs previsión',dev>=0?'pos':'neg');
+      }
+      // % de compras sobre venta real
+      let purchTotal=0;
+      Object.entries(purchases).forEach(([d,v])=>{
+        const dd=new Date(d+'T12:00:00');
+        if(dd>=from&&dd<=to)purchTotal+=v||0;
+      });
+      if(purchTotal>0&&realTotal>0){
+        const p=purchTotal/realTotal*100;
+        const target=costs.mmppPct!==undefined?costs.mmppPct:35;
+        html+=st(`${p.toFixed(1).replace('.',',')} %`,'compras',p<=target?'pos':'neg');
+      }
+      set('hubForecastStats',html||'<span class="hub-empty">Previsión sin importes</span>');
+    }catch(e){fail('hubForecastStats');}
+  })();
+}
+
 // ══ NAVEGACIÓN DEL HUB ════════════════════════════════════════════
 const hubScreen=document.getElementById('hubScreen');
 const auditScreen=document.getElementById('auditScreen');
@@ -4308,6 +4543,7 @@ const billingScreen=document.getElementById('billingScreen');
 const forecastScreen=document.getElementById('forecastScreen');
 
 function showScreen(name){
+  if(name==='hub')setTimeout(loadHubStats,50);
   hubScreen.hidden=name!=='hub';
   auditScreen.hidden=name!=='audit';
   staffScreen.hidden=name!=='staff';
@@ -4422,7 +4658,11 @@ onAuthStateChanged(auth, user=>{
   if(user){
     loginScreen.hidden=true;
     hubScreen.hidden=false;
-    document.getElementById('hubDate').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const dLbl=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    document.getElementById('hubDate').textContent=dLbl;
+    const sub=document.getElementById('hubSubtitle');
+    if(sub)sub.textContent=dLbl.charAt(0).toUpperCase()+dLbl.slice(1);
+    ensureConfigSeeded().then(loadHubStats).catch(loadHubStats);
   } else {
     loginScreen.hidden=false;
     hubScreen.hidden=true;
