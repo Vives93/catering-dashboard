@@ -40,10 +40,14 @@
 .dark .hub-card[data-module="staff"]{--accent:#D9BBF5;--accent-bg:#241A30}
 .dark .hub-card[data-module="billing"]{--accent:#F5A5A5;--accent-bg:#220E0E}
 .dark .hub-card[data-module="forecast"]{--accent:#6DBF95;--accent-bg:#0E2018}
+.dark .hub-card[data-module="looker"]{--accent:#AFA9EC;--accent-bg:#241A30}
 .dark .hub-card:hover:not(.disabled) .hub-icon{color:#141412}
 .dark .pnl-fc{color:#6DBF95}
 .dark .pnl-row.header .pnl-fc{color:#6DBF95}
 .module-header{text-align:center;padding:6px 0 18px}
+.events-banner{background:var(--alert-amber-bg);border:1px solid var(--alert-amber-border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:14px}
+.events-banner-title{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--alert-amber-fg);margin-bottom:6px}
+.events-banner-item{font-size:12px;color:var(--alert-amber-fg);line-height:1.5;padding:2px 0}
 .module-title{font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--text-primary);margin:0 0 4px}
 .module-sub{font-size:13px;color:var(--text-secondary);margin:0}
 .cumulative-controls{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;justify-content:center}
@@ -144,7 +148,7 @@
 .fc-monthly-real{font-size:12px;color:var(--text-secondary)}
 .btn-back{background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:5px 12px;cursor:pointer;font-size:12.5px;font-family:var(--font-sans);color:var(--text-secondary);transition:all .15s}
 .btn-back:hover{border-color:var(--text-primary);color:var(--text-primary)}
-.hub-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:900px;margin:0 auto}
+.hub-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .hub-card{position:relative;border-radius:12px;padding:15px 17px;cursor:pointer;overflow:hidden;border:1px solid var(--border-soft);background:var(--bg-card);transition:transform .18s cubic-bezier(.2,.8,.3,1),border-color .18s,box-shadow .18s}
 .hub-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)}
 .hub-card:hover:not(.disabled){transform:translateY(-3px);border-color:var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.07)}
@@ -170,7 +174,7 @@
 .hub-loading{font-size:11.5px;color:var(--text-tertiary)}
 .hub-empty{font-size:11.5px;color:var(--text-tertiary)}
 .hub-go{position:absolute;right:15px;bottom:12px;font-size:16px;color:var(--accent);opacity:0;transform:translateX(-5px);transition:all .18s}
-@media(max-width:900px){
+@media(max-width:980px){
   .hub-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .hub-wide{grid-column:span 2}
 }
@@ -496,6 +500,22 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
         <span class="hub-go">→</span>
       </div>
 
+      <div class="hub-card" data-module="looker" style="--accent:#534AB7;--accent-bg:#EEEDFE">
+        <div class="hub-top">
+          <div class="hub-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
+          </div>
+          <div class="hub-head">
+            <div class="hub-name">Looker</div>
+            <p class="hub-desc">Informe externo</p>
+          </div>
+        </div>
+        <div class="hub-stats">
+          <span class="hub-empty">Se abre en una pestaña nueva</span>
+        </div>
+        <span class="hub-go">↗</span>
+      </div>
+
     </div>
   </main>
 </div>
@@ -588,6 +608,10 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
       <button class="btn-back" id="btnBackFromPnl">← Hub</button>
       <span class="logo">Cuenta de explotación</span>
     </div>
+    <nav class="tabs" id="pnlTabs">
+      <button class="tab active" data-pnl-view="pnl">Cuenta</button>
+      <button class="tab" data-pnl-view="events">Acontecimientos</button>
+    </nav>
     <div class="topbar-actions">
       <button class="btn-action" id="btnImportComedor">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1533,7 +1557,10 @@ async function renderCumulative(container){
   active.forEach(o=>{
     if(isTestAccount(o))return;
     const c=o.customerName||'Sin nombre';
-    if(!byCustomer[c])byCustomer[c]={count:0,pax:0,price:0};byCustomer[c].count++;byCustomer[c].pax+=o.pax||0;byCustomer[c].price+=o.priceTotal||0;
+    if(!byCustomer[c])byCustomer[c]={count:0,pax:0,price:0,lastDate:null};
+    byCustomer[c].count++;byCustomer[c].pax+=o.pax||0;byCustomer[c].price+=o.priceTotal||0;
+    const d=toDate(o.deliveryAt);
+    if(d&&(!byCustomer[c].lastDate||d>byCustomer[c].lastDate))byCustomer[c].lastDate=d;
   });
 
   // Top salas
@@ -1583,7 +1610,20 @@ async function renderCumulative(container){
     const displayLabel=t==='Otros'?'Otros (sin tipo especificado en el CSV)':t;
     return`<div class="bar-row"><span class="bar-label" title="${escapeHtml(displayLabel)}">${escapeHtml(displayLabel)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxTP*100).toFixed(0)}%"></div></div><span class="bar-val" title="${v.pax} pax en total">${v.count} ped.</span></div>`;
   }).join('');
-  const custRows=Object.entries(byCustomer).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>`<div class="bar-row"><span class="bar-label" title="${escapeHtml(c)}">${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCustP*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped. · ${fmtMoney(v.price)}</span></div>`).join('');
+  const daysAgo=d=>{
+    if(!d)return'';
+    const n=Math.round((startOfDay(new Date())-startOfDay(d))/86400000);
+    if(n===0)return'hoy';
+    if(n===1)return'ayer';
+    if(n<0)return`en ${Math.abs(n)} d`;
+    if(n<30)return`hace ${n} d`;
+    if(n<365)return`hace ${Math.round(n/30)} m`;
+    return`hace ${Math.round(n/365)} a`;
+  };
+  const custRows=Object.entries(byCustomer).sort((a,b)=>b[1].price-a[1].price).slice(0,10).map(([c,v])=>{
+    const last=v.lastDate?`${v.lastDate.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'})} · ${daysAgo(v.lastDate)}`:'—';
+    return`<div class="bar-row"><span class="bar-label" title="${escapeHtml(c)}">${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.price/maxCustP*100).toFixed(0)}%"></div></div><span class="bar-val" style="width:auto;min-width:120px">${v.count} ped. · ${fmtMoney(v.price)}<br><span style="font-size:10px;color:var(--text-tertiary)">últ. ${last}</span></span></div>`;
+  }).join('');
   const roomRows=Object.entries(byRoomStat).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([r,v])=>`<div class="bar-row"><span class="bar-label" title="${escapeHtml(r)}">${escapeHtml(r)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxRoomC*100).toFixed(0)}%"></div></div><span class="bar-val">${v.count} ped.</span></div>`).join('');
   const totalHourOrders=byHour.reduce((s,v)=>s+v.count,0)+noHourCount;
   const maxCombined=Math.max(maxHourC,maxHourPickupC,1);
@@ -3618,6 +3658,144 @@ function parseRevenueCSV(text,channel){
 }
 
 
+// ══ ACONTECIMIENTOS ═══════════════════════════════════════════════
+// Sucesos que explican desviaciones en los datos (ERE, cierres, cambios de contrato…)
+const EVENT_TYPES=[
+  {k:'organizativo',lbl:'Organizativo',icon:'🏢',hint:'ERE, reestructuración, cambio de plantilla'},
+  {k:'comercial',lbl:'Comercial',icon:'📊',hint:'Cambio de tarifas, nuevo contrato, pérdida de cliente'},
+  {k:'cierre',lbl:'Cierre / festivo',icon:'🚪',hint:'Cierre del centro, festivos adicionales'},
+  {k:'obra',lbl:'Obra / incidencia',icon:'🔧',hint:'Reformas, averías, cierre parcial de instalaciones'},
+  {k:'otro',lbl:'Otro',icon:'📌',hint:''},
+];
+function evType(k){return EVENT_TYPES.find(t=>t.k===k)||EVENT_TYPES[4];}
+
+async function loadEvents(){
+  const snap=await getDoc(doc(db,'pnl_config','events'));
+  return snap.exists()?(snap.data().list||[]):[];
+}
+// Acontecimientos que solapan con un rango de fechas
+function eventsInRange(events,from,to){
+  if(!from||!to)return events;
+  return events.filter(e=>{
+    const s=new Date(e.start+'T12:00:00');
+    const en=new Date((e.end||e.start)+'T12:00:00');
+    return s<=to&&en>=from;
+  });
+}
+function eventsBanner(events,from,to){
+  const rel=eventsInRange(events,from,to);
+  if(!rel.length)return'';
+  return`<div class="events-banner">
+    <span class="events-banner-title">Acontecimientos en este período</span>
+    ${rel.map(e=>{
+      const t=evType(e.type);
+      const s=new Date(e.start+'T12:00:00');
+      const en=e.end&&e.end!==e.start?new Date(e.end+'T12:00:00'):null;
+      const range=en?`${s.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'})} – ${en.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'})}`:s.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'});
+      return`<div class="events-banner-item">${t.icon} <strong>${escapeHtml(e.title)}</strong> · ${range}${e.notes?` — ${escapeHtml(e.notes)}`:''}</div>`;
+    }).join('')}
+  </div>`;
+}
+
+async function renderEvents(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando acontecimientos…</span></div>`;
+  try{
+    const events=await loadEvents();
+    const today=startOfDay(new Date());
+    const sorted=events.slice().sort((a,b)=>b.start.localeCompare(a.start));
+    const current=sorted.filter(e=>{
+      const s=new Date(e.start+'T12:00:00'),en=new Date((e.end||e.start)+'T12:00:00');
+      return s<=today&&en>=today;
+    });
+
+    const rows=sorted.map((e,i)=>{
+      const t=evType(e.type);
+      const s=new Date(e.start+'T12:00:00');
+      const en=e.end&&e.end!==e.start?new Date(e.end+'T12:00:00'):null;
+      const isNow=s<=today&&(en||s)>=today;
+      const isPast=(en||s)<today;
+      return`<div class="order-card ${isPast?'staff-inactive':''}">
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${t.icon} ${escapeHtml(e.title)}</span>
+            <span class="order-loc">${s.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}${en?` – ${en.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}`:''}</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill pill-other">${t.lbl}</span>
+            ${isNow?'<span class="pill pill-pax-amber">En curso</span>':''}
+            <button class="btn-del-staff" data-del-event="${i}" title="Eliminar">✕</button>
+          </div>
+        </div>
+        ${e.notes?`<div class="comment-internal" style="font-style:normal">${escapeHtml(e.notes)}</div>`:''}
+      </div>`;
+    }).join('');
+
+    container.innerHTML=moduleHeader('Acontecimientos','Sucesos que explican variaciones en los datos')+`
+    ${current.length?renderAlerts(current.map(e=>({type:'amber',msg:`${evType(e.type).icon} En curso: ${e.title}`}))):''}
+    <div class="audit-section">
+      <h3>Registrar acontecimiento</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Estos registros aparecen como contexto en la Cuenta de explotación y en Forecast cuando el período seleccionado los incluye, para que sepas por qué las cifras cambiaron.</p>
+      <div class="form-grid">
+        <div class="form-group form-group-full"><label>Título *</label><input type="text" id="evTitle" placeholder="Ej. ERE — reducción de plantilla"></div>
+        <div class="form-group"><label>Tipo</label><select id="evType">${EVENT_TYPES.map(t=>`<option value="${t.k}">${t.icon} ${t.lbl}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Desde *</label><input type="date" id="evStart" value="${localISODate(new Date())}"></div>
+        <div class="form-group"><label>Hasta <span style="font-weight:400;color:var(--text-tertiary);font-size:10.5px">(vacío = un solo día)</span></label><input type="date" id="evEnd"></div>
+        <div class="form-group form-group-full"><label>Notas</label><textarea id="evNotes" rows="2" placeholder="Detalle e impacto esperado…"></textarea></div>
+      </div>
+      <button class="btn-primary" id="btnSaveEvent" style="max-width:220px">Guardar</button>
+      <p id="evMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-tertiary);margin-bottom:14px;line-height:1.6">
+      ${EVENT_TYPES.filter(t=>t.hint).map(t=>`<div>${t.icon} <strong>${t.lbl}:</strong> ${t.hint}</div>`).join('')}
+    </div>
+    ${events.length?`<p class="section-label">Registrados</p><div class="orders">${rows}</div>`:'<div class="empty-state"><p>Aún no hay acontecimientos registrados</p></div>'}`;
+
+    const btn=container.querySelector('#btnSaveEvent');
+    if(btn)btn.addEventListener('click',async()=>{
+      const msg=container.querySelector('#evMsg');
+      const title=container.querySelector('#evTitle').value.trim();
+      const start=container.querySelector('#evStart').value;
+      const end=container.querySelector('#evEnd').value||start;
+      if(!title||!start){msg.textContent='Indica al menos título y fecha de inicio';msg.style.color='var(--alert-red-fg)';return;}
+      if(end<start){msg.textContent='La fecha final no puede ser anterior a la inicial';msg.style.color='var(--alert-red-fg)';return;}
+      btn.disabled=true;btn.textContent='Guardando…';
+      try{
+        await setDoc(doc(db,'pnl_config','events'),{list:[...events,{
+          title,type:container.querySelector('#evType').value,start,end,
+          notes:container.querySelector('#evNotes').value.trim()
+        }],updatedAt:Timestamp.now()});
+        renderEvents(container);
+      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
+      btn.disabled=false;btn.textContent='Guardar';
+    });
+    container.querySelectorAll('[data-del-event]').forEach(b=>{
+      b.addEventListener('click',async()=>{
+        const target=sorted[+b.dataset.delEvent];
+        if(!confirm(`¿Eliminar "${target.title}"?`))return;
+        const updated=events.filter(e=>!(e.title===target.title&&e.start===target.start&&e.type===target.type));
+        await setDoc(doc(db,'pnl_config','events'),{list:updated,updatedAt:Timestamp.now()});
+        renderEvents(container);
+      });
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+let currentPnlView='pnl';
+function renderPnlModule(container){
+  if(currentPnlView==='events')renderEvents(container);
+  else renderPnl(container);
+}
+document.getElementById('pnlTabs').addEventListener('click',e=>{
+  const tab=e.target.closest('.tab');
+  if(!tab)return;
+  document.querySelectorAll('#pnlTabs .tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  currentPnlView=tab.dataset.pnlView;
+  renderPnlModule(document.getElementById('pnlContent'));
+});
+
 // ══ CUENTA DE EXPLOTACIÓN (P&L) ═══════════════════════════════════
 let pnlRange={type:'month',refDate:new Date(),from:null,to:null,compare:true,compareType:'month',compareRefDate:(()=>{const d=new Date();d.setMonth(d.getMonth()-1);return d;})(),compareFrom:null,compareTo:null};
 
@@ -3703,6 +3881,7 @@ async function renderPnl(container){
     const costs=costSnap.exists()?costSnap.data():{mmppPct:35,iuoPct:0,iuoMonthly:0};
     const ettList=ettSnapP.exists()?(ettSnapP.data().list||[]):[];
     const extras=extrasSnapP.exists()?(extrasSnapP.data().list||[]):[];
+    const pnlEvents=await loadEvents();
 
     const r=pnlRange;
     let from=r.from,to=r.to;
@@ -3827,7 +4006,7 @@ async function renderPnl(container){
       <h1 class="module-title">Cuenta de explotación</h1>
       <p class="module-sub">${periodLabel}${cmp?` · comparado con ${cLabel}`:''}</p>
     </div>
-    `+controls+`
+    `+controls+eventsBanner(pnlEvents,from,to)+`
     <div class="pnl-table">
       ${header}
       <div class="pnl-section-head">Ingresos</div>
@@ -3972,12 +4151,13 @@ let fcRefDate=new Date();
 
 async function loadForecastData(){
   const monthKey=`${fcRefDate.getFullYear()}-${String(fcRefDate.getMonth()+1).padStart(2,'0')}`;
-  const [fcSnap,revSnap,extrasSnap,costSnap,cateringOrders]=await Promise.all([
+  const [fcSnap,revSnap,extrasSnap,costSnap,cateringOrders,events]=await Promise.all([
     getDoc(doc(db,'forecast_config',monthKey)),
     getDoc(doc(db,'pnl_config','revenue')),
     getDoc(doc(db,'pnl_config','extras')),
     getDoc(doc(db,'pnl_config','costs')),
-    getOrders()
+    getOrders(),
+    loadEvents()
   ]);
   return{
     monthKey,
@@ -3985,7 +4165,8 @@ async function loadForecastData(){
     revenueRows:revSnap.exists()?(revSnap.data().rows||[]):[],
     extras:extrasSnap.exists()?(extrasSnap.data().list||[]):[],
     costs:costSnap.exists()?costSnap.data():{mmppPct:35},
-    cateringOrders
+    cateringOrders,
+    events
   };
 }
 
@@ -4008,11 +4189,14 @@ function devBadge(real,fcast){
   return`<span style="color:${cls};font-family:var(--font-mono);font-size:11px">${pct>=0?'+':''}${pct.toFixed(0)}%</span>`;
 }
 
-function fcNav(label,title){
+function fcNav(label,title,events){
+  const from=startOfMonth(fcRefDate),to=endOfMonth(fcRefDate);
+  const banner=events?eventsBanner(events,from,to):'';
   return`<div class="module-header">
     <h1 class="module-title">Forecast · ${title||''}</h1>
     <p class="module-sub">${label}</p>
   </div>
+  ${banner}
   <div class="cumulative-controls">
     <div class="date-nav" style="margin:0">
       <button class="date-nav-btn" id="fcPrev">◀</button>
@@ -4032,7 +4216,7 @@ function bindFcNav(container){
 async function renderFcSales(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando previsión…</span></div>`;
   try{
-    const {monthKey,fc,revenueRows,extras,cateringOrders}=await loadForecastData();
+    const {monthKey,fc,revenueRows,extras,cateringOrders,events}=await loadForecastData();
     const sales=fc.sales||{};              // previsión diaria: comedor y extra
     const salesMonthly=fc.salesMonthly||{}; // previsión mensual: catering y cafetería
     const days=monthDays(fcRefDate);
@@ -4091,7 +4275,7 @@ async function renderFcSales(container){
       </div>`;
     }).join('');
 
-    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Ventas')+`
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Ventas',events)+`
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Previsión total del mes</div><div class="kpi-value">${fmtMoney(totalFc)}</div><div class="kpi-sub">mensual + diaria</div></div>
       <div class="kpi-card"><div class="kpi-label">Real acumulado</div><div class="kpi-value">${fmtMoney(totalReal)}</div></div>
@@ -4154,7 +4338,7 @@ async function renderFcSales(container){
 async function renderFcPurchases(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando compras…</span></div>`;
   try{
-    const {monthKey,fc,costs}=await loadForecastData();
+    const {monthKey,fc,costs,events}=await loadForecastData();
     const sales=fc.sales||{};
     const salesMonthly=fc.salesMonthly||{};
     const purchases=fc.purchases||{};
@@ -4194,7 +4378,7 @@ async function renderFcPurchases(container){
       return totalSalesFc?(accReal/totalSalesFc*100):0;
     })();
 
-    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Compras')+`
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Compras',events)+`
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Objetivo del mes</div><div class="kpi-value">${fmtMoney(accTarget)}</div><div class="kpi-sub">${targetPct}% de la venta prevista</div></div>
       <div class="kpi-card"><div class="kpi-label">Gasto real</div><div class="kpi-value">${fmtMoney(accReal)}</div></div>
@@ -4235,7 +4419,7 @@ async function renderFcPurchases(container){
 async function renderFcOccupancy(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando ocupación…</span></div>`;
   try{
-    const {monthKey,fc,revenueRows,cateringOrders}=await loadForecastData();
+    const {monthKey,fc,revenueRows,cateringOrders,events}=await loadForecastData();
     const occ=fc.occupancy||{};
     const days=monthDays(fcRefDate);
 
@@ -4279,7 +4463,7 @@ async function renderFcOccupancy(container){
     const devCampus=accCampusFc?((accCampusReal-accCampusFc)/accCampusFc*100):0;
     const devCant=accCantFc?((accCantReal-accCantFc)/accCantFc*100):0;
 
-    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Ocupación')+`
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Ocupación',events)+`
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Campus · previsión</div><div class="kpi-value">${accCampusFc}</div><div class="kpi-sub">real: ${accCampusReal}</div></div>
       <div class="kpi-card"><div class="kpi-label">Campus · desviación</div><div class="kpi-value" style="color:${devCampus>=0?'var(--ok-fg)':'var(--alert-red-fg)'}">${accCampusFc?`${devCampus>=0?'+':''}${devCampus.toFixed(1)}%`:'—'}</div></div>
@@ -4568,13 +4752,15 @@ document.querySelectorAll('.hub-card').forEach(card=>{
       renderStaff(document.getElementById('staffContent'));
     } else if(mod==='pnl'){
       showScreen('pnl');
-      renderPnl(document.getElementById('pnlContent'));
+      renderPnlModule(document.getElementById('pnlContent'));
     } else if(mod==='billing'){
       showScreen('billing');
       renderExtras(document.getElementById('billingContent'));
     } else if(mod==='forecast'){
       showScreen('forecast');
       renderForecast(document.getElementById('forecastContent'));
+    } else if(mod==='looker'){
+      window.open('https://datastudio.google.com/reporting/75345ca9-22a2-44f2-b4f7-a66817585617/page/p_x0hwoqfz5d','_blank','noopener');
     }
   });
 });
