@@ -41,10 +41,13 @@
 .dark .hub-card[data-module="billing"]{--accent:#F5A5A5;--accent-bg:#220E0E}
 .dark .hub-card[data-module="forecast"]{--accent:#6DBF95;--accent-bg:#0E2018}
 .dark .hub-card[data-module="looker"]{--accent:#AFA9EC;--accent-bg:#241A30}
+.dark .hub-card[data-module="minutes"]{--accent:#FAC97A;--accent-bg:#2A1F0E}
 .dark .hub-card:hover:not(.disabled) .hub-icon{color:#141412}
 .dark .pnl-fc{color:#6DBF95}
 .dark .pnl-row.header .pnl-fc{color:#6DBF95}
 .module-header{text-align:center;padding:6px 0 18px}
+.data-freshness{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text-tertiary);padding:8px 14px;background:var(--bg);border-radius:var(--radius-md);margin-bottom:12px;justify-content:center}
+.data-freshness strong{color:var(--text-secondary);font-weight:500}
 .events-banner{background:var(--alert-amber-bg);border:1px solid var(--alert-amber-border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:14px}
 .events-banner-title{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--alert-amber-fg);margin-bottom:6px}
 .events-banner-item{font-size:12px;color:var(--alert-amber-fg);line-height:1.5;padding:2px 0}
@@ -139,6 +142,7 @@
 .vac-total{font-family:var(--font-mono);font-weight:600;color:var(--text-primary)}
 .vac-sep{color:var(--text-tertiary);margin:0 2px}
 .vac-used{color:var(--text-secondary);font-family:var(--font-mono)}
+.vac-prorated{font-size:10px;padding:1px 6px;border-radius:10px;background:var(--break-bg);color:var(--break-fg);font-weight:500}
 .vac-remaining{font-family:var(--font-mono);font-weight:600;color:var(--ok-fg);margin-left:auto}
 .vac-remaining.low{color:var(--alert-amber-fg)}
 .vac-remaining.neg{color:var(--alert-red-fg)}
@@ -148,7 +152,20 @@
 .fc-monthly-real{font-size:12px;color:var(--text-secondary)}
 .btn-back{background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:5px 12px;cursor:pointer;font-size:12.5px;font-family:var(--font-sans);color:var(--text-secondary);transition:all .15s}
 .btn-back:hover{border-color:var(--text-primary);color:var(--text-primary)}
-.hub-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#hubScreen{position:relative;min-height:100vh;overflow:hidden}
+.hub-bg{position:absolute;inset:52px 0 0 0;z-index:0;display:flex;flex-direction:column;justify-content:space-around;pointer-events:none;user-select:none;overflow:hidden}
+.hub-tape{white-space:nowrap;font-size:clamp(28px,5vw,52px);font-weight:700;letter-spacing:.05em;color:var(--text-primary);opacity:.045;text-transform:uppercase;line-height:1.1}
+.hub-tape span{padding-right:56px}
+.hub-tape.t1{animation:hubSlideL 46s linear infinite}
+.hub-tape.t2{animation:hubSlideR 58s linear infinite}
+.hub-tape.t3{animation:hubSlideL 38s linear infinite}
+.hub-tape.t4{animation:hubSlideR 52s linear infinite}
+@keyframes hubSlideL{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes hubSlideR{from{transform:translateX(-50%)}to{transform:translateX(0)}}
+.dark .hub-tape{opacity:.06}
+.hub-main{position:relative;z-index:1}
+@media(prefers-reduced-motion:reduce){.hub-tape{animation:none!important}}
+.hub-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:1000px;margin:0 auto}
 .hub-card{position:relative;border-radius:12px;padding:15px 17px;cursor:pointer;overflow:hidden;border:1px solid var(--border-soft);background:var(--bg-card);transition:transform .18s cubic-bezier(.2,.8,.3,1),border-color .18s,box-shadow .18s}
 .hub-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)}
 .hub-card:hover:not(.disabled){transform:translateY(-3px);border-color:var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.07)}
@@ -407,8 +424,13 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
       <button class="btn-logout" id="btnLogoutHub">Cerrar sesión</button>
     </div>
   </header>
-  <main class="main">
-  <main class="main">
+  <div class="hub-bg" aria-hidden="true">
+    <div class="hub-tape t1"><span>Deliver WOW · Move Fast · Be Real, Be Good · Own It · We Are All Chefs · </span><span>Deliver WOW · Move Fast · Be Real, Be Good · Own It · We Are All Chefs · </span></div>
+    <div class="hub-tape t2"><span>We Are All Chefs · Own It · Be Real, Be Good · Move Fast · Deliver WOW · </span><span>We Are All Chefs · Own It · Be Real, Be Good · Move Fast · Deliver WOW · </span></div>
+    <div class="hub-tape t3"><span>Own It · Deliver WOW · We Are All Chefs · Move Fast · Be Real, Be Good · </span><span>Own It · Deliver WOW · We Are All Chefs · Move Fast · Be Real, Be Good · </span></div>
+    <div class="hub-tape t4"><span>Move Fast · Be Real, Be Good · Deliver WOW · We Are All Chefs · Own It · </span><span>Move Fast · Be Real, Be Good · Deliver WOW · We Are All Chefs · Own It · </span></div>
+  </div>
+  <main class="main hub-main">
     <div class="module-header">
       <h1 class="module-title">Gestión operativa</h1>
       <p class="module-sub" id="hubSubtitle"></p>
@@ -500,6 +522,20 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
         <span class="hub-go">→</span>
       </div>
 
+      <div class="hub-card" data-module="minutes" style="--accent:#8B6020;--accent-bg:#FAEEDA">
+        <div class="hub-top">
+          <div class="hub-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+          </div>
+          <div class="hub-head">
+            <div class="hub-name">Actas</div>
+            <p class="hub-desc">Reuniones y acuerdos</p>
+          </div>
+        </div>
+        <div class="hub-stats" id="hubMinutesStats"><span class="hub-loading">Cargando…</span></div>
+        <span class="hub-go">→</span>
+      </div>
+
       <div class="hub-card" data-module="looker" style="--accent:#534AB7;--accent-bg:#EEEDFE">
         <div class="hub-top">
           <div class="hub-icon">
@@ -567,6 +603,25 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 </div>
 
 <!-- ══ MÓDULO CUENTA DE EXPLOTACIÓN ══ -->
+<!-- ══ MÓDULO ACTAS ══ -->
+<div id="minutesScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromMinutes">← Hub</button>
+      <span class="logo">Actas</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-action" id="btnNewMinute">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nueva acta
+      </button>
+      <button class="btn-theme" id="btnThemeMinutes" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutMinutes">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main" id="minutesContent"></main>
+</div>
+
 <!-- ══ MÓDULO FORECAST ══ -->
 <div id="forecastScreen" hidden>
   <header class="topbar">
@@ -2593,6 +2648,24 @@ const ABSENCE_TYPES=[
   {k:'ausencia',lbl:'Otra ausencia',icon:'📋'},
 ];
 function absType(k){return ABSENCE_TYPES.find(t=>t.k===k)||ABSENCE_TYPES[4];}
+// Devengo de vacaciones: 2,5 días por mes trabajado (30 días al año), prorrateado por días
+const VACATION_PER_MONTH=2.5;
+function accruedVacation(p,refDate){
+  // Si se ha fijado el devengo a mano, manda ese valor
+  if(p.accruedOverride!==undefined&&p.accruedOverride!==null&&p.accruedOverride!=='')return +p.accruedOverride;
+  const ref=refDate||new Date();
+  const annual=p.vacationDays!==undefined?p.vacationDays:30;
+  if(!p.contractDate)return annual;
+  const hire=new Date(p.contractDate+'T12:00:00');
+  if(isNaN(hire))return annual;
+  const yearStart=new Date(ref.getFullYear(),0,1);
+  if(hire<=yearStart)return annual; // contratado antes de este año: total anual
+  // Contratado durante el año: prorrateo por días trabajados
+  const daysWorked=Math.max(0,Math.round((ref-hire)/86400000));
+  const monthsWorked=daysWorked/30.4375;
+  const perMonth=annual/12; // respeta el total anual configurado por persona
+  return Math.round(Math.min(annual,monthsWorked*perMonth)*100)/100;
+}
 // Días laborables (lun-vie) entre dos fechas, para descontar vacaciones
 function workDaysBetween(startStr,endStr){
   const s=new Date(startStr+'T12:00:00'),e=new Date(endStr+'T12:00:00');
@@ -2614,7 +2687,7 @@ const STAFF_SEED=[
   {name:'Adrianna DeLorenzo',cardNumber:'46840',position:'Barista',jornadaType:'Media jornada',level:3,dni:'Y6470461T',contractType:'Indefinido',contractedHours:25,contractDate:'2025-11-18',monthlySalary:0,birthDate:'2000-07-20',status:'activo',weeklyHours:25,vacationDays:30,extraHolidays:0,note:''},
   {name:'Carolina Ávalos Domínguez',cardNumber:'45866',position:'Marmitona',jornadaType:'Completa',level:5,dni:'Z0479143N',contractType:'Indefinido',contractedHours:40,contractDate:'2024-11-19',monthlySalary:0,birthDate:'1982-10-08',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Nivel V: pendiente de indicar salario, no figura en la tabla del convenio'},
   {name:'Cinthia Valeria Rotela Ruiz',cardNumber:'45937',position:'Ayudante de camarero',jornadaType:'Completa',level:4,dni:'Y2125429J',contractType:'Indefinido',contractedHours:40,contractDate:'2025-02-24',monthlySalary:0,birthDate:'1994-12-22',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
-  {name:'Alejandro Gardó Moreno',cardNumber:'',position:'',jornadaType:'Completa',level:4,dni:'47325099T',contractType:'Indefinido',contractedHours:40,contractDate:'',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Pendiente: puesto y fecha de alta'},
+  {name:'Alejandro Gardó Moreno',cardNumber:'',position:'',jornadaType:'Completa',level:4,dni:'47325099T',contractType:'Indefinido',contractedHours:40,contractDate:'2026-02-15',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,accruedOverride:16.25,note:'Devengo fijado a mano: 16,25 días. Pendiente: puesto'},
 ];
 
 async function loadStaffData(){
@@ -2706,11 +2779,13 @@ async function renderStaffRoster(container){
       const myEtt=activeEtt.filter(e=>e.covers===p.name);
       const statusPill={activo:'pill-ok',baja:'pill-cancel',vacaciones:'pill-break',inactivo:'pill-other'}[status];
       const statusLbl={activo:'Activo',baja:'De baja',vacaciones:'Vacaciones',inactivo:'Desactivado'}[status];
-      const base=p.vacationDays!==undefined?p.vacationDays:30;
+      const annual=p.vacationDays!==undefined?p.vacationDays:30;
+      const accrued=accruedVacation(p,today);
+      const isProrated=accrued<annual;
       const extra=p.extraHolidays||0;
-      const totalBalance=base+extra;
+      const totalBalance=accrued+extra;
       const usedVac=myAbs.filter(a=>a.type==='vacaciones').reduce((s,a)=>s+workDaysBetween(a.start,a.end),0);
-      const remaining=totalBalance-usedVac;
+      const remaining=Math.round((totalBalance-usedVac)*100)/100;
       const bdLabel=p.birthDate?new Date(p.birthDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}):'';
       const histHtml=myAbs.length?`<div class="staff-hist">
         ${myAbs.map(a=>{
@@ -2751,10 +2826,12 @@ async function renderStaffRoster(container){
         </div>
         ${status!=='inactivo'?`<div class="vac-bar">
           <span class="vac-lbl">Vacaciones:</span>
-          <span class="vac-total">${totalBalance} días</span>
+          <span class="vac-total">${totalBalance.toString().replace('.',',')} días</span>
+          ${isProrated?`<span class="vac-prorated" title="Devengado a razón de ${(annual/12).toFixed(2).replace('.',',')} días por mes trabajado">devengado${p.accruedOverride!==undefined?' (fijado)':''}</span>`:''}
+          ${extra?`<span class="vac-sep">·</span><span class="vac-used">incl. ${extra} festivos</span>`:''}
           <span class="vac-sep">·</span>
           <span class="vac-used">Usados: ${usedVac}</span>
-          <span class="vac-remaining ${remaining<0?'neg':remaining<=5?'low':''}">Restan: ${remaining}</span>
+          <span class="vac-remaining ${remaining<0?'neg':remaining<=5?'low':''}">Restan: ${remaining.toString().replace('.',',')}</span>
         </div>`:''}
         ${p.note?`<div class="comment-internal">📝 ${escapeHtml(p.note)}</div>`:''}
         ${myEtt.map(e=>`<div class="comment-internal" style="font-style:normal">🔄 Cubierto por ETT: ${escapeHtml(e.ettName||'sin nombre')} · hasta ${new Date(e.end+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</div>`).join('')}
@@ -2876,6 +2953,7 @@ function openPersonModal(idx,staff,container){
         </select></div>
         <div class="form-group"><label>Días de vacaciones anuales</label><input type="number" id="pVac" value="${p.vacationDays!==undefined?p.vacationDays:30}" min="0" max="60"></div>
         <div class="form-group"><label>Festivos no disfrutados</label><input type="number" id="pExtra" value="${p.extraHolidays||0}" min="0" max="30"></div>
+        <div class="form-group"><label>Devengo actual (días)<br><span style="font-size:10.5px;color:var(--text-tertiary);font-weight:400">Vacío = se calcula por meses trabajados</span></label><input type="number" id="pAccrued" value="${p.accruedOverride!==undefined?p.accruedOverride:''}" min="0" max="60" step="0.25" placeholder="Automático"></div>
         <div class="form-group form-group-full"><label>Notas</label><textarea id="pNote" rows="2" placeholder="Observaciones…">${escapeHtml(p.note||'')}</textarea></div>
       </div>
       <p id="pSalaryPreview" style="font-size:12px;color:var(--text-secondary);margin-bottom:12px"></p>
@@ -2933,6 +3011,7 @@ function openPersonModal(idx,staff,container){
       status:overlay.querySelector('#pStatus').value,
       vacationDays:parseFloat(overlay.querySelector('#pVac').value)||0,
       extraHolidays:parseFloat(overlay.querySelector('#pExtra').value)||0,
+      ...(overlay.querySelector('#pAccrued').value!==''?{accruedOverride:parseFloat(overlay.querySelector('#pAccrued').value)||0}:{}),
       note:overlay.querySelector('#pNote').value.trim()
     };
     try{
@@ -3851,17 +3930,40 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const labourPayroll=-(sc.payrollMonthly*months);
   const labourLeave=-(sc.onLeaveMonthly*months);
   const labourEtt=-(sc.ettMonthly*months);
-  // MMPP: materias primas (alimentación), como % sobre ingresos
-  const mmpp=-(revenue*((costs.mmppPct!==undefined?costs.mmppPct:costs.purchasePct||35)/100));
+
+  // ── Costes manuales introducidos por mes (tienen prioridad sobre los calculados) ──
+  const manual=costs.manual||{};   // { 'YYYY-MM': {mmpp, iuo, transfers} }
+  const monthKeysInRange=[];
+  if(from&&to){
+    const cur=new Date(from.getFullYear(),from.getMonth(),1);
+    while(cur<=to){monthKeysInRange.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`);cur.setMonth(cur.getMonth()+1);}
+  }
+  const sumManual=field=>monthKeysInRange.reduce((s,k)=>s+(manual[k]&&manual[k][field]?+manual[k][field]:0),0);
+  const manualMmpp=sumManual('mmpp');
+  const manualIuo=sumManual('iuo');
+  const manualTransfers=sumManual('transfers');
+  const hasManualMmpp=manualMmpp>0;
+  const hasManualIuo=manualIuo>0;
+
+  // MMPP: importe real introducido a mano si existe; si no, % sobre ingresos
+  const mmpp=hasManualMmpp
+    ? -manualMmpp
+    : -(revenue*((costs.mmppPct!==undefined?costs.mmppPct:costs.purchasePct||35)/100));
   const costOfSales=mmpp;
   const grossProfit=revenue+costOfSales;
-  // IUO: gastos indirectos de la unidad (seguros, mkt, central, licencias, no alimentario, uniformes)
+
+  // IUO: importe real a mano si existe; si no, % sobre ingresos más la parte fija mensual
   const iuoPct=costs.iuoPct!==undefined?costs.iuoPct:0;
-  const iuoFromPct=-(revenue*(iuoPct/100));
-  const iuoFixed=-((costs.iuoMonthly||costs.otherMonthly||0)*months);
-  const iuo=iuoFromPct+iuoFixed;
-  const unitProfit=grossProfit+labourCost+iuo;
-  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,unitProfit,months,
+  const iuoFromPct=hasManualIuo?0:-(revenue*(iuoPct/100));
+  const iuoFixed=hasManualIuo?0:-((costs.iuoMonthly||costs.otherMonthly||0)*months);
+  const iuo=hasManualIuo?-manualIuo:(iuoFromPct+iuoFixed);
+
+  // Traspasos entre centros: siempre manual
+  const transfers=-manualTransfers;
+
+  const unitProfit=grossProfit+labourCost+iuo+transfers;
+  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,transfers,unitProfit,months,
+    hasManualMmpp,hasManualIuo,monthKeysInRange,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
 
@@ -3882,6 +3984,18 @@ async function renderPnl(container){
     const ettList=ettSnapP.exists()?(ettSnapP.data().list||[]):[];
     const extras=extrasSnapP.exists()?(extrasSnapP.data().list||[]):[];
     const pnlEvents=await loadEvents();
+    const [impSnap,revMetaSnap]=await Promise.all([
+      getDoc(doc(db,'catering_config','importInfo')),
+      getDoc(doc(db,'pnl_config','revenue'))
+    ]);
+    const lastCatering=impSnap.exists()&&impSnap.data().lastImportAt?toDate(impSnap.data().lastImportAt):null;
+    const lastRevenue=revMetaSnap.exists()&&revMetaSnap.data().updatedAt?toDate(revMetaSnap.data().updatedAt):null;
+    const fmtStamp=d=>d?`${d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})} a las ${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`:'nunca';
+    const freshness=`<div class="data-freshness">
+      <span><strong>Última actualización de datos</strong></span>
+      <span>Catering: ${fmtStamp(lastCatering)}</span>
+      <span>Comedor y cafetería: ${fmtStamp(lastRevenue)}</span>
+    </div>`;
 
     const r=pnlRange;
     let from=r.from,to=r.to;
@@ -4006,7 +4120,7 @@ async function renderPnl(container){
       <h1 class="module-title">Cuenta de explotación</h1>
       <p class="module-sub">${periodLabel}${cmp?` · comparado con ${cLabel}`:''}</p>
     </div>
-    `+controls+eventsBanner(pnlEvents,from,to)+`
+    `+controls+freshness+eventsBanner(pnlEvents,from,to)+`
     <div class="pnl-table">
       ${header}
       <div class="pnl-section-head">Ingresos</div>
@@ -4020,15 +4134,16 @@ async function renderPnl(container){
         return [...cats].sort().map(c=>L(c,cur.extrasByCategory[c]||0,cmp?(cmp.extrasByCategory[c]||0):0,{indent2:true})).join('');
       })()}
       <div class="pnl-section-head cost">Costes</div>
-      ${L('MMPP (Materias primas)',cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
+      ${L(cur.hasManualMmpp?'MMPP (Materias primas) · importe real':'MMPP (Materias primas) · estimado '+(costs.mmppPct!==undefined?costs.mmppPct:35)+'%',cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
       ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
       ${L('Labour Cost (Personal)',cur.labourCost,cmp?cmp.labourCost:0,{fcVal:fcAgg?fcAgg.labourCost:undefined})}
       ${L('Plantilla activa',cur.labourPayroll,cmp?cmp.labourPayroll:0,{indent:true})}
       ${cur.labourLeave!==0||(cmp&&cmp.labourLeave!==0)?L('Bajas',cur.labourLeave,cmp?cmp.labourLeave:0,{indent:true}):''}
       ${cur.labourEtt!==0||(cmp&&cmp.labourEtt!==0)?L('ETT (adicional)',cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true}):''}
-      ${L('IUO (Gastos indirectos)',cur.iuo,cmp?cmp.iuo:0,{fcVal:fcAgg?fcAgg.iuo:undefined})}
+      ${L(cur.hasManualIuo?'IUO (Gastos indirectos) · importe real':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{fcVal:fcAgg?fcAgg.iuo:undefined})}
       ${cur.iuoFromPct!==0?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
       ${cur.iuoFixed!==0?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
+      ${(cur.transfers!==0||(cmp&&cmp.transfers!==0))?L('Traspasos entre centros',cur.transfers,cmp?cmp.transfers:0):''}
       <div class="pnl-section-head result">Resultado</div>
       ${L('Unit Profit (Resultado)',cur.unitProfit,cmp?cmp.unitProfit:0,{bold:true,fcVal:fcAgg?fcAgg.unitProfit:undefined})}
     </div>
@@ -4056,10 +4171,40 @@ async function renderPnl(container){
     </div>
 
     <div class="audit-section" style="margin-top:14px">
-      <h3>Parámetros de coste</h3>
+      <h3>Costes reales por mes</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Introduce aquí los importes reales. Cuando un mes tiene MMPP o IUO, sustituyen a la estimación por porcentaje. Los traspasos entre centros son siempre manuales.</p>
+      <div class="sched-wrap" style="padding:0;border:none">
+        <table class="sched-table">
+          <thead><tr>
+            <th class="sched-name">Mes</th>
+            <th style="text-align:right">MMPP (€)</th>
+            <th style="text-align:right">IUO (€)</th>
+            <th style="text-align:right">Traspasos (€)</th>
+          </tr></thead>
+          <tbody>
+            ${(cur.monthKeysInRange||[]).map(k=>{
+              const m=(costs.manual||{})[k]||{};
+              const [y,mo]=k.split('-');
+              const lbl=new Date(+y,+mo-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+              return`<tr>
+                <td class="sched-name">${lbl}</td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="mmpp" value="${m.mmpp||''}" placeholder="est." step="50" min="0"></td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="iuo" value="${m.iuo||''}" placeholder="est." step="50" min="0"></td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="transfers" value="${m.transfers||''}" placeholder="0" step="50" min="0"></td>
+              </tr>`;
+            }).join('')||'<tr><td colspan="4" style="padding:10px;font-size:12px;color:var(--text-tertiary)">Selecciona un período concreto (mes, trimestre o año) para introducir costes.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      <p id="pnlManualMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+
+    <div class="audit-section" style="margin-top:14px">
+      <h3>Estimación por defecto</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Se aplica solo a los meses en los que no hayas introducido el importe real.</p>
       <div class="form-grid">
         <div class="form-group">
-          <label>MMPP — Materias primas (% sobre ingresos)</label>
+          <label>MMPP (% sobre ingresos)</label>
           <input type="number" id="pnlMmppPct" value="${costs.mmppPct!==undefined?costs.mmppPct:(costs.purchasePct||35)}" min="0" max="100" step="0.5">
         </div>
         <div class="form-group">
@@ -4071,7 +4216,7 @@ async function renderPnl(container){
           <input type="number" id="pnlIuoMonthly" value="${costs.iuoMonthly!==undefined?costs.iuoMonthly:(costs.otherMonthly||0)}" min="0" step="50">
         </div>
       </div>
-      <button class="btn-primary" id="btnSavePnlCosts" style="max-width:240px">Guardar parámetros</button>
+      <button class="btn-primary" id="btnSavePnlCosts" style="max-width:240px">Guardar estimación</button>
       <p id="pnlSaveMsg" style="font-size:12px;margin-top:10px"></p>
     </div>`;
 
@@ -4128,6 +4273,26 @@ function bindPnlControls(container){
   const cf=container.querySelector('#pnlCmpFrom'),ctd=container.querySelector('#pnlCmpTo');
   if(cf)cf.addEventListener('change',()=>{pnlRange.compareFrom=new Date(cf.value+'T00:00:00');renderPnl(container);});
   if(ctd)ctd.addEventListener('change',()=>{pnlRange.compareTo=new Date(ctd.value+'T23:59:59');renderPnl(container);});
+  // Costes reales por mes: se guardan al salir de la celda
+  container.querySelectorAll('[data-mc-key]').forEach(inp=>{
+    inp.addEventListener('change',async()=>{
+      const msg=container.querySelector('#pnlManualMsg');
+      const key=inp.dataset.mcKey,field=inp.dataset.mcF;
+      try{
+        const snap=await getDoc(doc(db,'pnl_config','costs'));
+        const data=snap.exists()?snap.data():{};
+        const manual=data.manual||{};
+        if(!manual[key])manual[key]={};
+        const v=parseFloat(inp.value);
+        if(isNaN(v)||v===0)delete manual[key][field];else manual[key][field]=v;
+        if(Object.keys(manual[key]).length===0)delete manual[key];
+        await setDoc(doc(db,'pnl_config','costs'),{manual},{merge:true});
+        if(msg){msg.textContent='✓ Guardado';msg.style.color='var(--ok-fg)';}
+        renderPnl(container);
+      }catch(e){if(msg){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}}
+    });
+  });
+
   const btn=container.querySelector('#btnSavePnlCosts');
   if(btn)btn.addEventListener('click',async()=>{
     const msg=container.querySelector('#pnlSaveMsg');
@@ -4144,6 +4309,186 @@ function bindPnlControls(container){
   });
 }
 
+
+// ══ MÓDULO ACTAS DE REUNIONES ═════════════════════════════════════
+const MEETING_TYPES=[
+  {k:'equipo',lbl:'Reunión de equipo',icon:'👥'},
+  {k:'cliente',lbl:'Reunión con cliente',icon:'🤝'},
+  {k:'proveedor',lbl:'Reunión con proveedor',icon:'🚚'},
+  {k:'direccion',lbl:'Dirección / central',icon:'🏢'},
+  {k:'auditoria',lbl:'Auditoría / calidad',icon:'✅'},
+  {k:'otro',lbl:'Otra',icon:'📋'},
+];
+function meetType(k){return MEETING_TYPES.find(t=>t.k===k)||MEETING_TYPES[5];}
+let minutesSearch='';
+let minutesFilterType='';
+
+// Normaliza texto para buscar sin tildes ni mayúsculas
+function normText(t){
+  return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+// Resalta los términos encontrados
+function highlight(text,terms){
+  let out=escapeHtml(text);
+  terms.forEach(term=>{
+    if(term.length<2)return;
+    const norm=normText(out);
+    const idx=norm.indexOf(normText(term));
+    if(idx===-1)return;
+    // Reconstruye marcando todas las apariciones
+    const re=new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`,'gi');
+    out=out.replace(re,'<mark class="hl">$1</mark>');
+  });
+  return out;
+}
+
+async function loadMinutes(){
+  const snap=await getDocs(query(collection(db,'minutes'),orderBy('meetingDate','desc')));
+  return snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+
+async function renderMinutes(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando actas…</span></div>`;
+  try{
+    const all=await loadMinutes();
+    const terms=minutesSearch.trim().split(/\s+/).filter(t=>t.length>=2);
+    const q=normText(minutesSearch);
+    let list=all;
+    if(minutesFilterType)list=list.filter(m=>m.type===minutesFilterType);
+    if(q){
+      list=list.filter(m=>{
+        const hay=normText([m.title,m.attendees,m.content,m.agreements,m.tasks,m.place].join(' '));
+        return terms.every(t=>hay.includes(normText(t)));
+      });
+    }
+    const totalTasks=all.reduce((s,m)=>s+((m.tasks||'').split('\n').filter(l=>l.trim()).length),0);
+
+    const rows=list.map(m=>{
+      const t=meetType(m.type);
+      const d=m.meetingDate?new Date(m.meetingDate+'T12:00:00'):null;
+      const snippet=(m.content||'').slice(0,400);
+      return`<div class="minute-card">
+        <div class="minute-head">
+          <div>
+            <span class="minute-title">${t.icon} ${terms.length?highlight(m.title||'Sin título',terms):escapeHtml(m.title||'Sin título')}</span>
+            <span class="minute-meta">${d?d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'—'}${m.place?` · ${escapeHtml(m.place)}`:''}</span>
+          </div>
+          <div class="minute-actions">
+            <span class="pill pill-other">${t.lbl}</span>
+            <button class="btn-action btn-edit-minute" data-edit-minute="${escapeHtml(m.id)}" style="padding:4px 10px;font-size:11.5px">Editar</button>
+            <button class="btn-del-staff" data-del-minute="${escapeHtml(m.id)}" title="Eliminar">✕</button>
+          </div>
+        </div>
+        ${m.attendees?`<div class="minute-field"><span class="minute-lbl">Asistentes</span><span>${terms.length?highlight(m.attendees,terms):escapeHtml(m.attendees)}</span></div>`:''}
+        ${snippet?`<div class="minute-field"><span class="minute-lbl">Contenido</span><span>${terms.length?highlight(snippet,terms):escapeHtml(snippet)}${(m.content||'').length>400?'…':''}</span></div>`:''}
+        ${m.agreements?`<div class="minute-field"><span class="minute-lbl">Acuerdos</span><span>${terms.length?highlight(m.agreements,terms):escapeHtml(m.agreements)}</span></div>`:''}
+        ${m.tasks?`<div class="minute-field"><span class="minute-lbl">Tareas</span><span>${terms.length?highlight(m.tasks,terms):escapeHtml(m.tasks)}</span></div>`:''}
+      </div>`;
+    }).join('');
+
+    container.innerHTML=moduleHeader('Actas de reuniones','Historial con búsqueda por palabras')+`
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Actas registradas</div><div class="kpi-value">${all.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Tareas anotadas</div><div class="kpi-value">${totalTasks}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Última reunión</div><div class="kpi-value" style="font-size:15px">${all[0]&&all[0].meetingDate?new Date(all[0].meetingDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'}):'—'}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Resultados</div><div class="kpi-value">${list.length}</div><div class="kpi-sub">${q||minutesFilterType?'según filtros':'sin filtrar'}</div></div>
+    </div>
+    <div class="cumulative-controls">
+      <div class="minute-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-tertiary);flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="minSearch" placeholder="Buscar por cualquier palabra…" value="${escapeHtml(minutesSearch)}">
+        ${minutesSearch?`<button class="btn-del-staff" id="minClear" title="Limpiar">✕</button>`:''}
+      </div>
+      <select class="range-select" id="minType">
+        <option value="">Todos los tipos</option>
+        ${MEETING_TYPES.map(t=>`<option value="${t.k}" ${minutesFilterType===t.k?'selected':''}>${t.icon} ${t.lbl}</option>`).join('')}
+      </select>
+    </div>
+    ${list.length?`<div class="minutes-list">${rows}</div>`:`<div class="empty-state"><p>${all.length?'Ningún acta coincide con la búsqueda':'Aún no hay actas registradas'}</p>${!all.length?'<p style="font-size:12px;margin-top:6px">Usa "Nueva acta" en la barra superior</p>':''}</div>`}`;
+
+    const inp=container.querySelector('#minSearch');
+    if(inp){
+      inp.addEventListener('input',()=>{
+        minutesSearch=inp.value;
+        clearTimeout(window.__minTimer);
+        window.__minTimer=setTimeout(()=>{
+          const pos=inp.selectionStart;
+          renderMinutes(container).then(()=>{
+            const n=container.querySelector('#minSearch');
+            if(n){n.focus();n.setSelectionRange(pos,pos);}
+          });
+        },300);
+      });
+    }
+    const clr=container.querySelector('#minClear');
+    if(clr)clr.addEventListener('click',()=>{minutesSearch='';renderMinutes(container);});
+    const ts=container.querySelector('#minType');
+    if(ts)ts.addEventListener('change',()=>{minutesFilterType=ts.value;renderMinutes(container);});
+    container.querySelectorAll('[data-edit-minute]').forEach(b=>{
+      b.addEventListener('click',()=>openMinuteModal(all.find(m=>m.id===b.dataset.editMinute),container));
+    });
+    container.querySelectorAll('[data-del-minute]').forEach(b=>{
+      b.addEventListener('click',async()=>{
+        const m=all.find(x=>x.id===b.dataset.delMinute);
+        if(!confirm(`¿Eliminar el acta "${m.title||'sin título'}"?`))return;
+        await deleteDoc(doc(db,'minutes',m.id));
+        renderMinutes(container);
+      });
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function openMinuteModal(m,container){
+  const isNew=!m;
+  const d=m||{title:'',type:'equipo',meetingDate:localISODate(new Date()),place:'',attendees:'',content:'',agreements:'',tasks:''};
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';
+  overlay.innerHTML=`<div class="modal modal-wide">
+    <div class="modal-header"><h2 class="modal-title">${isNew?'Nueva acta':'Editar acta'}</h2><button class="modal-close" data-close>✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-group-full"><label>Título *</label><input type="text" id="mTitle" value="${escapeHtml(d.title)}" placeholder="Ej. Reunión mensual con Nestlé"></div>
+        <div class="form-group"><label>Tipo</label><select id="mType">${MEETING_TYPES.map(t=>`<option value="${t.k}" ${d.type===t.k?'selected':''}>${t.icon} ${t.lbl}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Fecha *</label><input type="date" id="mDate" value="${d.meetingDate||''}"></div>
+        <div class="form-group form-group-full"><label>Lugar</label><input type="text" id="mPlace" value="${escapeHtml(d.place||'')}" placeholder="Ej. Sala 504, Edificio 1"></div>
+        <div class="form-group form-group-full"><label>Asistentes</label><input type="text" id="mAttendees" value="${escapeHtml(d.attendees||'')}" placeholder="Nombres separados por comas"></div>
+        <div class="form-group form-group-full"><label>Contenido / desarrollo</label><textarea id="mContent" rows="7" placeholder="Temas tratados…">${escapeHtml(d.content||'')}</textarea></div>
+        <div class="form-group form-group-full"><label>Acuerdos</label><textarea id="mAgreements" rows="3" placeholder="Decisiones tomadas…">${escapeHtml(d.agreements||'')}</textarea></div>
+        <div class="form-group form-group-full"><label>Tareas pendientes<br><span style="font-size:10.5px;color:var(--text-tertiary);font-weight:400">Una por línea</span></label><textarea id="mTasks" rows="4" placeholder="Responsable — tarea — fecha">${escapeHtml(d.tasks||'')}</textarea></div>
+      </div>
+      <button class="btn-primary" id="mSave">${isNew?'Crear acta':'Guardar cambios'}</button>
+      <p id="mMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelector('[data-close]').addEventListener('click',close);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+  overlay.querySelector('#mSave').addEventListener('click',async()=>{
+    const msg=overlay.querySelector('#mMsg');
+    const title=overlay.querySelector('#mTitle').value.trim();
+    const meetingDate=overlay.querySelector('#mDate').value;
+    if(!title||!meetingDate){msg.textContent='Indica al menos título y fecha';msg.style.color='var(--alert-red-fg)';return;}
+    const rec={
+      title,meetingDate,
+      type:overlay.querySelector('#mType').value,
+      place:overlay.querySelector('#mPlace').value.trim(),
+      attendees:overlay.querySelector('#mAttendees').value.trim(),
+      content:overlay.querySelector('#mContent').value.trim(),
+      agreements:overlay.querySelector('#mAgreements').value.trim(),
+      tasks:overlay.querySelector('#mTasks').value.trim(),
+      updatedAt:Timestamp.now()
+    };
+    try{
+      const id=m?m.id:'ACT-'+Date.now();
+      await setDoc(doc(db,'minutes',id),m?rec:{...rec,createdAt:Timestamp.now()},{merge:true});
+      close();
+      renderMinutes(container);
+    }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
+  });
+}
 
 // ══ MÓDULO FORECAST ═══════════════════════════════════════════════
 let currentFcView='sales';
