@@ -46,6 +46,24 @@
 .dark .pnl-fc{color:#6DBF95}
 .dark .pnl-row.header .pnl-fc{color:#6DBF95}
 .module-header{text-align:center;padding:6px 0 18px}
+.minutes-list{display:flex;flex-direction:column;gap:10px}
+.minute-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:15px 17px}
+.minute-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.minute-title{display:block;font-size:14.5px;font-weight:600;color:var(--text-primary);letter-spacing:-.01em}
+.minute-meta{display:block;font-size:11.5px;color:var(--text-tertiary);margin-top:2px}
+.minute-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.minute-field{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--border-soft);font-size:12.5px;line-height:1.55;color:var(--text-secondary)}
+.minute-lbl{flex-shrink:0;width:82px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary);font-weight:600;padding-top:2px}
+.minute-field>span:last-child{white-space:pre-wrap;min-width:0}
+.minute-search{display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:6px 11px;min-width:270px;flex:1;max-width:420px}
+.minute-search input{flex:1;min-width:0;border:none;background:none;outline:none;font-family:var(--font-sans);font-size:13px;color:var(--text-primary)}
+mark.hl{background:var(--alert-amber-border);color:var(--text-primary);border-radius:2px;padding:0 1px}
+.dark mark.hl{background:#7A5A18;color:#fff}
+@media(max-width:768px){
+  .minute-field{flex-direction:column;gap:2px}
+  .minute-lbl{width:auto}
+  .minute-search{min-width:0;max-width:none}
+}
 .data-freshness{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text-tertiary);padding:8px 14px;background:var(--bg);border-radius:var(--radius-md);margin-bottom:12px;justify-content:center}
 .data-freshness strong{color:var(--text-secondary);font-weight:500}
 .events-banner{background:var(--alert-amber-bg);border:1px solid var(--alert-amber-border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:14px}
@@ -2103,7 +2121,7 @@ async function renderLogic(container){
 
 // ── MODO NOCHE ────────────────────────────────────────────────────
 const root=document.documentElement;
-const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit','btnThemeStaff','btnThemePnl','btnThemeBilling','btnThemeForecast'].map(id=>document.getElementById(id)).filter(Boolean);
+const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit','btnThemeStaff','btnThemePnl','btnThemeBilling','btnThemeForecast','btnThemeMinutes'].map(id=>document.getElementById(id)).filter(Boolean);
 function syncThemeIcons(isDark){themeButtons.forEach(b=>b.textContent=isDark?'☀️':'🌙');}
 if(localStorage.getItem('theme')==='dark'){root.classList.add('dark');syncThemeIcons(true);}
 themeButtons.forEach(btn=>btn.addEventListener('click',()=>{
@@ -2687,7 +2705,7 @@ const STAFF_SEED=[
   {name:'Adrianna DeLorenzo',cardNumber:'46840',position:'Barista',jornadaType:'Media jornada',level:3,dni:'Y6470461T',contractType:'Indefinido',contractedHours:25,contractDate:'2025-11-18',monthlySalary:0,birthDate:'2000-07-20',status:'activo',weeklyHours:25,vacationDays:30,extraHolidays:0,note:''},
   {name:'Carolina Ávalos Domínguez',cardNumber:'45866',position:'Marmitona',jornadaType:'Completa',level:5,dni:'Z0479143N',contractType:'Indefinido',contractedHours:40,contractDate:'2024-11-19',monthlySalary:0,birthDate:'1982-10-08',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Nivel V: pendiente de indicar salario, no figura en la tabla del convenio'},
   {name:'Cinthia Valeria Rotela Ruiz',cardNumber:'45937',position:'Ayudante de camarero',jornadaType:'Completa',level:4,dni:'Y2125429J',contractType:'Indefinido',contractedHours:40,contractDate:'2025-02-24',monthlySalary:0,birthDate:'1994-12-22',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
-  {name:'Alejandro Gardó Moreno',cardNumber:'',position:'',jornadaType:'Completa',level:4,dni:'47325099T',contractType:'Indefinido',contractedHours:40,contractDate:'2026-02-15',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,accruedOverride:16.25,note:'Devengo fijado a mano: 16,25 días. Pendiente: puesto'},
+  {name:'Alejandro Gardó Moreno',cardNumber:'',position:'',jornadaType:'Completa',level:4,dni:'47325099T',contractType:'Indefinido',contractedHours:40,contractDate:'2026-06-15',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Alta deducida: devengará 16,25 días a 31/12. Pendiente: puesto'},
 ];
 
 async function loadStaffData(){
@@ -2781,6 +2799,7 @@ async function renderStaffRoster(container){
       const statusLbl={activo:'Activo',baja:'De baja',vacaciones:'Vacaciones',inactivo:'Desactivado'}[status];
       const annual=p.vacationDays!==undefined?p.vacationDays:30;
       const accrued=accruedVacation(p,today);
+      const yearEnd=accruedVacation(p,new Date(today.getFullYear(),11,31));
       const isProrated=accrued<annual;
       const extra=p.extraHolidays||0;
       const totalBalance=accrued+extra;
@@ -2827,7 +2846,7 @@ async function renderStaffRoster(container){
         ${status!=='inactivo'?`<div class="vac-bar">
           <span class="vac-lbl">Vacaciones:</span>
           <span class="vac-total">${totalBalance.toString().replace('.',',')} días</span>
-          ${isProrated?`<span class="vac-prorated" title="Devengado a razón de ${(annual/12).toFixed(2).replace('.',',')} días por mes trabajado">devengado${p.accruedOverride!==undefined?' (fijado)':''}</span>`:''}
+          ${isProrated?`<span class="vac-prorated" title="Devengado a razón de ${(annual/12).toFixed(2).replace('.',',')} días por mes trabajado">devengado hoy${p.accruedOverride!==undefined?' (fijado)':''}</span><span class="vac-sep">·</span><span class="vac-used">a 31/12: ${yearEnd.toString().replace('.',',')}</span>`:''}
           ${extra?`<span class="vac-sep">·</span><span class="vac-used">incl. ${extra} festivos</span>`:''}
           <span class="vac-sep">·</span>
           <span class="vac-used">Usados: ${usedVac}</span>
@@ -3539,7 +3558,8 @@ function parseStaffXLSX(arrayBuffer){
 }
 
 // ══ FACTURACIÓN EXTRA ═════════════════════════════════════════════
-const EXTRA_CATEGORIES=['Pedido de producto','Invitaciones','Servicio extra','Alquiler de material','Otros'];
+const TRANSFER_CATEGORY='Traspaso entre centros';
+const EXTRA_CATEGORIES=['Pedido de producto','Invitaciones','Servicio extra','Alquiler de material',TRANSFER_CATEGORY,'Otros'];
 const PAYMENT_STATES=['Pendiente','Facturado','Cobrado'];
 let extraFilter={category:'',state:'',from:null,to:null};
 
@@ -3557,7 +3577,9 @@ async function renderExtras(container){
     if(extraFilter.to)filtered=filtered.filter(e=>e.date<=extraFilter.to);
     filtered.sort((a,b)=>b.date.localeCompare(a.date));
 
-    const total=filtered.reduce((s,e)=>s+(e.amount||0),0);
+    const isTransfer=e=>(e.category||'Otros')===TRANSFER_CATEGORY;
+    const total=filtered.filter(e=>!isTransfer(e)).reduce((s,e)=>s+(e.amount||0),0);
+    const transfersTotal=filtered.filter(isTransfer).reduce((s,e)=>s+(e.amount||0),0);
     const pending=filtered.filter(e=>(e.state||'Pendiente')!=='Cobrado');
     const pendingAmount=pending.reduce((s,e)=>s+(e.amount||0),0);
     const overdue=pending.filter(e=>e.dueDate&&e.dueDate<localISODate(new Date()));
@@ -3567,22 +3589,24 @@ async function renderExtras(container){
     const byCat={};
     filtered.forEach(e=>{const c=e.category||'Otros';byCat[c]=(byCat[c]||0)+(e.amount||0);});
     const maxCat=Math.max(...Object.values(byCat),1);
-    const catRows=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>
-      `<div class="bar-row"><span class="bar-label">${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v/maxCat*100).toFixed(0)}%;background:#1A5C38"></div></div><span class="bar-val">${fmtMoney(v)}</span></div>`
-    ).join('');
+    const catRows=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{
+      const tr=c===TRANSFER_CATEGORY;
+      return`<div class="bar-row"><span class="bar-label">${tr?'🔄 ':''}${escapeHtml(c)}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v/maxCat*100).toFixed(0)}%;background:${tr?'var(--break-fg)':'#1A5C38'}"></div></div><span class="bar-val">${fmtMoney(v)}</span></div>`;
+    }).join('');
 
     const stateClass=s=>({Pendiente:'pill-pax-amber',Facturado:'pill-break',Cobrado:'pill-ok'}[s]||'pill-other');
     const rows=filtered.map(e=>{
       const realIdx=extras.findIndex(x=>x===e);
       const isOverdue=e.dueDate&&e.dueDate<localISODate(new Date())&&(e.state||'Pendiente')!=='Cobrado';
-      return`<div class="order-card" ${isOverdue?'style="border-left:3px solid #F09595"':''}>
+      const transf=isTransfer(e);
+      return`<div class="order-card" ${transf?'style="border-left:3px solid var(--other-fg)"':isOverdue?'style="border-left:3px solid #F09595"':''}>
         <div class="order-top">
           <div class="order-who">
-            <span class="order-name">${escapeHtml(e.concept||'Sin concepto')}</span>
+            <span class="order-name">${transf?'🔄 ':''}${escapeHtml(e.concept||'Sin concepto')}</span>
             <span class="order-loc">${new Date(e.date+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}${e.client?` · ${escapeHtml(e.client)}`:''}</span>
           </div>
           <div class="order-pills">
-            <span class="pill pill-other">${escapeHtml(e.category||'Otros')}</span>
+            <span class="pill ${transf?'pill-break':'pill-other'}">${escapeHtml(e.category||'Otros')}</span>
             <select class="staff-select" data-extra-state="${realIdx}">
               ${PAYMENT_STATES.map(s=>`<option value="${s}" ${(e.state||'Pendiente')===s?'selected':''}>${s}</option>`).join('')}
             </select>
@@ -3593,6 +3617,7 @@ async function renderExtras(container){
         <div class="order-meta">
           ${e.invoiceNum?`<span class="meta-item">Factura ${escapeHtml(e.invoiceNum)}</span>`:''}
           ${e.dueDate?`<span class="meta-item" ${isOverdue?'style="color:var(--alert-red-fg);font-weight:500"':''}>Cobro: ${new Date(e.dueDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}${isOverdue?' ⚠ vencido':''}</span>`:''}
+          ${transf?`<span class="meta-item" style="color:var(--break-fg)">No suma a ingresos · va a costes en la CE</span>`:''}
         </div>
         ${e.notes?`<div class="comment-internal" style="font-style:normal">📝 ${escapeHtml(e.notes)}</div>`:''}
       </div>`;
@@ -3602,12 +3627,15 @@ async function renderExtras(container){
     if(overdue.length>0)alerts.push({type:'red',msg:`${overdue.length} factura${overdue.length>1?'s':''} con cobro vencido · ${fmtMoney(overdueAmount)} pendiente`});
 
     container.innerHTML=moduleHeader('Facturación','Facturaciones extra fuera del sistema')+`<div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Total facturado extra</div><div class="kpi-value">${fmtMoney(total)}</div><div class="kpi-sub">${filtered.length} registro${filtered.length!==1?'s':''}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total facturado extra</div><div class="kpi-value">${fmtMoney(total)}</div><div class="kpi-sub">${filtered.filter(e=>!isTransfer(e)).length} registro${filtered.filter(e=>!isTransfer(e)).length!==1?'s':''} · sin traspasos</div></div>
       <div class="kpi-card"><div class="kpi-label">Pendiente de cobro</div><div class="kpi-value ${pendingAmount>0?'warn':''}">${fmtMoney(pendingAmount)}</div><div class="kpi-sub">${pending.length} sin cobrar</div></div>
       <div class="kpi-card"><div class="kpi-label">Vencido</div><div class="kpi-value ${overdueAmount>0?'alert':''}">${fmtMoney(overdueAmount)}</div><div class="kpi-sub">${overdue.length} factura${overdue.length!==1?'s':''}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Importe medio</div><div class="kpi-value">${filtered.length?fmtMoney(total/filtered.length):'—'}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Traspasos entre centros</div><div class="kpi-value">${fmtMoney(transfersTotal)}</div><div class="kpi-sub">coste, no ingreso</div></div>
     </div>
     ${alerts.length?renderAlerts(alerts):''}
+    <div class="alert alert-amber" style="margin-bottom:14px">
+      <span>ℹ️ Los registros con categoría <strong>"${TRANSFER_CATEGORY}"</strong> no cuentan como ingreso: alimentan la línea de coste "Traspasos entre centros" de la Cuenta de explotación.</span>
+    </div>
 
     <div class="audit-section">
       <h3>Añadir facturación extra</h3>
@@ -3912,7 +3940,11 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   });
   const comedor=byCh['comedor']||{billed:0,tickets:0};
   const cafeteria=byCh['cafeteria']||{billed:0,tickets:0};
-  const extrasInRange=(extras||[]).filter(e=>inRange(new Date(e.date+'T12:00:00')));
+  const extrasAll=(extras||[]).filter(e=>inRange(new Date(e.date+'T12:00:00')));
+  // Los traspasos entre centros se registran en Facturación pero no son ingreso: van a su línea de coste
+  const extrasInRange=extrasAll.filter(e=>(e.category||'Otros')!==TRANSFER_CATEGORY);
+  const transfersFromBilling=extrasAll.filter(e=>(e.category||'Otros')===TRANSFER_CATEGORY)
+    .reduce((s2,e)=>s2+(e.amount||0),0);
   const extrasRevenue=extrasInRange.reduce((s2,e)=>s2+(e.amount||0),0);
   const extrasByCategory={};
   extrasInRange.forEach(e=>{
@@ -3941,7 +3973,6 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const sumManual=field=>monthKeysInRange.reduce((s,k)=>s+(manual[k]&&manual[k][field]?+manual[k][field]:0),0);
   const manualMmpp=sumManual('mmpp');
   const manualIuo=sumManual('iuo');
-  const manualTransfers=sumManual('transfers');
   const hasManualMmpp=manualMmpp>0;
   const hasManualIuo=manualIuo>0;
 
@@ -3958,8 +3989,8 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const iuoFixed=hasManualIuo?0:-((costs.iuoMonthly||costs.otherMonthly||0)*months);
   const iuo=hasManualIuo?-manualIuo:(iuoFromPct+iuoFixed);
 
-  // Traspasos entre centros: siempre manual
-  const transfers=-manualTransfers;
+  // Traspasos entre centros: se alimentan de los registros de Facturación
+  const transfers=-transfersFromBilling;
 
   const unitProfit=grossProfit+labourCost+iuo+transfers;
   return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,transfers,unitProfit,months,
@@ -4143,7 +4174,7 @@ async function renderPnl(container){
       ${L(cur.hasManualIuo?'IUO (Gastos indirectos) · importe real':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{fcVal:fcAgg?fcAgg.iuo:undefined})}
       ${cur.iuoFromPct!==0?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
       ${cur.iuoFixed!==0?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
-      ${(cur.transfers!==0||(cmp&&cmp.transfers!==0))?L('Traspasos entre centros',cur.transfers,cmp?cmp.transfers:0):''}
+      ${(cur.transfers!==0||(cmp&&cmp.transfers!==0))?L('Traspasos entre centros · desde Facturación',cur.transfers,cmp?cmp.transfers:0):''}
       <div class="pnl-section-head result">Resultado</div>
       ${L('Unit Profit (Resultado)',cur.unitProfit,cmp?cmp.unitProfit:0,{bold:true,fcVal:fcAgg?fcAgg.unitProfit:undefined})}
     </div>
@@ -4155,6 +4186,7 @@ async function renderPnl(container){
       <div class="audit-row"><span class="audit-req"><strong>Facturación extra</strong> — registros introducidos manualmente en la pestaña "Facturación extra", desglosados por categoría</span></div>
       <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — calculado como ${costs.mmppPct!==undefined?costs.mmppPct:35}% de los ingresos totales (parámetro configurable, no facturas reales)</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — salario mensual real o de convenio (Restauración Colectiva Barcelona 2025) según nivel y jornada, del módulo Personal. Las bajas al ${costs.leaveCostPct!==undefined?costs.leaveCostPct:100}% y las ETT según registros vigentes</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — suma de los registros del módulo Facturación con categoría "Traspaso entre centros". No son ingreso, se descuentan como coste</span></div>
       <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — parte variable como % de ingresos más una parte fija mensual, ambas configurables abajo</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Prorrateo</strong> — los costes mensuales (personal, IUO fijo) se multiplican por ${cur.months} mes${cur.months>1?'es':''} para cubrir el período seleccionado</span></div>
     </div>
@@ -4172,14 +4204,13 @@ async function renderPnl(container){
 
     <div class="audit-section" style="margin-top:14px">
       <h3>Costes reales por mes</h3>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Introduce aquí los importes reales. Cuando un mes tiene MMPP o IUO, sustituyen a la estimación por porcentaje. Los traspasos entre centros son siempre manuales.</p>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Introduce aquí los importes reales. Cuando un mes tiene MMPP o IUO, sustituyen a la estimación por porcentaje. Los traspasos entre centros no se editan aquí: se alimentan de los registros del módulo Facturación.</p>
       <div class="sched-wrap" style="padding:0;border:none">
         <table class="sched-table">
           <thead><tr>
             <th class="sched-name">Mes</th>
             <th style="text-align:right">MMPP (€)</th>
             <th style="text-align:right">IUO (€)</th>
-            <th style="text-align:right">Traspasos (€)</th>
           </tr></thead>
           <tbody>
             ${(cur.monthKeysInRange||[]).map(k=>{
@@ -4190,9 +4221,8 @@ async function renderPnl(container){
                 <td class="sched-name">${lbl}</td>
                 <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="mmpp" value="${m.mmpp||''}" placeholder="est." step="50" min="0"></td>
                 <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="iuo" value="${m.iuo||''}" placeholder="est." step="50" min="0"></td>
-                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="transfers" value="${m.transfers||''}" placeholder="0" step="50" min="0"></td>
               </tr>`;
-            }).join('')||'<tr><td colspan="4" style="padding:10px;font-size:12px;color:var(--text-tertiary)">Selecciona un período concreto (mes, trimestre o año) para introducir costes.</td></tr>'}
+            }).join('')||'<tr><td colspan="3" style="padding:10px;font-size:12px;color:var(--text-tertiary)">Selecciona un período concreto (mes, trimestre o año) para introducir costes.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -5009,6 +5039,24 @@ async function loadHubStats(){
     }catch(e){fail('hubBillingStats');}
   })();
 
+  // ── Actas: número de actas y última reunión ──
+  (async()=>{
+    try{
+      const all=await loadMinutes();
+      if(!all.length){set('hubMinutesStats','<span class="hub-empty">Sin actas</span>');return;}
+      const tasks=all.reduce((s2,m)=>s2+((m.tasks||'').split('\n').filter(l=>l.trim()).length),0);
+      const last=all[0];
+      let html=st(all.length,all.length>1?'actas':'acta');
+      if(tasks)html+=st(tasks,'tareas');
+      if(last&&last.meetingDate){
+        const d=new Date(last.meetingDate+'T12:00:00');
+        const days=Math.round((startOfDay(new Date())-startOfDay(d))/86400000);
+        html+=st(days===0?'hoy':days===1?'ayer':`${days} d`,'última reunión');
+      }
+      set('hubMinutesStats',html);
+    }catch(e){fail('hubMinutesStats');}
+  })();
+
   // ── Forecast: desviación del mes en curso ──
   (async()=>{
     try{
@@ -5070,6 +5118,7 @@ const staffScreen=document.getElementById('staffScreen');
 const pnlScreen=document.getElementById('pnlScreen');
 const billingScreen=document.getElementById('billingScreen');
 const forecastScreen=document.getElementById('forecastScreen');
+const minutesScreen=document.getElementById('minutesScreen');
 
 function showScreen(name){
   if(name==='hub')setTimeout(loadHubStats,50);
@@ -5079,6 +5128,7 @@ function showScreen(name){
   pnlScreen.hidden=name!=='pnl';
   billingScreen.hidden=name!=='billing';
   forecastScreen.hidden=name!=='forecast';
+  minutesScreen.hidden=name!=='minutes';
   document.getElementById('app').hidden=name!=='catering';
 }
 
@@ -5104,6 +5154,9 @@ document.querySelectorAll('.hub-card').forEach(card=>{
     } else if(mod==='forecast'){
       showScreen('forecast');
       renderForecast(document.getElementById('forecastContent'));
+    } else if(mod==='minutes'){
+      showScreen('minutes');
+      renderMinutes(document.getElementById('minutesContent'));
     } else if(mod==='looker'){
       window.open('https://datastudio.google.com/reporting/75345ca9-22a2-44f2-b4f7-a66817585617/page/p_x0hwoqfz5d','_blank','noopener');
     }
@@ -5116,6 +5169,8 @@ document.getElementById('btnBackFromStaff').addEventListener('click',()=>showScr
 document.getElementById('btnBackFromPnl').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromBilling').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromForecast').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromMinutes').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnNewMinute').addEventListener('click',()=>openMinuteModal(null,document.getElementById('minutesContent')));
 
 // Importar horario de personal
 const staffFileInput=document.getElementById('staffFileInput');
@@ -5202,6 +5257,7 @@ onAuthStateChanged(auth, user=>{
     pnlScreen.hidden=true;
     billingScreen.hidden=true;
     forecastScreen.hidden=true;
+    minutesScreen.hidden=true;
     appEl.hidden=true;
   }
 });
@@ -5253,7 +5309,7 @@ document.getElementById('btnForgotPassword').addEventListener('click', async(e)=
 loginPassword.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 loginEmail.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-['btnLogout','btnLogoutHub','btnLogoutAudit','btnLogoutStaff','btnLogoutPnl','btnLogoutBilling','btnLogoutForecast'].forEach(id=>{
+['btnLogout','btnLogoutHub','btnLogoutAudit','btnLogoutStaff','btnLogoutPnl','btnLogoutBilling','btnLogoutForecast','btnLogoutMinutes'].forEach(id=>{
   const b=document.getElementById(id);
   if(b)b.addEventListener('click',async()=>{await signOut(auth);});
 });
