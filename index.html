@@ -46,6 +46,22 @@
 .dark .pnl-fc{color:#6DBF95}
 .dark .pnl-row.header .pnl-fc{color:#6DBF95}
 .module-header{text-align:center;padding:6px 0 18px}
+.choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;max-width:720px;margin:0 auto}
+.choice-card{position:relative;background:var(--bg-card);border:1px solid var(--border-soft);border-radius:14px;padding:26px 22px 22px;cursor:pointer;overflow:hidden;transition:transform .18s cubic-bezier(.2,.8,.3,1),border-color .18s,box-shadow .18s;text-align:center}
+.choice-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)}
+.choice-card:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 8px 22px rgba(0,0,0,.09)}
+.choice-card:hover .choice-icon{background:var(--accent);color:var(--bg-card)}
+.choice-card:hover .choice-go{opacity:1;transform:translateX(0)}
+.choice-icon{width:52px;height:52px;border-radius:13px;background:var(--accent-bg);color:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;transition:all .18s}
+.choice-icon svg{width:26px;height:26px}
+.choice-card h3{font-size:17px;font-weight:600;margin:0 0 6px;color:var(--text-primary);letter-spacing:-.01em}
+.choice-card p{font-size:12.5px;color:var(--text-secondary);line-height:1.5;margin:0}
+.choice-go{position:absolute;right:16px;bottom:14px;font-size:17px;color:var(--accent);opacity:0;transform:translateX(-5px);transition:all .18s}
+.prompt-box{width:100%;font-family:var(--font-mono);font-size:12px;line-height:1.55;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg);color:var(--text-primary);resize:vertical}
+@media(max-width:600px){
+  .choice-grid{grid-template-columns:1fr}
+  .choice-go{opacity:.5;transform:translateX(0)}
+}
 .minutes-list{display:flex;flex-direction:column;gap:10px}
 .minute-card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:15px 17px}
 .minute-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px}
@@ -621,6 +637,63 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 </div>
 
 <!-- ══ MÓDULO CUENTA DE EXPLOTACIÓN ══ -->
+<!-- ══ CATERING · ELECCIÓN ══ -->
+<div id="cateringChoiceScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromChoice">← Hub</button>
+      <span class="logo">Catering</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-theme" id="btnThemeChoice" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutChoice">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main">
+    <div class="module-header">
+      <h1 class="module-title">Catering</h1>
+      <p class="module-sub">¿Qué necesitas hacer?</p>
+    </div>
+    <div class="choice-grid">
+      <div class="choice-card" data-choice="sheet" style="--accent:#BA7517;--accent-bg:#FAEEDA">
+        <div class="choice-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h3"/><path d="M8 18h6"/></svg>
+        </div>
+        <h3>Hoja de seguimiento</h3>
+        <p>Pedidos del día, alertas de solapamiento y aforo, análisis acumulado y facturación.</p>
+        <span class="choice-go">→</span>
+      </div>
+      <div class="choice-card" data-choice="proposal" style="--accent:#534AB7;--accent-bg:#EEEDFE">
+        <div class="choice-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8H20l-4.7 3.4 1.8 5.8L12 14.6 6.9 18l1.8-5.8L4 8.8h6.1z"/></svg>
+        </div>
+        <h3>Generar propuesta</h3>
+        <p>Rellena los datos del evento y genera un texto listo para pegar en Claude y obtener la propuesta.</p>
+        <span class="choice-go">→</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══ CATERING · GENERADOR DE PROPUESTA ══ -->
+<div id="proposalScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromProposal">← Catering</button>
+      <span class="logo">Generar propuesta</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-action" id="btnEditGuidelines">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
+        Pautas
+      </button>
+      <button class="btn-theme" id="btnThemeProposal" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutProposal">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main" id="proposalContent"></main>
+</div>
+
 <!-- ══ MÓDULO ACTAS ══ -->
 <div id="minutesScreen" hidden>
   <header class="topbar">
@@ -648,7 +721,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
       <span class="logo">Forecast</span>
     </div>
     <nav class="tabs" id="forecastTabs">
-      <button class="tab active" data-fc-view="sales">Ventas</button>
+      <button class="tab active" data-fc-view="sales">Forecast & sales</button>
       <button class="tab" data-fc-view="purchases">Compras</button>
       <button class="tab" data-fc-view="occupancy">Ocupación</button>
     </nav>
@@ -2121,7 +2194,7 @@ async function renderLogic(container){
 
 // ── MODO NOCHE ────────────────────────────────────────────────────
 const root=document.documentElement;
-const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit','btnThemeStaff','btnThemePnl','btnThemeBilling','btnThemeForecast','btnThemeMinutes'].map(id=>document.getElementById(id)).filter(Boolean);
+const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit','btnThemeStaff','btnThemePnl','btnThemeBilling','btnThemeForecast','btnThemeMinutes','btnThemeChoice','btnThemeProposal'].map(id=>document.getElementById(id)).filter(Boolean);
 function syncThemeIcons(isDark){themeButtons.forEach(b=>b.textContent=isDark?'☀️':'🌙');}
 if(localStorage.getItem('theme')==='dark'){root.classList.add('dark');syncThemeIcons(true);}
 themeButtons.forEach(btn=>btn.addEventListener('click',()=>{
@@ -3559,6 +3632,13 @@ function parseStaffXLSX(arrayBuffer){
 
 // ══ FACTURACIÓN EXTRA ═════════════════════════════════════════════
 const TRANSFER_CATEGORY='Traspaso entre centros';
+// Sentido del traspaso: 'out' = facturamos nosotros (cobramos), 'in' = nos facturan (pagamos)
+const TRANSFER_DIRECTIONS=[
+  {k:'out',lbl:'Emitido — facturamos nosotros (cobro)',short:'Emitido',sign:1,icon:'↗'},
+  {k:'in',lbl:'Recibido — nos facturan (pago)',short:'Recibido',sign:-1,icon:'↙'},
+];
+function transferDir(k){return TRANSFER_DIRECTIONS.find(d=>d.k===k)||TRANSFER_DIRECTIONS[1];}
+const TRANSFER_COUNTERPARTS=['Central','Otro centro'];
 const EXTRA_CATEGORIES=['Pedido de producto','Invitaciones','Servicio extra','Alquiler de material',TRANSFER_CATEGORY,'Otros'];
 const PAYMENT_STATES=['Pendiente','Facturado','Cobrado'];
 let extraFilter={category:'',state:'',from:null,to:null};
@@ -3579,7 +3659,9 @@ async function renderExtras(container){
 
     const isTransfer=e=>(e.category||'Otros')===TRANSFER_CATEGORY;
     const total=filtered.filter(e=>!isTransfer(e)).reduce((s,e)=>s+(e.amount||0),0);
-    const transfersTotal=filtered.filter(isTransfer).reduce((s,e)=>s+(e.amount||0),0);
+    const trOut=filtered.filter(e=>isTransfer(e)&&(e.transferDirection||'in')==='out').reduce((s,e)=>s+(e.amount||0),0);
+    const trIn=filtered.filter(e=>isTransfer(e)&&(e.transferDirection||'in')==='in').reduce((s,e)=>s+(e.amount||0),0);
+    const transfersTotal=trOut-trIn;
     const pending=filtered.filter(e=>(e.state||'Pendiente')!=='Cobrado');
     const pendingAmount=pending.reduce((s,e)=>s+(e.amount||0),0);
     const overdue=pending.filter(e=>e.dueDate&&e.dueDate<localISODate(new Date()));
@@ -3602,7 +3684,7 @@ async function renderExtras(container){
       return`<div class="order-card" ${transf?'style="border-left:3px solid var(--other-fg)"':isOverdue?'style="border-left:3px solid #F09595"':''}>
         <div class="order-top">
           <div class="order-who">
-            <span class="order-name">${transf?'🔄 ':''}${escapeHtml(e.concept||'Sin concepto')}</span>
+            <span class="order-name">${transf?transferDir(e.transferDirection).icon+' ':''}${escapeHtml(e.concept||'Sin concepto')}</span>
             <span class="order-loc">${new Date(e.date+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}${e.client?` · ${escapeHtml(e.client)}`:''}</span>
           </div>
           <div class="order-pills">
@@ -3617,7 +3699,12 @@ async function renderExtras(container){
         <div class="order-meta">
           ${e.invoiceNum?`<span class="meta-item">Factura ${escapeHtml(e.invoiceNum)}</span>`:''}
           ${e.dueDate?`<span class="meta-item" ${isOverdue?'style="color:var(--alert-red-fg);font-weight:500"':''}>Cobro: ${new Date(e.dueDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}${isOverdue?' ⚠ vencido':''}</span>`:''}
-          ${transf?`<span class="meta-item" style="color:var(--break-fg)">No suma a ingresos · va a costes en la CE</span>`:''}
+          ${transf?(()=>{
+            const d=transferDir(e.transferDirection);
+            return`<span class="meta-item" style="color:var(--break-fg);font-weight:500">${d.icon} ${d.short}${d.sign>0?' · ingreso':' · coste'}</span>`
+              +(e.counterpart?`<span class="meta-item" style="color:var(--text-tertiary)">${escapeHtml(e.counterpart)}</span>`:'')
+              +(e.adminCode?`<span class="meta-item" style="color:var(--text-tertiary)">Cód. ${escapeHtml(e.adminCode)}</span>`:'');
+          })():''}
         </div>
         ${e.notes?`<div class="comment-internal" style="font-style:normal">📝 ${escapeHtml(e.notes)}</div>`:''}
       </div>`;
@@ -3630,11 +3717,11 @@ async function renderExtras(container){
       <div class="kpi-card"><div class="kpi-label">Total facturado extra</div><div class="kpi-value">${fmtMoney(total)}</div><div class="kpi-sub">${filtered.filter(e=>!isTransfer(e)).length} registro${filtered.filter(e=>!isTransfer(e)).length!==1?'s':''} · sin traspasos</div></div>
       <div class="kpi-card"><div class="kpi-label">Pendiente de cobro</div><div class="kpi-value ${pendingAmount>0?'warn':''}">${fmtMoney(pendingAmount)}</div><div class="kpi-sub">${pending.length} sin cobrar</div></div>
       <div class="kpi-card"><div class="kpi-label">Vencido</div><div class="kpi-value ${overdueAmount>0?'alert':''}">${fmtMoney(overdueAmount)}</div><div class="kpi-sub">${overdue.length} factura${overdue.length!==1?'s':''}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Traspasos entre centros</div><div class="kpi-value">${fmtMoney(transfersTotal)}</div><div class="kpi-sub">coste, no ingreso</div></div>
+      <div class="kpi-card"><div class="kpi-label">Traspasos</div><div class="kpi-value" style="font-size:15px">↗ ${fmtMoney(trOut)}<br>↙ ${fmtMoney(trIn)}</div><div class="kpi-sub">emitidos (ingreso) · recibidos (coste)</div></div>
     </div>
     ${alerts.length?renderAlerts(alerts):''}
     <div class="alert alert-amber" style="margin-bottom:14px">
-      <span>ℹ️ Los registros con categoría <strong>"${TRANSFER_CATEGORY}"</strong> no cuentan como ingreso: alimentan la línea de coste "Traspasos entre centros" de la Cuenta de explotación.</span>
+      <span>ℹ️ Los registros de <strong>"${TRANSFER_CATEGORY}"</strong> se separan en la Cuenta de explotación: los <strong>emitidos</strong> (↗) son facturación real y entran en Ingresos; los <strong>recibidos</strong> (↙) son compra y entran en Costes.</span>
     </div>
 
     <div class="audit-section">
@@ -3644,6 +3731,9 @@ async function renderExtras(container){
         <div class="form-group"><label>Concepto *</label><input type="text" id="exConcept" placeholder="Ej. Pedido de leche"></div>
         <div class="form-group"><label>Importe sin IVA (€) *</label><input type="number" id="exAmount" value="0" step="0.01" min="0"></div>
         <div class="form-group"><label>Categoría</label><select id="exCategory">${EXTRA_CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
+        <div class="form-group transfer-only" hidden><label>Sentido del traspaso *</label><select id="exTransferDir">${TRANSFER_DIRECTIONS.map(d=>`<option value="${d.k}">${d.icon} ${d.lbl}</option>`).join('')}</select></div>
+        <div class="form-group transfer-only" hidden><label>Contraparte</label><input type="text" id="exCounterpart" list="cpList" placeholder="Central u otro centro"><datalist id="cpList">${TRANSFER_COUNTERPARTS.map(c=>`<option value="${c}">`).join('')}</datalist></div>
+        <div class="form-group transfer-only" hidden><label>Código administrativo<br><span style="font-size:10.5px;color:var(--text-tertiary);font-weight:400">Pendiente de definir</span></label><input type="text" id="exAdminCode" placeholder="Opcional"></div>
         <div class="form-group"><label>Cliente / departamento</label><input type="text" id="exClient" placeholder="Ej. Nestlé — RRHH"></div>
         <div class="form-group"><label>Nº de factura</label><input type="text" id="exInvoice" placeholder="Opcional"></div>
         <div class="form-group"><label>Estado</label><select id="exState">${PAYMENT_STATES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>
@@ -3685,6 +3775,14 @@ async function renderExtras(container){
       await setDoc(doc(db,'pnl_config','extras'),{list,updatedAt:Timestamp.now()});
     };
 
+    // Los campos de traspaso solo se muestran con esa categoría
+    const catSel=container.querySelector('#exCategory');
+    const toggleTransferFields=()=>{
+      const on=catSel&&catSel.value===TRANSFER_CATEGORY;
+      container.querySelectorAll('.transfer-only').forEach(el=>{el.hidden=!on;});
+    };
+    if(catSel){catSel.addEventListener('change',toggleTransferFields);toggleTransferFields();}
+
     const btnSave=container.querySelector('#btnSaveExtra');
     if(btnSave)btnSave.addEventListener('click',async()=>{
       const msg=container.querySelector('#exMsg');
@@ -3700,6 +3798,11 @@ async function renderExtras(container){
           client:container.querySelector('#exClient').value.trim(),
           invoiceNum:container.querySelector('#exInvoice').value.trim(),
           state:container.querySelector('#exState').value,
+          ...(container.querySelector('#exCategory').value===TRANSFER_CATEGORY?{
+            transferDirection:container.querySelector('#exTransferDir').value,
+            counterpart:container.querySelector('#exCounterpart').value.trim(),
+            adminCode:container.querySelector('#exAdminCode').value.trim()
+          }:{}),
           dueDate:container.querySelector('#exDueDate').value,
           notes:container.querySelector('#exNotes').value.trim()
         }]);
@@ -3943,7 +4046,11 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const extrasAll=(extras||[]).filter(e=>inRange(new Date(e.date+'T12:00:00')));
   // Los traspasos entre centros se registran en Facturación pero no son ingreso: van a su línea de coste
   const extrasInRange=extrasAll.filter(e=>(e.category||'Otros')!==TRANSFER_CATEGORY);
-  const transfersFromBilling=extrasAll.filter(e=>(e.category||'Otros')===TRANSFER_CATEGORY)
+  const transferRecs=extrasAll.filter(e=>(e.category||'Otros')===TRANSFER_CATEGORY);
+  // Emitidos: los facturamos nosotros, entra dinero. Recibidos: nos facturan, sale dinero.
+  const transfersOut=transferRecs.filter(e=>(e.transferDirection||'in')==='out')
+    .reduce((s2,e)=>s2+(e.amount||0),0);
+  const transfersIn=transferRecs.filter(e=>(e.transferDirection||'in')==='in')
     .reduce((s2,e)=>s2+(e.amount||0),0);
   const extrasRevenue=extrasInRange.reduce((s2,e)=>s2+(e.amount||0),0);
   const extrasByCategory={};
@@ -3951,7 +4058,7 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
     const c=e.category||'Otros';
     extrasByCategory[c]=(extrasByCategory[c]||0)+(e.amount||0);
   });
-  const revenue=cateringRevenue+comedor.billed+cafeteria.billed+extrasRevenue;
+  const revenue=cateringRevenue+comedor.billed+cafeteria.billed+extrasRevenue+transfersOut;
   // Meses cubiertos por el rango, para prorratear costes mensuales
   let months=1;
   if(from&&to){
@@ -3989,11 +4096,11 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const iuoFixed=hasManualIuo?0:-((costs.iuoMonthly||costs.otherMonthly||0)*months);
   const iuo=hasManualIuo?-manualIuo:(iuoFromPct+iuoFixed);
 
-  // Traspasos entre centros: se alimentan de los registros de Facturación
-  const transfers=-transfersFromBilling;
+  // Traspasos: los emitidos son ingreso (ya sumados a Revenue); los recibidos son coste
+  const transfers=-transfersIn;
 
   const unitProfit=grossProfit+labourCost+iuo+transfers;
-  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,transfers,unitProfit,months,
+  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn,unitProfit,months,
     hasManualMmpp,hasManualIuo,monthKeysInRange,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
@@ -4164,6 +4271,7 @@ async function renderPnl(container){
         const cats=new Set([...Object.keys(cur.extrasByCategory||{}),...(cmp?Object.keys(cmp.extrasByCategory||{}):[])]);
         return [...cats].sort().map(c=>L(c,cur.extrasByCategory[c]||0,cmp?(cmp.extrasByCategory[c]||0):0,{indent2:true})).join('');
       })()}
+      ${(cur.transfersOut!==0||(cmp&&cmp.transfersOut!==0))?L('Traspasos emitidos · desde Facturación',cur.transfersOut,cmp?cmp.transfersOut:0,{indent:true}):''}
       <div class="pnl-section-head cost">Costes</div>
       ${L(cur.hasManualMmpp?'MMPP (Materias primas) · importe real':'MMPP (Materias primas) · estimado '+(costs.mmppPct!==undefined?costs.mmppPct:35)+'%',cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
       ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
@@ -4174,7 +4282,7 @@ async function renderPnl(container){
       ${L(cur.hasManualIuo?'IUO (Gastos indirectos) · importe real':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{fcVal:fcAgg?fcAgg.iuo:undefined})}
       ${cur.iuoFromPct!==0?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
       ${cur.iuoFixed!==0?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
-      ${(cur.transfers!==0||(cmp&&cmp.transfers!==0))?L('Traspasos entre centros · desde Facturación',cur.transfers,cmp?cmp.transfers:0):''}
+      ${(cur.transfersIn!==0||(cmp&&cmp.transfersIn!==0))?L('Traspasos recibidos · desde Facturación',cur.transfers,cmp?cmp.transfers:0):''}
       <div class="pnl-section-head result">Resultado</div>
       ${L('Unit Profit (Resultado)',cur.unitProfit,cmp?cmp.unitProfit:0,{bold:true,fcVal:fcAgg?fcAgg.unitProfit:undefined})}
     </div>
@@ -4186,7 +4294,7 @@ async function renderPnl(container){
       <div class="audit-row"><span class="audit-req"><strong>Facturación extra</strong> — registros introducidos manualmente en la pestaña "Facturación extra", desglosados por categoría</span></div>
       <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — calculado como ${costs.mmppPct!==undefined?costs.mmppPct:35}% de los ingresos totales (parámetro configurable, no facturas reales)</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — salario mensual real o de convenio (Restauración Colectiva Barcelona 2025) según nivel y jornada, del módulo Personal. Las bajas al ${costs.leaveCostPct!==undefined?costs.leaveCostPct:100}% y las ETT según registros vigentes</span></div>
-      <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — suma de los registros del módulo Facturación con categoría "Traspaso entre centros". No son ingreso, se descuentan como coste</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — de los registros de Facturación con esa categoría: los <strong>emitidos</strong> son facturación real y entran en Ingresos; los <strong>recibidos</strong> son compra y entran en Costes</span></div>
       <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — parte variable como % de ingresos más una parte fija mensual, ambas configurables abajo</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Prorrateo</strong> — los costes mensuales (personal, IUO fijo) se multiplican por ${cur.months} mes${cur.months>1?'es':''} para cubrir el período seleccionado</span></div>
     </div>
@@ -4339,6 +4447,373 @@ function bindPnlControls(container){
   });
 }
 
+
+// ══ CATERING · GENERADOR DE PROPUESTA ═════════════════════════════
+// Catálogo de productos (semilla) — se migra a Firestore en el primer arranque
+// n=nombre · p=precio · d=descripción · a=alérgenos · v=dietas · f=formato
+const MENU_SEED={
+ coffee:[
+  {n:"Pulga Queso con Pan de Nueces y Albaricoques",p:1.5,a:["Gluten", "Leche", "Frutos Secos"]},
+  {n:"Pulga Pavo",p:1.5,a:["Gluten"]},
+  {n:"Pulga Aguacate y Tomate Seco",p:2.75,a:["Gluten"],v:["Vegano", "Vegetariano"]},
+  {n:"Pulga jamon ibérico",p:3.0,a:["Gluten"]},
+  {n:"Pulga Fuet con Pan de Albaricoque y Nueces",p:1.8,a:["Gluten", "Leche", "Frutos Secos"]},
+  {n:"Pulga de Atún y Rúcula",p:1.8,a:["Gluten"]},
+  {n:"Pulga Buti Blanca",p:1.8,a:["Gluten"]},
+  {n:"Pulga Chorizo",p:1.8,a:["Gluten", "Leche"]},
+  {n:"Pulga de Lomo Embuchado",p:1.8,a:["Gluten"]},
+  {n:"Brioche de Jamón Dulce y Queso",p:2.73,a:["Gluten", "Leche"]},
+  {n:"Brioche de Jamón Ibérico",p:3.0,a:["Gluten", "Leche"]},
+  {n:"Brioche de Chocolate Nestlé",p:2.5,a:["Gluten", "Leche"]},
+  {n:"Mini Flautín Jamón iberico",p:3.0,a:["Gluten"]},
+  {n:"Mini Flautín Atún & Rúcula",p:1.8,a:["Gluten"]},
+  {n:"Mini Flautín Pavo",p:1.5,a:["Gluten"]},
+  {n:"Mini Flautín Aguacate & Tomate Seco",p:2.75,a:["Gluten"]},
+  {n:"Mini Croissant Mantequilla",p:1.2,a:["Gluten", "Leche"]},
+  {n:"Mini Croissant Chocolate",p:1.2,a:["Gluten", "Leche", "Frutos Secos"]},
+  {n:"Mini croissant de choco blanco",p:1.2,a:["Gluten", "Leche"]},
+  {n:"Mini croissant de cereales",p:1.2,a:["Gluten", "Leche"]},
+  {n:"Micro Muffin Fresa & Chocolate",p:1.2,a:["Gluten", "Leche"]},
+  {n:"Mini Ensaimada",p:1.0,a:["Gluten"]},
+  {n:"Mini Rol de Canela",p:1.75,a:["Gluten", "Leche"]},
+  {n:"Mini Pain au Chocolat",p:1.75,a:["Gluten", "Leche"]},
+  {n:"Trozo de Banana Bread",p:3.65,a:["Gluten"],f:"Tarrina BIO"},
+  {n:"Mini Cookie",p:1.0,a:["Gluten", "Leche"]},
+  {n:"Mini palmeritas",p:1.0,a:["Gluten"]},
+  {n:"Mini Gofre con Milky Bar",p:3.5,a:["Gluten", "Leche"]},
+  {n:"PopDot Negrito",p:0.86,a:["Gluten", "Leche"]},
+  {n:"Cookie de Te Matcha & Chips de Chocolate Blanco",p:2.95,a:["Leche"]},
+  {n:"Rol de Canela",p:2.2,a:["Gluten", "Leche"],v:["Vegetariano"]},
+  {n:"Vasito de Yogur con Coulis - Sin Muesli",p:2.0,a:["Leche"]},
+  {n:"Yogur con Granola",p:2.65,a:["Gluten", "Leche", "Frutos Secos"]},
+  {n:"SIN GLUTEN - Bocadillo de Queso",p:3.25,a:["Leche"]},
+  {n:"SIN GLUTEN - Bocadillo Aguacate, Tomate Seco y Rúcula",p:3.25,v:["Vegetariano"]},
+  {n:"Borek de Queso",p:2.5,a:["Gluten", "Leche"],v:["Vegetariano"]},
+  {n:"Jarra de Zumo de Naranja Natural",p:15.0},
+  {n:"Set Café Nespresso + Infusiones Nestlé",p:6.2},
+  {n:"Set Leches + Infusiones",p:3.64},
+  {n:"Reposición Café + Leches (sin cafetera)",p:3.65},
+  {n:"Box Coca de Chocolate",p:15.0,a:["Gluten", "Leche", "Frutos Secos"]},
+  {n:"Box Pecaditos",p:15.0,a:["Gluten", "Leche"]},
+  {n:"Brocheta de Fruta Variada",p:1.82,v:["Vegano", "Vegetariano"]},
+  {n:"Trufas de Chocolate",p:1.45,a:["Leche"]}
+ ],
+ lunch:[
+  {n:"Brioche de Pollo con Salsa César y Lechuga",p:3.0,a:["Gluten", "Leche"]},
+  {n:"Brioche de Jamón Ibérico",p:3.0,a:["Gluten", "Leche"]},
+  {n:"Brioche de Brie y Confitura de Tomate",p:3.0,a:["Gluten", "Leche"]},
+  {n:"Brioche de Salmón Ahumado, Eneldo y Queso Crema",p:3.0,a:["Gluten", "Leche"]},
+  {n:"Brioche de Atún, Mayonesa y Rúcula",p:2.1,a:["Gluten", "Leche"]},
+  {n:"Croquetas de Cocido",p:2.5,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Croqueta de Ceps",p:2.5,a:["Gluten"],v:["Vegetariano"],f:"Bandeja Madera"},
+  {n:"Croqueta de Verduras",p:2.5,a:["Gluten", "Leche"],v:["Vegetariano"],f:"Bandeja Madera"},
+  {n:"Croqueta de Queso de Cabra y Cebolla Caramelizada",p:2.5,a:["Gluten", "Leche"],v:["Vegetariano"],f:"Bandeja Madera"},
+  {n:"Croqueta de Pollo Asado",p:2.5,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Croqueta de Gamba Roja",p:2.5,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Croqueta de Chuletón",p:2.5,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Brocheta de Tomate Cherry y Mozzarella",p:2.5,a:["Leche"],v:["Vegetariano"],f:"Bandeja Madera"},
+  {n:"Shot Hummus con Crudités",p:2.5,v:["Vegano", "Vegetariano"],f:"Mini"},
+  {n:"Jamón Ibérico con Pan de Cristal",p:3.0,a:["Gluten"],f:"Bandeja Madera"},
+  {n:"Gilda",p:1.75,f:"Bandeja Madera"},
+  {n:"Box Tortilla de Patatas",p:11.5,v:["Vegetariano"]},
+  {n:"Tostadita con Anchoa y Mantequilla",p:2.28,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Mini Wrap de Espinaca, Salmón y Queso",p:2.0,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Borek de Queso",p:2.5,a:["Gluten", "Leche"],v:["Vegetariano"]},
+  {n:"Gyoza de Verdura",p:2.0,a:["Gluten"],v:["Vegano", "Vegetariano"],f:"Bandeja Madera"},
+  {n:"Gyoza de Langostino",p:2.0,a:["Gluten"],f:"Bandeja Madera"},
+  {n:"Trozo de Focaccia de Gorgonzola y Cebolla",p:1.0,a:["Gluten", "Leche"],v:["Vegetariano"],f:"Bandeja Madera"},
+  {n:"Mini Burger de Ternera",p:3.6,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Brochetas de Langostinos con Pan Japonés",p:2.75,a:["Gluten"],f:"Bandeja Madera"},
+  {n:"Fingers de Pollo Rebozados con Mayonesa Japonesa",p:2.14,a:["Gluten"],f:"Bandeja Madera"},
+  {n:"Baos Pulled Pork",p:3.6,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Trozo de Focaccia de Olivada y Tomate Seco",p:1.33,a:["Gluten"],v:["Vegetariano"],f:"Bandeja Madera"},
+  {n:"Mini Bikini de sobrasada",p:2.8,a:["Gluten", "Leche", "Frutos Secos"],f:"Bandeja Madera"},
+  {n:"Tabla de Quesos",p:25.0,a:["Gluten", "Leche"],v:["Vegetariano"],f:"Mini"},
+  {n:"Tabla de Jamón con Pan de Coca",p:25.0,a:["Gluten"]},
+  {n:"SIN GLUTEN - Bikini sobrasada, queso y miel",p:3.5,a:["Leche", "Frutos Secos"],f:"Bandeja Madera"},
+  {n:"SIN GLUTEN Mini wrap de salmón, espinaca y queso",p:3.91,a:["Leche"],f:"Bandeja Madera"},
+  {n:"SIN GLUTEN- Pan con jamón ibérico",p:4.0,f:"Bandeja Madera"},
+  {n:"Ensalada verde básica XL",p:5.5,d:"Plato grande, para personas con intolerancias, alergias o dietas específicas.",v:["Vegano", "Vegetariano"]},
+  {n:"Empanada Argentina",p:2.59,a:["Gluten"]},
+  {n:"Tabla de quesos y embutidos Nestlé",p:9.17,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Brocheta de Verduras Variadas",p:3.13,v:["Vegano", "Vegetariano"],f:"Bandeja Madera"},
+  {n:"Piruleta de Cordero",p:2.5,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Falafel de Remolacha con Hummus",p:3.99,v:["Vegano", "Vegetariano"],f:"Bandeja Madera"},
+  {n:"Steak Tartar",p:15.92,a:["Gluten"],f:"Bandeja Madera"},
+  {n:"Taco de Atún con Guacamole",p:5.75,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Tostadas con Steak Tartar Nestlé",p:8.0,a:["Gluten"],f:"Bandeja Madera"},
+  {n:"Roll vegano de verduras",p:4.22,a:["Gluten", "Leche"],f:"Bandeja Madera"},
+  {n:"Mini pollo teriyaki",p:4.0,a:["Gluten"],f:"Bandeja Madera"},
+  {n:"Steak Tartar Nestlé",p:15.92,f:"Bandeja Madera"},
+  {n:"Brocheta de Fruta Variada",p:1.82,v:["Vegano", "Vegetariano"]},
+  {n:"SIN GLUTEN - Brownie",p:3.65,a:["Leche", "Frutos Secos"],f:"Mini"},
+  {n:"Trufas de Chocolate",p:1.45,a:["Leche"]},
+  {n:"Cubitera con hielo + pinzas cubitera",p:2.5},
+  {n:"Limon Cortado",p:1.5},
+  {n:"Menta",p:2.5},
+  {n:"Gazpacho de Sandía, Tomate & Albahaca",p:2.5,d:"con Pipas de Calabaza",v:["Vegano", "Vegetariano"],f:"Mini"},
+  {n:"Gazpacho de Pera & Espinaca",p:2.5,d:"con Pipas de Calabaza",v:["Vegano", "Vegetariano"],f:"Mini"},
+  {n:"Ensalada Fría de Garbanzos, Huevo, Aguacate & Tomate Seco",p:3.5,d:"con Pipas de Calabaza y Vinagreta de Mostaza",v:["Vegetariano"],f:"Mini"},
+  {n:"Ensalada de Calabacín Salteado, Espárragos Verdes, Higo & Rúcula",p:3.5,d:"con Pesto Aromático",a:["Frutos Secos"],v:["Vegano"],f:"Mini"},
+  {n:"Ensalada verde basica",p:3.5,v:["Vegano", "Vegetariano"],f:"Mini"},
+  {n:"Pasta Alla Norma",p:3.75,d:"con Berenjena y Ricotta",a:["Gluten", "Leche"],v:["Vegetariano"],f:"Mini"},
+  {n:"Pasta Integral Vegana",p:3.75,d:"con Feta Vegano, Tomate Seco y Dressing de Albahaca",a:["Gluten"],v:["Vegano", "Vegetariano"],f:"Mini"},
+  {n:"Fideuá de Verduras",p:3.75,d:"con Mayonesa de Tomate",a:["Gluten"],v:["Vegano", "Vegetariano"],f:"Mini"},
+  {n:"Santorini Bowl",p:4.0,d:"con Salsa Tzaziki Vegana",a:["Gluten"],v:["Vegano"],f:"Mini"},
+  {n:"Pollo Marinado con Salsa de Mostaza",p:4.0,d:"con Maíz y Tomate al Horno",f:"Mini"},
+  {n:"Pavo de Lola",p:4.0,d:"con Arroz, Aceite de Albahaca, Tomate Seco y Cherry Horno",f:"Mini"},
+  {n:"Secreto Italiano",p:4.0,d:"con Patata Gajo al Limón y Romero",a:["Leche"],f:"Mini"},
+  {n:"Tarta Carajillo de Baileys",p:3.65,a:["Gluten", "Leche"],v:["Vegetariano"],f:"Mini"},
+  {n:"Bizcocho, Pastelera y Fruta de Temporada",p:3.65,a:["Gluten", "Leche"],v:["Vegetariano"],f:"Mini"}
+ ]
+};
+
+// El catálogo real vive en Firestore protegido; en memoria arranca vacío
+let MENU_CATALOG={coffee:[],lunch:[]};
+
+async function ensureMenuSeeded(){
+  try{
+    const snap=await getDoc(doc(db,'catering_config','menu_catalog'));
+    if(!snap.exists()){
+      await setDoc(doc(db,'catering_config','menu_catalog'),{...MENU_SEED,updatedAt:Timestamp.now()});
+      MENU_CATALOG={coffee:MENU_SEED.coffee,lunch:MENU_SEED.lunch};
+    } else {
+      const d=snap.data();
+      MENU_CATALOG={coffee:d.coffee||[],lunch:d.lunch||[]};
+    }
+  }catch(e){console.warn('No se pudo sincronizar el catálogo:',e.message);}
+}
+
+// Formatea la carta para incluirla en el prompt
+function catalogBlock(which){
+  const fmtItem=i=>{
+    const bits=[`- ${i.n}`];
+    if(i.d)bits.push(i.d);
+    const tail=[];
+    tail.push(`${i.p.toFixed(2).replace('.',',')} €`);
+    if(i.a&&i.a.length)tail.push(`alérgenos: ${i.a.join(', ')}`);
+    if(i.v&&i.v.length)tail.push(i.v.join('/'));
+    if(i.f)tail.push(`formato ${i.f}`);
+    return `${bits.join(' ')} · ${tail.join(' · ')}`;
+  };
+  const parts=[];
+  const wantCoffee=which==='coffee'||which==='both';
+  const wantLunch=which==='lunch'||which==='both';
+  if(wantCoffee&&MENU_CATALOG.coffee.length){
+    parts.push('### Carta de Coffee break / desayuno');
+    parts.push(MENU_CATALOG.coffee.map(fmtItem).join('\n'));
+  }
+  if(wantLunch&&MENU_CATALOG.lunch.length){
+    if(parts.length)parts.push('');
+    parts.push('### Carta de Lunch / evento');
+    parts.push(MENU_CATALOG.lunch.map(fmtItem).join('\n'));
+  }
+  return parts.join('\n');
+}
+
+const DEFAULT_GUIDELINES=`- Cocina de producto real, sin ultraprocesados.
+- Ofrecer siempre una opción vegetariana y una sin gluten.
+- Indicar los alérgenos de cada elaboración.
+- Presentación cuidada: el montaje importa tanto como el sabor.
+- Priorizar producto de temporada y proveedor de proximidad.
+- Ajustar cantidades al número de comensales, sin excesos.`;
+
+const SERVICE_TYPES=['Coffee break','Desayuno','Lunch','Finger lunch','Comida a la carta','Cóctel','Evento','Otro'];
+const EVENT_TYPES=['Reunión interna','Reunión con cliente','Formación','Celebración','Presentación','Visita externa','Otro'];
+
+async function loadGuidelines(){
+  const snap=await getDoc(doc(db,'catering_config','promptGuidelines'));
+  return snap.exists()?(snap.data().text||DEFAULT_GUIDELINES):DEFAULT_GUIDELINES;
+}
+
+// Contexto histórico que se adjunta al prompt para que la propuesta sea realista
+async function buildHistoricalContext(){
+  try{
+    const orders=(await getOrders()).filter(o=>o.orderStatus!=='CANCELADO');
+    if(!orders.length)return null;
+    const byType={};
+    orders.forEach(o=>{
+      const t=o.cateringType||'Otros';
+      if(!byType[t])byType[t]={count:0,pax:0,price:0};
+      byType[t].count++;byType[t].pax+=o.pax||0;byType[t].price+=o.priceTotal||0;
+    });
+    const top=Object.entries(byType).sort((a,b)=>b[1].count-a[1].count).slice(0,8);
+    const withPax=orders.filter(o=>o.pax>0&&o.priceTotal>0);
+    const avgPerPax=withPax.length?withPax.reduce((s,o)=>s+o.priceTotal/o.pax,0)/withPax.length:0;
+    const avgPax=orders.filter(o=>o.pax>0).reduce((s,o,_,a)=>s+o.pax/a.length,0);
+    return{top,avgPerPax,avgPax,total:orders.length};
+  }catch(e){return null;}
+}
+
+function buildPrompt(f,guidelines,hist,roomCapacity){
+  const L=[];
+  L.push('Actúa como chef y responsable de un servicio de catering corporativo. Necesito una propuesta de catering concreta y lista para presentar al cliente.');
+  L.push('');
+  L.push('## Datos del servicio');
+  L.push(`- Comensales: ${f.pax||'—'}`);
+  L.push(`- Tipo de evento: ${f.eventType||'—'}`);
+  L.push(`- Tipo de servicio: ${f.serviceType||'—'}`);
+  if(f.room)L.push(`- Sala: ${f.room}${roomCapacity?` (aforo ${roomCapacity} personas)`:''}`);
+  if(f.deliveryTime)L.push(`- Hora de entrega: ${f.deliveryTime}`);
+  if(f.pickupTime)L.push(`- Hora de recogida: ${f.pickupTime}`);
+  if(f.requester)L.push(`- Solicitado por: ${f.requester}`);
+  if(f.ceco)L.push(`- CECO: ${f.ceco}`);
+  if(f.allergies)L.push(`- Alergias e intolerancias a respetar: ${f.allergies}`);
+  if(f.notes)L.push(`- Notas adicionales: ${f.notes}`);
+  L.push('');
+  L.push('## Nuestra carta disponible');
+  L.push('Debes construir la propuesta **exclusivamente** con estos productos, respetando nombres y precios:');
+  L.push('');
+  L.push(catalogBlock(f.catalogScope||'both'));
+  L.push('');
+  L.push('## Pautas de nuestra cocina');
+  L.push(guidelines);
+  if(hist){
+    L.push('');
+    L.push('## Contexto de nuestro histórico');
+    L.push(`Hemos servido ${hist.total} caterings. Los formatos más frecuentes son:`);
+    hist.top.forEach(([t,v])=>{
+      const pp=v.pax?v.price/v.pax:0;
+      L.push(`- ${t}: ${v.count} servicios${v.pax?`, ${Math.round(v.pax/v.count)} pax de media`:''}${pp?`, ${pp.toFixed(2)} €/pax`:''}`);
+    });
+    if(hist.avgPerPax)L.push(`Nuestro precio medio histórico es de ${hist.avgPerPax.toFixed(2)} € por comensal (sin IVA).`);
+  }
+  L.push('');
+  L.push('## Qué necesito de ti');
+  L.push('1. Una selección de productos **de la carta anterior**, con las unidades de cada uno y el total para los comensales indicados.');
+  L.push('2. El precio total de la propuesta y el precio resultante por comensal, calculados con los precios de la carta.');
+  L.push('3. Confirmación de que la propuesta cubre las alergias e intolerancias indicadas, señalando qué productos son la alternativa para cada caso.');
+  L.push('4. Una tabla resumen: producto · unidades · precio unitario · subtotal.');
+  L.push('5. Indicaciones de montaje y material necesario para la sala indicada.');
+  L.push('6. Una breve justificación de por qué esa combinación encaja con el tipo de evento y la franja horaria.');
+  L.push('');
+  L.push('Reglas importantes:');
+  L.push('- No inventes productos que no estén en la carta. Si crees que falta algo necesario, dímelo explícitamente.');
+  L.push('- No cambies los precios de la carta.');
+  L.push('- Si falta algún dato relevante para proponer, pregúntame antes en lugar de suponerlo.');
+  return L.join('\n');
+}
+
+let proposalForm={pax:'',eventType:'',serviceType:'',room:'',deliveryTime:'',pickupTime:'',requester:'',ceco:'',allergies:'',notes:'',catalogScope:'both'};
+
+async function renderProposal(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Preparando…</span></div>`;
+  try{
+    const [guidelines,hist]=await Promise.all([loadGuidelines(),buildHistoricalContext(),ensureMenuSeeded()]);
+    const f=proposalForm;
+    const roomCap=f.room?getRoomCapacity(f.room):null;
+    const overCap=roomCap&&f.pax&&+f.pax>roomCap;
+    const prompt=buildPrompt(f,guidelines,hist,roomCap);
+    const ready=f.pax&&f.serviceType;
+
+    container.innerHTML=moduleHeader('Generar propuesta de catering','Rellena los datos y copia el texto para pegarlo en Claude')+`
+    ${overCap?renderAlerts([{type:'red',msg:`Aforo superado · la sala ${f.room} admite ${roomCap} personas y has indicado ${f.pax}`}]):''}
+    <div class="audit-section">
+      <h3>Datos del servicio</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Comensales (pax) *</label><input type="number" id="prPax" value="${escapeHtml(f.pax)}" min="1" placeholder="Ej. 25"></div>
+        <div class="form-group"><label>Tipo de servicio *</label><select id="prService"><option value="">Selecciona…</option>${SERVICE_TYPES.map(t=>`<option value="${t}" ${f.serviceType===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Tipo de evento</label><select id="prEvent"><option value="">Selecciona…</option>${EVENT_TYPES.map(t=>`<option value="${t}" ${f.eventType===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Sala</label><input type="text" id="prRoom" value="${escapeHtml(f.room)}" list="roomList" placeholder="Nombre de la sala"><datalist id="roomList">${ROOM_DIRECTORY.slice(0,120).map(r=>`<option value="${escapeHtml(r.room)}">`).join('')}</datalist></div>
+        <div class="form-group"><label>Hora de entrega</label><input type="time" id="prDelivery" value="${escapeHtml(f.deliveryTime)}"></div>
+        <div class="form-group"><label>Hora de recogida</label><input type="time" id="prPickup" value="${escapeHtml(f.pickupTime)}"></div>
+        <div class="form-group"><label>Persona solicitante</label><input type="text" id="prRequester" value="${escapeHtml(f.requester)}" placeholder="Nombre y apellidos"></div>
+        <div class="form-group"><label>CECO</label><input type="text" id="prCeco" value="${escapeHtml(f.ceco)}" placeholder="Centro de coste"></div>
+        <div class="form-group form-group-full"><label>Alergias e intolerancias</label><input type="text" id="prAllergies" value="${escapeHtml(f.allergies)}" placeholder="Ej. 2 sin gluten, 1 sin lactosa, 1 vegano"></div>
+        <div class="form-group"><label>Carta a incluir</label><select id="prScope">
+          <option value="both" ${(f.catalogScope||'both')==='both'?'selected':''}>Ambas cartas (${MENU_CATALOG.coffee.length+MENU_CATALOG.lunch.length} productos)</option>
+          <option value="coffee" ${f.catalogScope==='coffee'?'selected':''}>Solo coffee break (${MENU_CATALOG.coffee.length})</option>
+          <option value="lunch" ${f.catalogScope==='lunch'?'selected':''}>Solo lunch / evento (${MENU_CATALOG.lunch.length})</option>
+        </select></div>
+        <div class="form-group form-group-full"><label>Notas adicionales</label><textarea id="prNotes" rows="2" placeholder="Cualquier detalle relevante…">${escapeHtml(f.notes)}</textarea></div>
+      </div>
+    </div>
+
+    <div class="audit-section">
+      <h3>Texto generado</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">${ready?'Cópialo y pégalo en Claude. Incluye tus pautas de cocina y el contexto de vuestro histórico.':'Rellena al menos los comensales y el tipo de servicio para generar el texto.'}</p>
+      <textarea id="prPrompt" class="prompt-box" rows="16" readonly>${escapeHtml(prompt)}</textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn-primary" id="btnCopyPrompt" style="max-width:220px" ${ready?'':'disabled'}>Copiar texto</button>
+        <button class="btn-action" id="btnResetProposal">Vaciar formulario</button>
+      </div>
+      <p id="prMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+
+    <div style="font-size:11.5px;color:var(--text-tertiary);line-height:1.6;margin-bottom:10px">
+      ℹ️ Esta pantalla no llama a ninguna IA por su cuenta: prepara el texto para que lo pegues donde quieras. Incluye vuestra carta completa (${MENU_CATALOG.coffee.length+MENU_CATALOG.lunch.length} productos con precios y alérgenos)${hist?` y datos de ${hist.total} caterings del histórico`:''}.
+    </div>`;
+
+    const bind=(id,field,rerender)=>{
+      const el=container.querySelector(id);
+      if(!el)return;
+      el.addEventListener('change',()=>{
+        proposalForm[field]=el.value;
+        renderProposal(container);
+      });
+    };
+    bind('#prPax','pax');bind('#prService','serviceType');bind('#prEvent','eventType');
+    bind('#prRoom','room');bind('#prDelivery','deliveryTime');bind('#prPickup','pickupTime');
+    bind('#prRequester','requester');bind('#prCeco','ceco');bind('#prAllergies','allergies');bind('#prNotes','notes');bind('#prScope','catalogScope');
+
+    const btnCopy=container.querySelector('#btnCopyPrompt');
+    if(btnCopy)btnCopy.addEventListener('click',async()=>{
+      const msg=container.querySelector('#prMsg');
+      const box=container.querySelector('#prPrompt');
+      try{
+        await navigator.clipboard.writeText(box.value);
+        msg.textContent='✓ Texto copiado al portapapeles';msg.style.color='var(--ok-fg)';
+      }catch(e){
+        box.removeAttribute('readonly');box.select();
+        document.execCommand('copy');
+        box.setAttribute('readonly','');
+        msg.textContent='✓ Texto copiado';msg.style.color='var(--ok-fg)';
+      }
+      setTimeout(()=>{if(msg)msg.textContent='';},2500);
+    });
+    const btnReset=container.querySelector('#btnResetProposal');
+    if(btnReset)btnReset.addEventListener('click',()=>{
+      proposalForm={pax:'',eventType:'',serviceType:'',room:'',deliveryTime:'',pickupTime:'',requester:'',ceco:'',allergies:'',notes:'',catalogScope:'both'};
+      renderProposal(container);
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function openGuidelinesModal(container){
+  loadGuidelines().then(text=>{
+    const overlay=document.createElement('div');
+    overlay.className='modal-overlay';
+    overlay.innerHTML=`<div class="modal modal-wide">
+      <div class="modal-header"><h2 class="modal-title">Pautas de cocina</h2><button class="modal-close" data-close>✕</button></div>
+      <div class="modal-body">
+        <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px">Estas pautas se incluyen en todos los textos que generes, para que las propuestas respeten siempre vuestros criterios.</p>
+        <div class="form-group"><label>Pautas</label><textarea id="glText" rows="12">${escapeHtml(text)}</textarea></div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+          <button class="btn-primary" id="glSave" style="max-width:200px">Guardar pautas</button>
+          <button class="btn-action" id="glReset">Restaurar por defecto</button>
+        </div>
+        <p id="glMsg" style="font-size:12px;margin-top:10px"></p>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const close=()=>overlay.remove();
+    overlay.querySelector('[data-close]').addEventListener('click',close);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+    overlay.querySelector('#glReset').addEventListener('click',()=>{
+      overlay.querySelector('#glText').value=DEFAULT_GUIDELINES;
+    });
+    overlay.querySelector('#glSave').addEventListener('click',async()=>{
+      const msg=overlay.querySelector('#glMsg');
+      try{
+        await setDoc(doc(db,'catering_config','promptGuidelines'),{text:overlay.querySelector('#glText').value,updatedAt:Timestamp.now()});
+        close();
+        renderProposal(container);
+      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
+    });
+  });
+}
 
 // ══ MÓDULO ACTAS DE REUNIONES ═════════════════════════════════════
 const MEETING_TYPES=[
@@ -4650,7 +5125,7 @@ async function renderFcSales(container){
       </div>`;
     }).join('');
 
-    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Ventas',events)+`
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Forecast & sales',events)+`
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Previsión total del mes</div><div class="kpi-value">${fmtMoney(totalFc)}</div><div class="kpi-sub">mensual + diaria</div></div>
       <div class="kpi-card"><div class="kpi-label">Real acumulado</div><div class="kpi-value">${fmtMoney(totalReal)}</div></div>
@@ -5119,6 +5594,8 @@ const pnlScreen=document.getElementById('pnlScreen');
 const billingScreen=document.getElementById('billingScreen');
 const forecastScreen=document.getElementById('forecastScreen');
 const minutesScreen=document.getElementById('minutesScreen');
+const cateringChoiceScreen=document.getElementById('cateringChoiceScreen');
+const proposalScreen=document.getElementById('proposalScreen');
 
 function showScreen(name){
   if(name==='hub')setTimeout(loadHubStats,50);
@@ -5129,6 +5606,8 @@ function showScreen(name){
   billingScreen.hidden=name!=='billing';
   forecastScreen.hidden=name!=='forecast';
   minutesScreen.hidden=name!=='minutes';
+  cateringChoiceScreen.hidden=name!=='cateringChoice';
+  proposalScreen.hidden=name!=='proposal';
   document.getElementById('app').hidden=name!=='catering';
 }
 
@@ -5137,8 +5616,7 @@ document.querySelectorAll('.hub-card').forEach(card=>{
     if(card.classList.contains('disabled'))return;
     const mod=card.dataset.module;
     if(mod==='catering'){
-      showScreen('catering');
-      if(!appStarted){appStarted=true;startApp();}
+      showScreen('cateringChoice');
     } else if(mod==='audit'){
       showScreen('audit');
       renderAuditView(currentAuditView);
@@ -5163,13 +5641,27 @@ document.querySelectorAll('.hub-card').forEach(card=>{
   });
 });
 
-document.getElementById('btnBackFromCatering').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromCatering').addEventListener('click',()=>showScreen('cateringChoice'));
 document.getElementById('btnBackFromAudit').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromStaff').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromPnl').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromBilling').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromForecast').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromMinutes').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromChoice').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromProposal').addEventListener('click',()=>showScreen('cateringChoice'));
+document.getElementById('btnEditGuidelines').addEventListener('click',()=>openGuidelinesModal(document.getElementById('proposalContent')));
+document.querySelectorAll('.choice-card').forEach(card=>{
+  card.addEventListener('click',()=>{
+    if(card.dataset.choice==='sheet'){
+      showScreen('catering');
+      if(!appStarted){appStarted=true;startApp();}
+    } else {
+      showScreen('proposal');
+      renderProposal(document.getElementById('proposalContent'));
+    }
+  });
+});
 document.getElementById('btnNewMinute').addEventListener('click',()=>openMinuteModal(null,document.getElementById('minutesContent')));
 
 // Importar horario de personal
@@ -5258,6 +5750,8 @@ onAuthStateChanged(auth, user=>{
     billingScreen.hidden=true;
     forecastScreen.hidden=true;
     minutesScreen.hidden=true;
+    cateringChoiceScreen.hidden=true;
+    proposalScreen.hidden=true;
     appEl.hidden=true;
   }
 });
@@ -5309,7 +5803,7 @@ document.getElementById('btnForgotPassword').addEventListener('click', async(e)=
 loginPassword.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 loginEmail.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-['btnLogout','btnLogoutHub','btnLogoutAudit','btnLogoutStaff','btnLogoutPnl','btnLogoutBilling','btnLogoutForecast','btnLogoutMinutes'].forEach(id=>{
+['btnLogout','btnLogoutHub','btnLogoutAudit','btnLogoutStaff','btnLogoutPnl','btnLogoutBilling','btnLogoutForecast','btnLogoutMinutes','btnLogoutChoice','btnLogoutProposal'].forEach(id=>{
   const b=document.getElementById(id);
   if(b)b.addEventListener('click',async()=>{await signOut(auth);});
 });
