@@ -3883,20 +3883,19 @@ async function loadEvents(){
   const snap=await getDoc(doc(db,'pnl_config','events'));
   return snap.exists()?(snap.data().list||[]):[];
 }
-// Acontecimientos que solapan con un rango de fechas
+// Acontecimientos que EMPIEZAN dentro del período: solo se muestran en el mes en que suceden
 function eventsInRange(events,from,to){
   if(!from||!to)return events;
   return events.filter(e=>{
     const s=new Date(e.start+'T12:00:00');
-    const en=new Date((e.end||e.start)+'T12:00:00');
-    return s<=to&&en>=from;
+    return s>=from&&s<=to;
   });
 }
 function eventsBanner(events,from,to){
   const rel=eventsInRange(events,from,to);
   if(!rel.length)return'';
   return`<div class="events-banner">
-    <span class="events-banner-title">Acontecimientos en este período</span>
+    <span class="events-banner-title">Acontecimientos ocurridos en este período</span>
     ${rel.map(e=>{
       const t=evType(e.type);
       const s=new Date(e.start+'T12:00:00');
@@ -4007,7 +4006,10 @@ document.getElementById('pnlTabs').addEventListener('click',e=>{
 });
 
 // ══ CUENTA DE EXPLOTACIÓN (P&L) ═══════════════════════════════════
-let pnlRange={type:'month',refDate:new Date(),from:null,to:null,compare:true,compareType:'month',compareRefDate:(()=>{const d=new Date();d.setMonth(d.getMonth()-1);return d;})(),compareFrom:null,compareTo:null};
+// Por defecto la CE compara con el mismo período del año anterior
+let pnlRange={type:'month',refDate:new Date(),from:null,to:null,compare:true,compareType:'month',
+  compareRefDate:(()=>{const d=new Date();d.setFullYear(d.getFullYear()-1);return d;})(),
+  compareFrom:null,compareTo:null};
 
 function pnlLine(label,value,revenue,opts={}){
   const pct=revenue?(value/revenue*100):0;
@@ -4029,7 +4031,7 @@ function pnlLine(label,value,revenue,opts={}){
   </div>`;
 }
 
-function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras){
+function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchases){
   const inRange=d=>!from||!to||(d&&d>=from&&d<=to);
   const cateringActive=cateringOrders.filter(o=>o.orderStatus!=='CANCELADO'&&inRange(toDate(o.deliveryAt)));
   const cateringRevenue=cateringActive.reduce((s,o)=>s+(o.priceTotal||0),0);
@@ -4083,10 +4085,11 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const hasManualMmpp=manualMmpp>0;
   const hasManualIuo=manualIuo>0;
 
-  // MMPP: importe real introducido a mano si existe; si no, % sobre ingresos
-  const mmpp=hasManualMmpp
-    ? -manualMmpp
-    : -(revenue*((costs.mmppPct!==undefined?costs.mmppPct:costs.purchasePct||35)/100));
+  // MMPP: importe real. Prioridad: importe manual de esta pantalla → compras reales del Forecast.
+  // No se estima por porcentaje: si no hay dato real, la línea queda a cero y se avisa.
+  const forecastPurchases=fcPurchases||0;
+  const mmppSource=hasManualMmpp?'manual':(forecastPurchases>0?'forecast':'none');
+  const mmpp=hasManualMmpp?-manualMmpp:-forecastPurchases;
   const costOfSales=mmpp;
   const grossProfit=revenue+costOfSales;
 
@@ -4101,7 +4104,7 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
 
   const unitProfit=grossProfit+labourCost+iuo+transfers;
   return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn,unitProfit,months,
-    hasManualMmpp,hasManualIuo,monthKeysInRange,
+    hasManualMmpp,hasManualIuo,monthKeysInRange,mmppSource,forecastPurchases,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
 
@@ -4153,8 +4156,30 @@ async function renderPnl(container){
       } else if(ct==='custom'){cFrom=r.compareFrom;cTo=r.compareTo;cLabel='rango personalizado';}
     }
 
-    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras);
-    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList,extras):null;
+    // Compras reales introducidas en Forecast, sumadas para el período
+    const sumForecastPurchases=async(f,t)=>{
+      if(!f||!t)return 0;
+      const keys=[];
+      const cur2=new Date(f.getFullYear(),f.getMonth(),1);
+      while(cur2<=t){keys.push(`${cur2.getFullYear()}-${String(cur2.getMonth()+1).padStart(2,'0')}`);cur2.setMonth(cur2.getMonth()+1);}
+      const docs=await Promise.all(keys.map(k=>getDoc(doc(db,'forecast_config',k))));
+      let total=0;
+      docs.forEach(sn=>{
+        if(!sn.exists())return;
+        Object.entries(sn.data().purchases||{}).forEach(([day,v])=>{
+          const dd=new Date(day+'T12:00:00');
+          if(dd>=f&&dd<=t)total+=+v||0;
+        });
+      });
+      return total;
+    };
+    const [fcPurchCur,fcPurchCmp]=await Promise.all([
+      sumForecastPurchases(from,to),
+      (r.compare&&cFrom&&cTo)?sumForecastPurchases(cFrom,cTo):Promise.resolve(0)
+    ]);
+
+    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchCur);
+    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList,extras,fcPurchCmp):null;
 
     const varOf=(a,b)=>b?((a-b)/Math.abs(b)*100):0;
     const varTxt=(a,b)=>{if(!b)return'';const v=varOf(a,b);return`${v>=0?'+':''}${v.toFixed(1)}%`;};
@@ -4232,6 +4257,7 @@ async function renderPnl(container){
       });
       const fcRevenue=fcCatering+fcComedor+fcCafeteria+fcExtra;
       // Las columnas de forecast se muestran siempre, aunque aún no haya previsión introducida
+      // Previsión de MMPP: el gasto previsto si existe, si no el objetivo sobre la venta prevista
       const fcMmpp=fcPurchases>0?-fcPurchases:-(fcRevenue*((costs.mmppPct!==undefined?costs.mmppPct:35)/100));
       const fcGross=fcRevenue+fcMmpp;
       const fcLabour=cur.labourCost; // el coste de personal previsto es el mismo estructural
@@ -4273,7 +4299,7 @@ async function renderPnl(container){
       })()}
       ${(cur.transfersOut!==0||(cmp&&cmp.transfersOut!==0))?L('Traspasos emitidos · desde Facturación',cur.transfersOut,cmp?cmp.transfersOut:0,{indent:true}):''}
       <div class="pnl-section-head cost">Costes</div>
-      ${L(cur.hasManualMmpp?'MMPP (Materias primas) · importe real':'MMPP (Materias primas) · estimado '+(costs.mmppPct!==undefined?costs.mmppPct:35)+'%',cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
+      ${L('MMPP (Materias primas)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · compras reales de Forecast':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
       ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
       ${L('Labour Cost (Personal)',cur.labourCost,cmp?cmp.labourCost:0,{fcVal:fcAgg?fcAgg.labourCost:undefined})}
       ${L('Plantilla activa',cur.labourPayroll,cmp?cmp.labourPayroll:0,{indent:true})}
@@ -4292,7 +4318,7 @@ async function renderPnl(container){
       <div class="audit-row"><span class="audit-req"><strong>Catering</strong> — importe sin IVA de pedidos no cancelados, del módulo Catering (importación CSV/Holded)</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Comedor / Cafetería</strong> — facturado de los CSV importados con los botones de la barra superior</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Facturación extra</strong> — registros introducidos manualmente en la pestaña "Facturación extra", desglosados por categoría</span></div>
-      <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — calculado como ${costs.mmppPct!==undefined?costs.mmppPct:35}% de los ingresos totales (parámetro configurable, no facturas reales)</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — importe real: primero el introducido en la tabla de costes por mes; si no hay, la suma del gasto real registrado en Forecast → Compras. Nunca se estima por porcentaje</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — salario mensual real o de convenio (Restauración Colectiva Barcelona 2025) según nivel y jornada, del módulo Personal. Las bajas al ${costs.leaveCostPct!==undefined?costs.leaveCostPct:100}% y las ETT según registros vigentes</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — de los registros de Facturación con esa categoría: los <strong>emitidos</strong> son facturación real y entran en Ingresos; los <strong>recibidos</strong> son compra y entran en Costes</span></div>
       <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — parte variable como % de ingresos más una parte fija mensual, ambas configurables abajo</span></div>
@@ -4306,13 +4332,14 @@ async function renderPnl(container){
       <div class="kpi-card"><div class="kpi-label">Margen sobre ingresos</div><div class="kpi-value ${cur.unitProfit<0?'alert':''}">${cur.revenue?(cur.unitProfit/cur.revenue*100).toFixed(1):0}%</div></div>
     </div>
 
+    ${cur.mmppSource==='none'?`<div class="alert alert-red" style="margin-top:16px"><span>⚠️ <strong>Sin datos de compras</strong> para este período. Introduce el gasto real en Forecast → Compras, o el importe mensual en la tabla de abajo. La línea de MMPP está a cero, así que el margen que ves está incompleto.</span></div>`:''}
     <div class="alert alert-amber" style="margin-top:16px">
-      <span>⚠️ Cifras <strong>orientativas</strong>: el personal usa la tabla salarial del convenio de Barcelona 2025, prorrateada sobre ${cur.months} mes${cur.months>1?'es':''} del período. MMPP e IUO son parámetros configurables, no facturas reales.</span>
+      <span>⚠️ Cifras <strong>orientativas</strong>: el personal usa la tabla salarial del convenio de Barcelona 2025, prorrateada sobre ${cur.months} mes${cur.months>1?'es':''} del período. El IUO es un parámetro configurable; el MMPP sale siempre de importes reales.</span>
     </div>
 
     <div class="audit-section" style="margin-top:14px">
       <h3>Costes reales por mes</h3>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Introduce aquí los importes reales. Cuando un mes tiene MMPP o IUO, sustituyen a la estimación por porcentaje. Los traspasos entre centros no se editan aquí: se alimentan de los registros del módulo Facturación.</p>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Introduce aquí los importes reales si prefieres el total del mes. Si dejas MMPP vacío, se usa el gasto diario que hayas registrado en Forecast → Compras. Los traspasos entre centros no se editan aquí: se alimentan de los registros del módulo Facturación.</p>
       <div class="sched-wrap" style="padding:0;border:none">
         <table class="sched-table">
           <thead><tr>
@@ -4327,7 +4354,7 @@ async function renderPnl(container){
               const lbl=new Date(+y,+mo-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
               return`<tr>
                 <td class="sched-name">${lbl}</td>
-                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="mmpp" value="${m.mmpp||''}" placeholder="est." step="50" min="0"></td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="mmpp" value="${m.mmpp||''}" placeholder="Forecast" step="50" min="0"></td>
                 <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="iuo" value="${m.iuo||''}" placeholder="est." step="50" min="0"></td>
               </tr>`;
             }).join('')||'<tr><td colspan="3" style="padding:10px;font-size:12px;color:var(--text-tertiary)">Selecciona un período concreto (mes, trimestre o año) para introducir costes.</td></tr>'}
@@ -4338,11 +4365,11 @@ async function renderPnl(container){
     </div>
 
     <div class="audit-section" style="margin-top:14px">
-      <h3>Estimación por defecto</h3>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Se aplica solo a los meses en los que no hayas introducido el importe real.</p>
+      <h3>Parámetros</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">El <strong>objetivo de compras</strong> se usa solo en Forecast para marcar la meta diaria de gasto; no estima el coste de la CE, que siempre sale de importes reales. El IUO sí se estima porque no hay una fuente de datos reales.</p>
       <div class="form-grid">
         <div class="form-group">
-          <label>MMPP (% sobre ingresos)</label>
+          <label>Objetivo de compras (% sobre venta)</label>
           <input type="number" id="pnlMmppPct" value="${costs.mmppPct!==undefined?costs.mmppPct:(costs.purchasePct||35)}" min="0" max="100" step="0.5">
         </div>
         <div class="form-group">
@@ -4354,7 +4381,7 @@ async function renderPnl(container){
           <input type="number" id="pnlIuoMonthly" value="${costs.iuoMonthly!==undefined?costs.iuoMonthly:(costs.otherMonthly||0)}" min="0" step="50">
         </div>
       </div>
-      <button class="btn-primary" id="btnSavePnlCosts" style="max-width:240px">Guardar estimación</button>
+      <button class="btn-primary" id="btnSavePnlCosts" style="max-width:240px">Guardar parámetros</button>
       <p id="pnlSaveMsg" style="font-size:12px;margin-top:10px"></p>
     </div>`;
 
@@ -4371,6 +4398,20 @@ function bindPnlControls(container){
     else if(type==='year')d.setFullYear(d.getFullYear()+dir);
     return d;
   };
+  // Mantiene la comparativa en el mismo período del año anterior mientras no se toque a mano
+  const syncCompareToLastYear=()=>{
+    if(!pnlRange.compare||pnlRange.compareManual)return;
+    pnlRange.compareType=pnlRange.type==='all'?'month':pnlRange.type;
+    if(pnlRange.compareType==='custom'){
+      if(pnlRange.from){const a=new Date(pnlRange.from);a.setFullYear(a.getFullYear()-1);pnlRange.compareFrom=a;}
+      if(pnlRange.to){const b=new Date(pnlRange.to);b.setFullYear(b.getFullYear()-1);pnlRange.compareTo=b;}
+    } else {
+      const d=new Date(pnlRange.refDate||new Date());
+      d.setFullYear(d.getFullYear()-1);
+      pnlRange.compareRefDate=d;
+    }
+  };
+
   const sel=container.querySelector('#pnlRangeType');
   if(sel)sel.addEventListener('change',()=>{
     pnlRange.type=sel.value;
@@ -4378,11 +4419,12 @@ function bindPnlControls(container){
       if(!pnlRange.from)pnlRange.from=startOfMonth(new Date());
       if(!pnlRange.to)pnlRange.to=endOfMonth(new Date());
     } else if(!pnlRange.refDate)pnlRange.refDate=new Date();
+    syncCompareToLastYear();
     renderPnl(container);
   });
   const p=container.querySelector('#pnlPrev'),n=container.querySelector('#pnlNext');
-  if(p)p.addEventListener('click',()=>{pnlRange.refDate=step(new Date(pnlRange.refDate),pnlRange.type,-1);renderPnl(container);});
-  if(n)n.addEventListener('click',()=>{pnlRange.refDate=step(new Date(pnlRange.refDate),pnlRange.type,1);renderPnl(container);});
+  if(p)p.addEventListener('click',()=>{pnlRange.refDate=step(new Date(pnlRange.refDate),pnlRange.type,-1);syncCompareToLastYear();renderPnl(container);});
+  if(n)n.addEventListener('click',()=>{pnlRange.refDate=step(new Date(pnlRange.refDate),pnlRange.type,1);syncCompareToLastYear();renderPnl(container);});
   const f=container.querySelector('#pnlFrom'),t=container.querySelector('#pnlTo');
   if(f)f.addEventListener('change',()=>{pnlRange.from=new Date(f.value+'T00:00:00');renderPnl(container);});
   if(t)t.addEventListener('change',()=>{pnlRange.to=new Date(t.value+'T23:59:59');renderPnl(container);});
@@ -4398,6 +4440,7 @@ function bindPnlControls(container){
   });
   const cs=container.querySelector('#pnlCmpType');
   if(cs)cs.addEventListener('change',()=>{
+    pnlRange.compareManual=true;
     pnlRange.compareType=cs.value;
     if(cs.value==='custom'){
       if(!pnlRange.compareFrom)pnlRange.compareFrom=startOfMonth(new Date());
@@ -4406,11 +4449,11 @@ function bindPnlControls(container){
     renderPnl(container);
   });
   const cp=container.querySelector('#pnlCmpPrev'),cn=container.querySelector('#pnlCmpNext');
-  if(cp)cp.addEventListener('click',()=>{pnlRange.compareRefDate=step(new Date(pnlRange.compareRefDate),pnlRange.compareType,-1);renderPnl(container);});
-  if(cn)cn.addEventListener('click',()=>{pnlRange.compareRefDate=step(new Date(pnlRange.compareRefDate),pnlRange.compareType,1);renderPnl(container);});
+  if(cp)cp.addEventListener('click',()=>{pnlRange.compareManual=true;pnlRange.compareRefDate=step(new Date(pnlRange.compareRefDate),pnlRange.compareType,-1);renderPnl(container);});
+  if(cn)cn.addEventListener('click',()=>{pnlRange.compareManual=true;pnlRange.compareRefDate=step(new Date(pnlRange.compareRefDate),pnlRange.compareType,1);renderPnl(container);});
   const cf=container.querySelector('#pnlCmpFrom'),ctd=container.querySelector('#pnlCmpTo');
-  if(cf)cf.addEventListener('change',()=>{pnlRange.compareFrom=new Date(cf.value+'T00:00:00');renderPnl(container);});
-  if(ctd)ctd.addEventListener('change',()=>{pnlRange.compareTo=new Date(ctd.value+'T23:59:59');renderPnl(container);});
+  if(cf)cf.addEventListener('change',()=>{pnlRange.compareManual=true;pnlRange.compareFrom=new Date(cf.value+'T00:00:00');renderPnl(container);});
+  if(ctd)ctd.addEventListener('change',()=>{pnlRange.compareManual=true;pnlRange.compareTo=new Date(ctd.value+'T23:59:59');renderPnl(container);});
   // Costes reales por mes: se guardan al salir de la celda
   container.querySelectorAll('[data-mc-key]').forEach(inp=>{
     inp.addEventListener('change',async()=>{
@@ -5039,14 +5082,11 @@ function devBadge(real,fcast){
   return`<span style="color:${cls};font-family:var(--font-mono);font-size:11px">${pct>=0?'+':''}${pct.toFixed(0)}%</span>`;
 }
 
-function fcNav(label,title,events){
-  const from=startOfMonth(fcRefDate),to=endOfMonth(fcRefDate);
-  const banner=events?eventsBanner(events,from,to):'';
+function fcNav(label,title){
   return`<div class="module-header">
     <h1 class="module-title">Forecast · ${title||''}</h1>
     <p class="module-sub">${label}</p>
   </div>
-  ${banner}
   <div class="cumulative-controls">
     <div class="date-nav" style="margin:0">
       <button class="date-nav-btn" id="fcPrev">◀</button>
@@ -5125,7 +5165,7 @@ async function renderFcSales(container){
       </div>`;
     }).join('');
 
-    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Forecast & sales',events)+`
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Forecast & sales')+`
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Previsión total del mes</div><div class="kpi-value">${fmtMoney(totalFc)}</div><div class="kpi-sub">mensual + diaria</div></div>
       <div class="kpi-card"><div class="kpi-label">Real acumulado</div><div class="kpi-value">${fmtMoney(totalReal)}</div></div>
@@ -5228,7 +5268,7 @@ async function renderFcPurchases(container){
       return totalSalesFc?(accReal/totalSalesFc*100):0;
     })();
 
-    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Compras',events)+`
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Compras')+`
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Objetivo del mes</div><div class="kpi-value">${fmtMoney(accTarget)}</div><div class="kpi-sub">${targetPct}% de la venta prevista</div></div>
       <div class="kpi-card"><div class="kpi-label">Gasto real</div><div class="kpi-value">${fmtMoney(accReal)}</div></div>
@@ -5313,7 +5353,7 @@ async function renderFcOccupancy(container){
     const devCampus=accCampusFc?((accCampusReal-accCampusFc)/accCampusFc*100):0;
     const devCant=accCantFc?((accCantReal-accCantFc)/accCantFc*100):0;
 
-    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Ocupación',events)+`
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Ocupación')+`
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Campus · previsión</div><div class="kpi-value">${accCampusFc}</div><div class="kpi-sub">real: ${accCampusReal}</div></div>
       <div class="kpi-card"><div class="kpi-label">Campus · desviación</div><div class="kpi-value" style="color:${devCampus>=0?'var(--ok-fg)':'var(--alert-red-fg)'}">${accCampusFc?`${devCampus>=0?'+':''}${devCampus.toFixed(1)}%`:'—'}</div></div>
