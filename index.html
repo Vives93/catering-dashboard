@@ -4619,7 +4619,7 @@ const DEFAULT_GUIDELINES=`- Cocina de producto real, sin ultraprocesados.
 - Ajustar cantidades al número de comensales, sin excesos.`;
 
 const SERVICE_TYPES=['Coffee break','Desayuno','Lunch','Finger lunch','Comida a la carta','Cóctel','Evento','Otro'];
-const EVENT_TYPES=['Reunión interna','Reunión con cliente','Formación','Celebración','Presentación','Visita externa','Otro'];
+const MEETING_EVENT_TYPES=['Reunión interna','Reunión con cliente','Formación','Celebración','Presentación','Visita externa','Otro'];
 
 async function loadGuidelines(){
   const snap=await getDoc(doc(db,'catering_config','promptGuidelines'));
@@ -4713,7 +4713,7 @@ async function renderProposal(container){
       <div class="form-grid">
         <div class="form-group"><label>Comensales (pax) *</label><input type="number" id="prPax" value="${escapeHtml(f.pax)}" min="1" placeholder="Ej. 25"></div>
         <div class="form-group"><label>Tipo de servicio *</label><select id="prService"><option value="">Selecciona…</option>${SERVICE_TYPES.map(t=>`<option value="${t}" ${f.serviceType===t?'selected':''}>${t}</option>`).join('')}</select></div>
-        <div class="form-group"><label>Tipo de evento</label><select id="prEvent"><option value="">Selecciona…</option>${EVENT_TYPES.map(t=>`<option value="${t}" ${f.eventType===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Tipo de evento</label><select id="prEvent"><option value="">Selecciona…</option>${MEETING_EVENT_TYPES.map(t=>`<option value="${t}" ${f.eventType===t?'selected':''}>${t}</option>`).join('')}</select></div>
         <div class="form-group"><label>Sala</label><input type="text" id="prRoom" value="${escapeHtml(f.room)}" list="roomList" placeholder="Nombre de la sala"><datalist id="roomList">${ROOM_DIRECTORY.slice(0,120).map(r=>`<option value="${escapeHtml(r.room)}">`).join('')}</datalist></div>
         <div class="form-group"><label>Hora de entrega</label><input type="time" id="prDelivery" value="${escapeHtml(f.deliveryTime)}"></div>
         <div class="form-group"><label>Hora de recogida</label><input type="time" id="prPickup" value="${escapeHtml(f.pickupTime)}"></div>
