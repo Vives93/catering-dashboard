@@ -42,6 +42,7 @@
 .dark .hub-card[data-module="forecast"]{--accent:#6DBF95;--accent-bg:#0E2018}
 .dark .hub-card[data-module="looker"]{--accent:#AFA9EC;--accent-bg:#241A30}
 .dark .hub-card[data-module="minutes"]{--accent:#FAC97A;--accent-bg:#2A1F0E}
+.dark .hub-card[data-module="records"]{--accent:#5FBFC7;--accent-bg:#0A2124}
 .dark .hub-card:hover:not(.disabled) .hub-icon{color:#141412}
 .dark .pnl-fc{color:#6DBF95}
 .dark .pnl-row.header .pnl-fc{color:#6DBF95}
@@ -80,6 +81,9 @@ mark.hl{background:var(--alert-amber-border);color:var(--text-primary);border-ra
   .minute-lbl{width:auto}
   .minute-search{min-width:0;max-width:none}
 }
+.month-picker{font-family:var(--font-sans);font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-card);color:var(--text-primary);cursor:pointer}
+.month-picker:hover{border-color:var(--text-secondary)}
+.month-picker:focus{border-color:var(--text-primary);outline:none}
 .data-freshness{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text-tertiary);padding:8px 14px;background:var(--bg);border-radius:var(--radius-md);margin-bottom:12px;justify-content:center}
 .data-freshness strong{color:var(--text-secondary);font-weight:500}
 .events-banner{background:var(--alert-amber-bg);border:1px solid var(--alert-amber-border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:14px}
@@ -199,7 +203,7 @@ mark.hl{background:var(--alert-amber-border);color:var(--text-primary);border-ra
 .dark .hub-tape{opacity:.06}
 .hub-main{position:relative;z-index:1}
 @media(prefers-reduced-motion:reduce){.hub-tape{animation:none!important}}
-.hub-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:1000px;margin:0 auto}
+.hub-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 .hub-card{position:relative;border-radius:12px;padding:15px 17px;cursor:pointer;overflow:hidden;border:1px solid var(--border-soft);background:var(--bg-card);transition:transform .18s cubic-bezier(.2,.8,.3,1),border-color .18s,box-shadow .18s}
 .hub-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)}
 .hub-card:hover:not(.disabled){transform:translateY(-3px);border-color:var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.07)}
@@ -225,7 +229,10 @@ mark.hl{background:var(--alert-amber-border);color:var(--text-primary);border-ra
 .hub-loading{font-size:11.5px;color:var(--text-tertiary)}
 .hub-empty{font-size:11.5px;color:var(--text-tertiary)}
 .hub-go{position:absolute;right:15px;bottom:12px;font-size:16px;color:var(--accent);opacity:0;transform:translateX(-5px);transition:all .18s}
-@media(max-width:980px){
+@media(max-width:1200px){
+  .hub-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:900px){
   .hub-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .hub-wide{grid-column:span 2}
 }
@@ -548,7 +555,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/><path d="M3 21h18"/></svg>
           </div>
           <div class="hub-head">
-            <div class="hub-name">Forecast</div>
+            <div class="hub-name">Forecast &amp; sales</div>
             <p class="hub-desc">Previsión y desvío</p>
           </div>
         </div>
@@ -567,6 +574,20 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
           </div>
         </div>
         <div class="hub-stats" id="hubMinutesStats"><span class="hub-loading">Cargando…</span></div>
+        <span class="hub-go">→</span>
+      </div>
+
+      <div class="hub-card" data-module="records" style="--accent:#0E7C86;--accent-bg:#E0F2F3">
+        <div class="hub-top">
+          <div class="hub-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6a2 2 0 0 1 2 2v1h1a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1V4a2 2 0 0 1 2-2z"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>
+          </div>
+          <div class="hub-head">
+            <div class="hub-name">Registros</div>
+            <p class="hub-desc">Mermas y temperaturas</p>
+          </div>
+        </div>
+        <div class="hub-stats" id="hubRecordsStats"><span class="hub-loading">Cargando…</span></div>
         <span class="hub-go">→</span>
       </div>
 
@@ -637,6 +658,26 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 </div>
 
 <!-- ══ MÓDULO CUENTA DE EXPLOTACIÓN ══ -->
+<!-- ══ MÓDULO REGISTROS ══ -->
+<div id="recordsScreen" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-back" id="btnBackFromRecords">← Hub</button>
+      <span class="logo">Registros</span>
+    </div>
+    <nav class="tabs" id="recordsTabs">
+      <button class="tab active" data-rec-view="waste">Mermas</button>
+      <button class="tab" data-rec-view="temp">Temperaturas</button>
+      <button class="tab" data-rec-view="equipment">Equipos</button>
+    </nav>
+    <div class="topbar-actions">
+      <button class="btn-theme" id="btnThemeRecords" title="Modo noche">🌙</button>
+      <button class="btn-logout" id="btnLogoutRecords">Cerrar sesión</button>
+    </div>
+  </header>
+  <main class="main" id="recordsContent"></main>
+</div>
+
 <!-- ══ CATERING · ELECCIÓN ══ -->
 <div id="cateringChoiceScreen" hidden>
   <header class="topbar">
@@ -718,10 +759,10 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
   <header class="topbar">
     <div class="topbar-left">
       <button class="btn-back" id="btnBackFromForecast">← Hub</button>
-      <span class="logo">Forecast</span>
+      <span class="logo">Forecast &amp; sales</span>
     </div>
     <nav class="tabs" id="forecastTabs">
-      <button class="tab active" data-fc-view="sales">Forecast & sales</button>
+      <button class="tab active" data-fc-view="sales">Ventas</button>
       <button class="tab" data-fc-view="purchases">Compras</button>
       <button class="tab" data-fc-view="occupancy">Ocupación</button>
     </nav>
@@ -1573,6 +1614,11 @@ function compareBadge(current,previous){
   return`<span class="compare-badge ${cls}">${arrow} ${Math.abs(diff).toFixed(0)}%</span>`;
 }
 
+// Valor para <input type="month"> a partir de una fecha
+function monthInputValue(d){
+  if(!d)return'';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
 function buildPeriodLabel(type,refDate){
   if(type==='day')return refDate.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});
   if(type==='week'){const ws=startOfWeek(refDate),we=endOfWeek(refDate);return`${ws.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${we.toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`;}
@@ -1629,7 +1675,8 @@ async function renderCumulative(container){
       <button class="date-nav-btn" id="cumPrev">◀</button>
       <span class="date-nav-label" style="cursor:default">${periodLabel}</span>
       <button class="date-nav-btn" id="cumNext">▶</button>
-    </div>`:''}
+    </div>
+    <input type="month" class="month-picker" id="cumMonthPick" value="${monthInputValue(range.refDate)}" title="Ir a un mes concreto">`:''}
     <div class="range-inputs" id="customRangeInputs" style="display:${range.type==='custom'?'flex':'none'}">
       <input type="date" id="rangeFrom" value="${range.from?localISODate(range.from):''}">
       <span style="color:var(--text-tertiary);font-size:12px">a</span>
@@ -1651,7 +1698,8 @@ async function renderCumulative(container){
       <button class="date-nav-btn" id="cmpPrev">◀</button>
       <span class="date-nav-label" style="cursor:default">${cmpPeriodLabel}</span>
       <button class="date-nav-btn" id="cmpNext">▶</button>
-    </div>`:''}
+    </div>
+    <input type="month" class="month-picker" id="cmpMonthPick" value="${monthInputValue(range.compareRefDate)}" title="Ir a un mes concreto">`:''}
     <div class="range-inputs" id="compareCustomInputs" style="display:${(range.compareType||range.type)==='custom'?'flex':'none'}">
       <input type="date" id="compareRangeFrom" value="${range.compareFrom?localISODate(range.compareFrom):''}">
       <span style="color:var(--text-tertiary);font-size:12px">a</span>
@@ -2004,6 +2052,20 @@ function bindCumulativeControls(container){
     renderCumulative(container);
   });
 
+  const cumMp=container.querySelector('#cumMonthPick');
+  if(cumMp)cumMp.addEventListener('change',()=>{
+    if(!cumMp.value)return;
+    const [y,m]=cumMp.value.split('-');
+    cumulativeRange.refDate=new Date(+y,+m-1,1);
+    renderCumulative(container);
+  });
+  const cmpMp=container.querySelector('#cmpMonthPick');
+  if(cmpMp)cmpMp.addEventListener('change',()=>{
+    if(!cmpMp.value)return;
+    const [y,m]=cmpMp.value.split('-');
+    cumulativeRange.compareRefDate=new Date(+y,+m-1,1);
+    renderCumulative(container);
+  });
   if(cumPrev)cumPrev.addEventListener('click',()=>{
     const d=new Date(cumulativeRange.refDate);
     if(cumulativeRange.type==='day')d.setDate(d.getDate()-1);
@@ -2194,7 +2256,7 @@ async function renderLogic(container){
 
 // ── MODO NOCHE ────────────────────────────────────────────────────
 const root=document.documentElement;
-const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit','btnThemeStaff','btnThemePnl','btnThemeBilling','btnThemeForecast','btnThemeMinutes','btnThemeChoice','btnThemeProposal'].map(id=>document.getElementById(id)).filter(Boolean);
+const themeButtons=['btnTheme','btnThemeHub','btnThemeAudit','btnThemeStaff','btnThemePnl','btnThemeBilling','btnThemeForecast','btnThemeMinutes','btnThemeChoice','btnThemeProposal','btnThemeRecords'].map(id=>document.getElementById(id)).filter(Boolean);
 function syncThemeIcons(isDark){themeButtons.forEach(b=>b.textContent=isDark?'☀️':'🌙');}
 if(localStorage.getItem('theme')==='dark'){root.classList.add('dark');syncThemeIcons(true);}
 themeButtons.forEach(btn=>btn.addEventListener('click',()=>{
@@ -2776,7 +2838,7 @@ const STAFF_SEED=[
   {name:'María del Mar Fernández García',cardNumber:'44185',position:'Cocinera',jornadaType:'Completa',level:3,dni:'38109465Y',contractType:'Indefinido',contractedHours:40,contractDate:'2023-01-16',monthlySalary:0,birthDate:'1970-12-26',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
   {name:'Mónica Colera Martínez',cardNumber:'44478',position:'Camarera',jornadaType:'Completa',level:3,dni:'44184307L',contractType:'Indefinido',contractedHours:40,contractDate:'2024-09-01',monthlySalary:0,birthDate:'1974-05-18',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
   {name:'Adrianna DeLorenzo',cardNumber:'46840',position:'Barista',jornadaType:'Media jornada',level:3,dni:'Y6470461T',contractType:'Indefinido',contractedHours:25,contractDate:'2025-11-18',monthlySalary:0,birthDate:'2000-07-20',status:'activo',weeklyHours:25,vacationDays:30,extraHolidays:0,note:''},
-  {name:'Carolina Ávalos Domínguez',cardNumber:'45866',position:'Marmitona',jornadaType:'Completa',level:5,dni:'Z0479143N',contractType:'Indefinido',contractedHours:40,contractDate:'2024-11-19',monthlySalary:0,birthDate:'1982-10-08',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Nivel V: pendiente de indicar salario, no figura en la tabla del convenio'},
+  {name:'Carolina Ávalos Domínguez',cardNumber:'45866',position:'Marmitona',jornadaType:'Completa',level:5,dni:'Z0479143N',contractType:'Indefinido',contractedHours:40,contractDate:'2024-11-19',monthlySalary:998.90,birthDate:'1982-10-08',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Nivel V, salario acordado (no figura en la tabla del convenio)'},
   {name:'Cinthia Valeria Rotela Ruiz',cardNumber:'45937',position:'Ayudante de camarero',jornadaType:'Completa',level:4,dni:'Y2125429J',contractType:'Indefinido',contractedHours:40,contractDate:'2025-02-24',monthlySalary:0,birthDate:'1994-12-22',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
   {name:'Alejandro Gardó Moreno',cardNumber:'',position:'',jornadaType:'Completa',level:4,dni:'47325099T',contractType:'Indefinido',contractedHours:40,contractDate:'2026-06-15',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Alta deducida: devengará 16,25 días a 31/12. Pendiente: puesto'},
 ];
@@ -3260,6 +3322,8 @@ async function renderStaffSchedule(container){
   }
 }
 
+// Mes que se está viendo en el calendario de ausencias
+let calRefDate=new Date();
 async function renderStaffCalendar(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando calendario…</span></div>`;
   try{
@@ -3308,6 +3372,7 @@ async function renderStaffCalendar(container){
         <span class="date-nav-label" style="cursor:default">${calRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</span>
         <button class="date-nav-btn" id="calNext">▶</button>
       </div>
+      <input type="month" class="month-picker" id="calMonthPick" value="${monthInputValue(calRefDate)}" title="Ir a un mes concreto">
       <span style="font-size:11px;color:var(--text-tertiary)">
         <span class="cal-legend cal-vac"></span> Vacaciones
         <span class="cal-legend cal-baja"></span> Baja
@@ -3333,6 +3398,13 @@ async function renderStaffCalendar(container){
     </div>
     ${absences.length?`<p class="section-label">Todas las ausencias registradas</p>${absList}`:''}`;
 
+    const calMp=container.querySelector('#calMonthPick');
+    if(calMp)calMp.addEventListener('change',()=>{
+      if(!calMp.value)return;
+      const [y,m]=calMp.value.split('-');
+      calRefDate=new Date(+y,+m-1,1);
+      renderStaffCalendar(container);
+    });
     container.querySelector('#calPrev').addEventListener('click',()=>{calRefDate=new Date(calRefDate.getFullYear(),calRefDate.getMonth()-1,1);renderStaffCalendar(container);});
     container.querySelector('#calNext').addEventListener('click',()=>{calRefDate=new Date(calRefDate.getFullYear(),calRefDate.getMonth()+1,1);renderStaffCalendar(container);});
 
@@ -3424,7 +3496,7 @@ async function renderStaffEtt(container){
         <div class="form-group"><label>Nombre de la ETT / persona</label><input type="text" id="ettName" placeholder="Ej. Randstad — Juan P."></div>
         <div class="form-group"><label>Puesto que ocupa</label><input type="text" id="ettRole" placeholder="Ej. Aux. colectividades"></div>
         <div class="form-group"><label>¿A quién cubre?</label><select id="ettCovers"><option value="">Nadie (refuerzo)</option>${staffOptions}</select></div>
-        <div class="form-group"><label>Coste mensual (€)</label><input type="number" id="ettCost" value="0" min="0" step="50"></div>
+        <div class="form-group"><label>Coste mensual (€)</label><input type="number" id="ettCost" value="0" min="0" step="0.01"></div>
         <div class="form-group"><label>Desde</label><input type="date" id="ettStart" value="${localISODate(new Date())}"></div>
         <div class="form-group"><label>Hasta</label><input type="date" id="ettEnd" value="${localISODate(new Date())}"></div>
       </div>
@@ -4060,7 +4132,9 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
     const c=e.category||'Otros';
     extrasByCategory[c]=(extrasByCategory[c]||0)+(e.amount||0);
   });
-  const revenue=cateringRevenue+comedor.billed+cafeteria.billed+extrasRevenue+transfersOut;
+  // Los abonos por errores de TPV suman: Proppos nos devuelve el importe
+  const refunds=manualRefunds;
+  const revenue=cateringRevenue+comedor.billed+cafeteria.billed+extrasRevenue+transfersOut+refunds;
   // Meses cubiertos por el rango, para prorratear costes mensuales
   let months=1;
   if(from&&to){
@@ -4082,6 +4156,7 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const sumManual=field=>monthKeysInRange.reduce((s,k)=>s+(manual[k]&&manual[k][field]?+manual[k][field]:0),0);
   const manualMmpp=sumManual('mmpp');
   const manualIuo=sumManual('iuo');
+  const manualRefunds=sumManual('refunds'); // abonos por errores de TPV (Proppos)
   const hasManualMmpp=manualMmpp>0;
   const hasManualIuo=manualIuo>0;
 
@@ -4104,7 +4179,7 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
 
   const unitProfit=grossProfit+labourCost+iuo+transfers;
   return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn,unitProfit,months,
-    hasManualMmpp,hasManualIuo,monthKeysInRange,mmppSource,forecastPurchases,
+    hasManualMmpp,hasManualIuo,monthKeysInRange,mmppSource,forecastPurchases,refunds,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
 
@@ -4196,7 +4271,8 @@ async function renderPnl(container){
         <button class="date-nav-btn" id="pnlPrev">◀</button>
         <span class="date-nav-label" style="cursor:default">${periodLabel}</span>
         <button class="date-nav-btn" id="pnlNext">▶</button>
-      </div>`:''}
+      </div>
+      <input type="month" class="month-picker" id="pnlMonthPick" value="${monthInputValue(r.refDate)}" title="Ir a un mes concreto">`:''}
       <div class="range-inputs" id="pnlCustomInputs" style="display:${r.type==='custom'?'flex':'none'}">
         <input type="date" id="pnlFrom" value="${r.from?localISODate(r.from):''}">
         <span style="color:var(--text-tertiary);font-size:12px">a</span>
@@ -4216,7 +4292,8 @@ async function renderPnl(container){
         <button class="date-nav-btn" id="pnlCmpPrev">◀</button>
         <span class="date-nav-label" style="cursor:default">${cLabel}</span>
         <button class="date-nav-btn" id="pnlCmpNext">▶</button>
-      </div>`:''}
+      </div>
+      <input type="month" class="month-picker" id="pnlCmpMonthPick" value="${monthInputValue(r.compareRefDate)}" title="Ir a un mes concreto">`:''}
       <div class="range-inputs" id="pnlCmpCustom" style="display:${(r.compareType||r.type)==='custom'?'flex':'none'}">
         <input type="date" id="pnlCmpFrom" value="${r.compareFrom?localISODate(r.compareFrom):''}">
         <span style="color:var(--text-tertiary);font-size:12px">a</span>
@@ -4298,6 +4375,7 @@ async function renderPnl(container){
         return [...cats].sort().map(c=>L(c,cur.extrasByCategory[c]||0,cmp?(cmp.extrasByCategory[c]||0):0,{indent2:true})).join('');
       })()}
       ${(cur.transfersOut!==0||(cmp&&cmp.transfersOut!==0))?L('Traspasos emitidos · desde Facturación',cur.transfersOut,cmp?cmp.transfersOut:0,{indent:true}):''}
+      ${(cur.refunds!==0||(cmp&&cmp.refunds!==0))?L('Abonos por errores de TPV (Proppos)',cur.refunds,cmp?cmp.refunds:0,{indent:true}):''}
       <div class="pnl-section-head cost">Costes</div>
       ${L('MMPP (Materias primas)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · compras reales de Forecast':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
       ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
@@ -4320,6 +4398,7 @@ async function renderPnl(container){
       <div class="audit-row"><span class="audit-req"><strong>Facturación extra</strong> — registros introducidos manualmente en la pestaña "Facturación extra", desglosados por categoría</span></div>
       <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — importe real: primero el introducido en la tabla de costes por mes; si no hay, la suma del gasto real registrado en Forecast → Compras. Nunca se estima por porcentaje</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — salario mensual real o de convenio (Restauración Colectiva Barcelona 2025) según nivel y jornada, del módulo Personal. Las bajas al ${costs.leaveCostPct!==undefined?costs.leaveCostPct:100}% y las ETT según registros vigentes</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Abonos por errores de TPV (Proppos)</strong> — importe introducido a mano por mes. Suma a los ingresos porque es un importe que nos devuelven. En el futuro se podrá importar</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — de los registros de Facturación con esa categoría: los <strong>emitidos</strong> son facturación real y entran en Ingresos; los <strong>recibidos</strong> son compra y entran en Costes</span></div>
       <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — parte variable como % de ingresos más una parte fija mensual, ambas configurables abajo</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Prorrateo</strong> — los costes mensuales (personal, IUO fijo) se multiplican por ${cur.months} mes${cur.months>1?'es':''} para cubrir el período seleccionado</span></div>
@@ -4338,14 +4417,15 @@ async function renderPnl(container){
     </div>
 
     <div class="audit-section" style="margin-top:14px">
-      <h3>Costes reales por mes</h3>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Introduce aquí los importes reales si prefieres el total del mes. Si dejas MMPP vacío, se usa el gasto diario que hayas registrado en Forecast → Compras. Los traspasos entre centros no se editan aquí: se alimentan de los registros del módulo Facturación.</p>
+      <h3>Importes reales por mes</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Introduce aquí los importes reales si prefieres el total del mes. Si dejas MMPP vacío, se usa el gasto diario registrado en Forecast → Compras. Los <strong>abonos de TPV</strong> suman a los ingresos porque Proppos nos devuelve el importe. Los traspasos entre centros no se editan aquí: se alimentan de los registros del módulo Facturación.</p>
       <div class="sched-wrap" style="padding:0;border:none">
         <table class="sched-table">
           <thead><tr>
             <th class="sched-name">Mes</th>
             <th style="text-align:right">MMPP (€)</th>
             <th style="text-align:right">IUO (€)</th>
+            <th style="text-align:right">Abonos TPV (€)</th>
           </tr></thead>
           <tbody>
             ${(cur.monthKeysInRange||[]).map(k=>{
@@ -4354,10 +4434,11 @@ async function renderPnl(container){
               const lbl=new Date(+y,+mo-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
               return`<tr>
                 <td class="sched-name">${lbl}</td>
-                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="mmpp" value="${m.mmpp||''}" placeholder="Forecast" step="50" min="0"></td>
-                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="iuo" value="${m.iuo||''}" placeholder="est." step="50" min="0"></td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="mmpp" value="${m.mmpp||''}" placeholder="Forecast" step="0.01" min="0"></td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="iuo" value="${m.iuo||''}" placeholder="est." step="0.01" min="0"></td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="refunds" value="${m.refunds||''}" placeholder="0" step="0.01" min="0"></td>
               </tr>`;
-            }).join('')||'<tr><td colspan="3" style="padding:10px;font-size:12px;color:var(--text-tertiary)">Selecciona un período concreto (mes, trimestre o año) para introducir costes.</td></tr>'}
+            }).join('')||'<tr><td colspan="4" style="padding:10px;font-size:12px;color:var(--text-tertiary)">Selecciona un período concreto (mes, trimestre o año) para introducir importes.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -4378,7 +4459,7 @@ async function renderPnl(container){
         </div>
         <div class="form-group form-group-full">
           <label>IUO fijo mensual (€) — seguros, marketing, central, licencias, no alimentario, uniformes</label>
-          <input type="number" id="pnlIuoMonthly" value="${costs.iuoMonthly!==undefined?costs.iuoMonthly:(costs.otherMonthly||0)}" min="0" step="50">
+          <input type="number" id="pnlIuoMonthly" value="${costs.iuoMonthly!==undefined?costs.iuoMonthly:(costs.otherMonthly||0)}" min="0" step="0.01">
         </div>
       </div>
       <button class="btn-primary" id="btnSavePnlCosts" style="max-width:240px">Guardar parámetros</button>
@@ -4425,6 +4506,22 @@ function bindPnlControls(container){
   const p=container.querySelector('#pnlPrev'),n=container.querySelector('#pnlNext');
   if(p)p.addEventListener('click',()=>{pnlRange.refDate=step(new Date(pnlRange.refDate),pnlRange.type,-1);syncCompareToLastYear();renderPnl(container);});
   if(n)n.addEventListener('click',()=>{pnlRange.refDate=step(new Date(pnlRange.refDate),pnlRange.type,1);syncCompareToLastYear();renderPnl(container);});
+  const mp=container.querySelector('#pnlMonthPick');
+  if(mp)mp.addEventListener('change',()=>{
+    if(!mp.value)return;
+    const [y,m]=mp.value.split('-');
+    pnlRange.refDate=new Date(+y,+m-1,1);
+    syncCompareToLastYear();
+    renderPnl(container);
+  });
+  const cmp=container.querySelector('#pnlCmpMonthPick');
+  if(cmp)cmp.addEventListener('change',()=>{
+    if(!cmp.value)return;
+    const [y,m]=cmp.value.split('-');
+    pnlRange.compareManual=true;
+    pnlRange.compareRefDate=new Date(+y,+m-1,1);
+    renderPnl(container);
+  });
   const f=container.querySelector('#pnlFrom'),t=container.querySelector('#pnlTo');
   if(f)f.addEventListener('change',()=>{pnlRange.from=new Date(f.value+'T00:00:00');renderPnl(container);});
   if(t)t.addEventListener('change',()=>{pnlRange.to=new Date(t.value+'T23:59:59');renderPnl(container);});
@@ -4491,8 +4588,357 @@ function bindPnlControls(container){
 }
 
 
+// ══ MÓDULO REGISTROS · MERMAS Y TEMPERATURAS ══════════════════════
+const WASTE_REASONS=[
+  {k:'caducidad',lbl:'Caducidad',icon:'📅'},
+  {k:'sobreproduccion',lbl:'Sobreproducción',icon:'📈'},
+  {k:'rotura',lbl:'Rotura o derrame',icon:'💥'},
+  {k:'devolucion',lbl:'Devolución de cliente',icon:'↩️'},
+  {k:'error',lbl:'Error de elaboración',icon:'⚠️'},
+  {k:'cadena_frio',lbl:'Rotura de cadena de frío',icon:'🌡️'},
+  {k:'otro',lbl:'Otro',icon:'📌'},
+];
+const WASTE_AREAS=['Cocina','Comedor','Cafetería','Catering','Almacén'];
+const WASTE_UNITS=['kg','unidades','litros','raciones'];
+function wasteReason(k){return WASTE_REASONS.find(r=>r.k===k)||WASTE_REASONS[6];}
+
+// Equipos con control de temperatura. Rango correcto según APPCC.
+const DEFAULT_EQUIPMENT=[
+  {id:'cam1',name:'Cámara de refrigeración 1',min:0,max:4},
+  {id:'cam2',name:'Cámara de refrigeración 2',min:0,max:4},
+  {id:'cong1',name:'Congelador 1',min:-22,max:-18},
+  {id:'exp1',name:'Expositor cafetería',min:0,max:6},
+];
+
+let currentRecordsView='waste';
+let recRefDate=new Date();
+
+async function loadRecords(){
+  const monthKey=`${recRefDate.getFullYear()}-${String(recRefDate.getMonth()+1).padStart(2,'0')}`;
+  const [wSnap,tSnap,eSnap]=await Promise.all([
+    getDoc(doc(db,'records_waste',monthKey)),
+    getDoc(doc(db,'records_temp',monthKey)),
+    getDoc(doc(db,'records_config','equipment'))
+  ]);
+  return{
+    monthKey,
+    waste:wSnap.exists()?(wSnap.data().list||[]):[],
+    temps:tSnap.exists()?(tSnap.data().list||[]):[],
+    equipment:eSnap.exists()?(eSnap.data().list||DEFAULT_EQUIPMENT):DEFAULT_EQUIPMENT
+  };
+}
+
+function recNav(label,title){
+  return`<div class="module-header">
+    <h1 class="module-title">Registros · ${title}</h1>
+    <p class="module-sub">${label}</p>
+  </div>
+  <div class="cumulative-controls">
+    <div class="date-nav" style="margin:0">
+      <button class="date-nav-btn" id="recPrev">◀</button>
+      <span class="date-nav-label" style="cursor:default;min-width:130px">${label}</span>
+      <button class="date-nav-btn" id="recNext">▶</button>
+    </div>
+    <input type="month" class="month-picker" id="recMonthPick" value="${monthInputValue(recRefDate)}" title="Ir a un mes concreto">
+  </div>`;
+}
+function bindRecNav(container){
+  const mp=container.querySelector('#recMonthPick');
+  if(mp)mp.addEventListener('change',()=>{
+    if(!mp.value)return;
+    const [y,m]=mp.value.split('-');
+    recRefDate=new Date(+y,+m-1,1);
+    renderRecords(container);
+  });
+  const p=container.querySelector('#recPrev'),n=container.querySelector('#recNext');
+  if(p)p.addEventListener('click',()=>{recRefDate=new Date(recRefDate.getFullYear(),recRefDate.getMonth()-1,1);renderRecords(container);});
+  if(n)n.addEventListener('click',()=>{recRefDate=new Date(recRefDate.getFullYear(),recRefDate.getMonth()+1,1);renderRecords(container);});
+}
+
+// ── MERMAS ────────────────────────────────────────────────────────
+async function renderWaste(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando mermas…</span></div>`;
+  try{
+    const {monthKey,waste}=await loadRecords();
+    const mLabel=recRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+    const sorted=waste.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const totalCost=waste.reduce((s,w)=>s+(w.cost||0),0);
+    const byReason={};
+    waste.forEach(w=>{const k=w.reason||'otro';byReason[k]=(byReason[k]||0)+(w.cost||0);});
+    const maxR=Math.max(...Object.values(byReason),1);
+    const reasonRows=Object.entries(byReason).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
+      const r=wasteReason(k);
+      return`<div class="bar-row"><span class="bar-label">${r.icon} ${r.lbl}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v/maxR*100).toFixed(0)}%;background:var(--alert-red-border)"></div></div><span class="bar-val">${fmtMoney(v)}</span></div>`;
+    }).join('');
+    const byArea={};
+    waste.forEach(w=>{const k=w.area||'Sin área';byArea[k]=(byArea[k]||0)+(w.cost||0);});
+
+    const rows=sorted.map((w,i)=>{
+      const r=wasteReason(w.reason);
+      const d=w.date?new Date(w.date+'T12:00:00'):null;
+      return`<div class="order-card">
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${r.icon} ${escapeHtml(w.product||'Sin producto')}</span>
+            <span class="order-loc">${d?d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}):'—'}${w.area?` · ${escapeHtml(w.area)}`:''}${w.recordedBy?` · ${escapeHtml(w.recordedBy)}`:''}</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill pill-other">${r.lbl}</span>
+            <span class="pill pill-cancel" style="font-family:var(--font-mono)">${fmtMoney(w.cost||0)}</span>
+            <button class="btn-del-staff" data-del-waste="${i}" title="Eliminar">✕</button>
+          </div>
+        </div>
+        <div class="order-meta">
+          <span class="meta-item">${w.qty||0} ${escapeHtml(w.unit||'')}</span>
+          ${w.notes?`<span class="meta-item">${escapeHtml(w.notes)}</span>`:''}
+        </div>
+      </div>`;
+    }).join('');
+
+    container.innerHTML=recNav(mLabel,'Mermas')+`
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Coste de mermas</div><div class="kpi-value ${totalCost>0?'alert':''}">${fmtMoney(totalCost)}</div><div class="kpi-sub">${mLabel}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Registros</div><div class="kpi-value">${waste.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Motivo principal</div><div class="kpi-value" style="font-size:14px">${Object.keys(byReason).length?wasteReason(Object.entries(byReason).sort((a,b)=>b[1]-a[1])[0][0]).lbl:'—'}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Área con más merma</div><div class="kpi-value" style="font-size:14px">${Object.keys(byArea).length?Object.entries(byArea).sort((a,b)=>b[1]-a[1])[0][0]:'—'}</div></div>
+    </div>
+    <div class="audit-section">
+      <h3>Registrar merma</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Fecha *</label><input type="date" id="wDate" value="${localISODate(new Date())}"></div>
+        <div class="form-group"><label>Producto *</label><input type="text" id="wProduct" placeholder="Ej. Pan de coca"></div>
+        <div class="form-group"><label>Cantidad *</label><input type="number" id="wQty" value="" step="0.1" min="0" placeholder="0"></div>
+        <div class="form-group"><label>Unidad</label><select id="wUnit">${WASTE_UNITS.map(u=>`<option value="${u}">${u}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Coste estimado (€)</label><input type="number" id="wCost" value="" step="0.01" min="0" placeholder="0,00"></div>
+        <div class="form-group"><label>Motivo</label><select id="wReason">${WASTE_REASONS.map(r=>`<option value="${r.k}">${r.icon} ${r.lbl}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Área</label><select id="wArea">${WASTE_AREAS.map(a=>`<option value="${a}">${a}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Registrado por</label><input type="text" id="wBy" placeholder="Nombre"></div>
+        <div class="form-group form-group-full"><label>Observaciones</label><input type="text" id="wNotes" placeholder="Opcional"></div>
+      </div>
+      <button class="btn-primary" id="btnSaveWaste" style="max-width:220px">Guardar merma</button>
+      <p id="wMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+    ${waste.length?`<div class="stats-grid" style="grid-template-columns:1fr">
+      <div class="stat-card"><h3>Coste por motivo</h3><span class="scope-label">${mLabel}</span><div class="bar-chart">${reasonRows}</div></div>
+    </div>
+    <p class="section-label">Registros de ${mLabel}</p><div class="orders">${rows}</div>`:'<div class="empty-state"><p>Sin mermas registradas este mes</p></div>'}`;
+
+    bindRecNav(container);
+    const btn=container.querySelector('#btnSaveWaste');
+    if(btn)btn.addEventListener('click',async()=>{
+      const msg=container.querySelector('#wMsg');
+      const date=container.querySelector('#wDate').value;
+      const product=container.querySelector('#wProduct').value.trim();
+      const qty=parseFloat(container.querySelector('#wQty').value)||0;
+      if(!date||!product||qty<=0){msg.textContent='Rellena fecha, producto y cantidad';msg.style.color='var(--alert-red-fg)';return;}
+      const key=`${date.slice(0,7)}`;
+      btn.disabled=true;btn.textContent='Guardando…';
+      try{
+        const snap=await getDoc(doc(db,'records_waste',key));
+        const list=snap.exists()?(snap.data().list||[]):[];
+        list.push({date,product,qty,
+          unit:container.querySelector('#wUnit').value,
+          cost:parseFloat(container.querySelector('#wCost').value)||0,
+          reason:container.querySelector('#wReason').value,
+          area:container.querySelector('#wArea').value,
+          recordedBy:container.querySelector('#wBy').value.trim(),
+          notes:container.querySelector('#wNotes').value.trim()});
+        await setDoc(doc(db,'records_waste',key),{list,updatedAt:Timestamp.now()});
+        recRefDate=new Date(date+'T12:00:00');
+        renderWaste(container);
+      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
+      btn.disabled=false;btn.textContent='Guardar merma';
+    });
+    container.querySelectorAll('[data-del-waste]').forEach(b=>{
+      b.addEventListener('click',async()=>{
+        const target=sorted[+b.dataset.delWaste];
+        if(!confirm(`¿Eliminar la merma de ${target.product}?`))return;
+        const list=waste.filter(w=>w!==target&&!(w.date===target.date&&w.product===target.product&&w.qty===target.qty));
+        await setDoc(doc(db,'records_waste',monthKey),{list,updatedAt:Timestamp.now()});
+        renderWaste(container);
+      });
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+// ── TEMPERATURAS ──────────────────────────────────────────────────
+async function renderTemps(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando temperaturas…</span></div>`;
+  try{
+    const {monthKey,temps,equipment}=await loadRecords();
+    const mLabel=recRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+    const sorted=temps.slice().sort((a,b)=>`${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+    const outOfRange=temps.filter(t=>{
+      const eq=equipment.find(e=>e.id===t.equipmentId);
+      if(!eq)return false;
+      return t.value<eq.min||t.value>eq.max;
+    });
+    const todayStr=localISODate(new Date());
+    const todayCount=temps.filter(t=>t.date===todayStr).length;
+    const pendingAction=outOfRange.filter(t=>!t.action);
+
+    const rows=sorted.map((t,i)=>{
+      const eq=equipment.find(e=>e.id===t.equipmentId);
+      const bad=eq&&(t.value<eq.min||t.value>eq.max);
+      const d=t.date?new Date(t.date+'T12:00:00'):null;
+      return`<div class="order-card" ${bad?'style="border-left:3px solid #F09595"':''}>
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${bad?'⚠️ ':'✓ '}${escapeHtml(eq?eq.name:t.equipmentId||'Equipo')}</span>
+            <span class="order-loc">${d?d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}):'—'}${t.time?` · ${escapeHtml(t.time)}`:''}${t.recordedBy?` · ${escapeHtml(t.recordedBy)}`:''}</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill ${bad?'pill-cancel':'pill-ok'}" style="font-family:var(--font-mono);font-weight:600">${t.value} °C</span>
+            ${eq?`<span class="pill pill-other" style="font-size:10px">rango ${eq.min} a ${eq.max}</span>`:''}
+            <button class="btn-del-staff" data-del-temp="${i}" title="Eliminar">✕</button>
+          </div>
+        </div>
+        ${bad&&!t.action?`<div class="comment-internal" style="color:var(--alert-red-fg);font-style:normal">⚠️ Fuera de rango sin acción correctiva registrada</div>`:''}
+        ${t.action?`<div class="comment-internal" style="font-style:normal">🔧 ${escapeHtml(t.action)}</div>`:''}
+      </div>`;
+    }).join('');
+
+    container.innerHTML=recNav(mLabel,'Temperaturas')+`
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Lecturas del mes</div><div class="kpi-value">${temps.length}</div><div class="kpi-sub">${todayCount} hoy</div></div>
+      <div class="kpi-card"><div class="kpi-label">Fuera de rango</div><div class="kpi-value ${outOfRange.length>0?'alert':''}">${outOfRange.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Sin acción correctiva</div><div class="kpi-value ${pendingAction.length>0?'alert':''}">${pendingAction.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Equipos controlados</div><div class="kpi-value">${equipment.length}</div></div>
+    </div>
+    ${pendingAction.length?renderAlerts([{type:'red',msg:`${pendingAction.length} lectura${pendingAction.length>1?'s':''} fuera de rango sin acción correctiva registrada`}]):''}
+    <div class="audit-section">
+      <h3>Registrar temperatura</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Fecha *</label><input type="date" id="tDate" value="${localISODate(new Date())}"></div>
+        <div class="form-group"><label>Hora *</label><input type="time" id="tTime" value="${new Date().toTimeString().slice(0,5)}"></div>
+        <div class="form-group"><label>Equipo *</label><select id="tEquip">${equipment.map(e=>`<option value="${escapeHtml(e.id)}">${escapeHtml(e.name)} (${e.min} a ${e.max} °C)</option>`).join('')}</select></div>
+        <div class="form-group"><label>Temperatura (°C) *</label><input type="number" id="tValue" value="" step="0.1" placeholder="0,0"></div>
+        <div class="form-group"><label>Registrado por</label><input type="text" id="tBy" placeholder="Nombre"></div>
+        <div class="form-group form-group-full"><label>Acción correctiva<br><span style="font-size:10.5px;color:var(--text-tertiary);font-weight:400">Obligatoria si la lectura sale de rango</span></label><input type="text" id="tAction" placeholder="Qué se hizo al detectarlo"></div>
+      </div>
+      <button class="btn-primary" id="btnSaveTemp" style="max-width:220px">Guardar lectura</button>
+      <p id="tMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+    ${temps.length?`<p class="section-label">Lecturas de ${mLabel}</p><div class="orders">${rows}</div>`:'<div class="empty-state"><p>Sin lecturas registradas este mes</p></div>'}`;
+
+    bindRecNav(container);
+    const btn=container.querySelector('#btnSaveTemp');
+    if(btn)btn.addEventListener('click',async()=>{
+      const msg=container.querySelector('#tMsg');
+      const date=container.querySelector('#tDate').value;
+      const time=container.querySelector('#tTime').value;
+      const equipmentId=container.querySelector('#tEquip').value;
+      const raw=container.querySelector('#tValue').value;
+      if(!date||!time||raw===''){msg.textContent='Rellena fecha, hora y temperatura';msg.style.color='var(--alert-red-fg)';return;}
+      const value=parseFloat(raw);
+      const eq=equipment.find(e=>e.id===equipmentId);
+      const action=container.querySelector('#tAction').value.trim();
+      const bad=eq&&(value<eq.min||value>eq.max);
+      if(bad&&!action){
+        msg.textContent=`${value} °C está fuera del rango de ${eq.name} (${eq.min} a ${eq.max} °C). Indica la acción correctiva para poder guardar.`;
+        msg.style.color='var(--alert-red-fg)';return;
+      }
+      const key=date.slice(0,7);
+      btn.disabled=true;btn.textContent='Guardando…';
+      try{
+        const snap=await getDoc(doc(db,'records_temp',key));
+        const list=snap.exists()?(snap.data().list||[]):[];
+        list.push({date,time,equipmentId,value,action,recordedBy:container.querySelector('#tBy').value.trim()});
+        await setDoc(doc(db,'records_temp',key),{list,updatedAt:Timestamp.now()});
+        recRefDate=new Date(date+'T12:00:00');
+        renderTemps(container);
+      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
+      btn.disabled=false;btn.textContent='Guardar lectura';
+    });
+    container.querySelectorAll('[data-del-temp]').forEach(b=>{
+      b.addEventListener('click',async()=>{
+        const target=sorted[+b.dataset.delTemp];
+        if(!confirm('¿Eliminar esta lectura?'))return;
+        const list=temps.filter(t=>t!==target&&!(t.date===target.date&&t.time===target.time&&t.equipmentId===target.equipmentId));
+        await setDoc(doc(db,'records_temp',monthKey),{list,updatedAt:Timestamp.now()});
+        renderTemps(container);
+      });
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+// ── EQUIPOS ───────────────────────────────────────────────────────
+async function renderEquipment(container){
+  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando equipos…</span></div>`;
+  try{
+    const {equipment}=await loadRecords();
+    const rows=equipment.map((e,i)=>`<div class="shift-row">
+      <input class="staff-inline-input" style="flex:1;min-width:170px" data-eq-idx="${i}" data-eq-f="name" value="${escapeHtml(e.name)}" placeholder="Nombre del equipo">
+      <input class="staff-inline-input" style="width:70px;text-align:right" type="number" data-eq-idx="${i}" data-eq-f="min" value="${e.min}" step="0.5" title="Mínimo">
+      <span style="font-size:11px;color:var(--text-tertiary)">a</span>
+      <input class="staff-inline-input" style="width:70px;text-align:right" type="number" data-eq-idx="${i}" data-eq-f="max" value="${e.max}" step="0.5" title="Máximo">
+      <span style="font-size:11px;color:var(--text-tertiary)">°C</span>
+      <button class="btn-del-staff" data-del-eq="${i}" title="Eliminar equipo">✕</button>
+    </div>`).join('');
+    container.innerHTML=moduleHeader('Registros · Equipos','Define los equipos y su rango correcto de temperatura')+`
+    <div class="audit-section">
+      <h3>Equipos con control de temperatura</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">El rango determina cuándo una lectura se marca fuera de norma y exige acción correctiva.</p>
+      ${rows}
+      <button class="btn-action" id="btnAddEq" style="margin-top:10px">+ Añadir equipo</button>
+      <p id="eqMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>`;
+    const save=async list=>{
+      const msg=container.querySelector('#eqMsg');
+      try{
+        await setDoc(doc(db,'records_config','equipment'),{list,updatedAt:Timestamp.now()});
+        renderEquipment(container);
+      }catch(e){if(msg){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}}
+    };
+    container.querySelectorAll('[data-eq-idx]').forEach(inp=>{
+      inp.addEventListener('change',async()=>{
+        const i=+inp.dataset.eqIdx,f=inp.dataset.eqF;
+        equipment[i][f]=f==='name'?inp.value.trim():(parseFloat(inp.value)||0);
+        await save(equipment);
+      });
+    });
+    container.querySelectorAll('[data-del-eq]').forEach(b=>{
+      b.addEventListener('click',async()=>{
+        const i=+b.dataset.delEq;
+        if(!confirm(`¿Eliminar ${equipment[i].name}?`))return;
+        equipment.splice(i,1);
+        await save(equipment);
+      });
+    });
+    const add=container.querySelector('#btnAddEq');
+    if(add)add.addEventListener('click',async()=>{
+      equipment.push({id:'eq'+Date.now(),name:'Nuevo equipo',min:0,max:4});
+      await save(equipment);
+    });
+  }catch(e){
+    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function renderRecords(container){
+  if(currentRecordsView==='temp')renderTemps(container);
+  else if(currentRecordsView==='equipment')renderEquipment(container);
+  else renderWaste(container);
+}
+document.getElementById('recordsTabs').addEventListener('click',e=>{
+  const tab=e.target.closest('.tab');
+  if(!tab)return;
+  document.querySelectorAll('#recordsTabs .tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  currentRecordsView=tab.dataset.recView;
+  renderRecords(document.getElementById('recordsContent'));
+});
+
+// ══ MÓDULO REGISTROS · FIN ════════════════════════════════════════
+
 // ══ CATERING · GENERADOR DE PROPUESTA ═════════════════════════════
 // Catálogo de productos (semilla) — se migra a Firestore en el primer arranque
+// Al subir MENU_VERSION, la próxima carga actualiza el catálogo guardado
+const MENU_VERSION=2;
 // n=nombre · p=precio · d=descripción · a=alérgenos · v=dietas · f=formato
 const MENU_SEED={
  coffee:[
@@ -4534,8 +4980,8 @@ const MENU_SEED={
   {n:"Borek de Queso",p:2.5,a:["Gluten", "Leche"],v:["Vegetariano"]},
   {n:"Jarra de Zumo de Naranja Natural",p:15.0},
   {n:"Set Café Nespresso + Infusiones Nestlé",p:6.2},
-  {n:"Set Leches + Infusiones",p:3.64},
-  {n:"Reposición Café + Leches (sin cafetera)",p:3.65},
+  {n:"Set Leches + Infusiones",p:3.64,d:"Incluye un brick de leche y un brick de bebida de avena"},
+  {n:"Reposición Café + Leches (sin cafetera)",p:3.65,d:"Incluye un brick de leche y un brick de bebida de avena"},
   {n:"Box Coca de Chocolate",p:15.0,a:["Gluten", "Leche", "Frutos Secos"]},
   {n:"Box Pecaditos",p:15.0,a:["Gluten", "Leche"]},
   {n:"Brocheta de Fruta Variada",p:1.82,v:["Vegano", "Vegetariano"]},
@@ -4617,12 +5063,14 @@ let MENU_CATALOG={coffee:[],lunch:[]};
 async function ensureMenuSeeded(){
   try{
     const snap=await getDoc(doc(db,'catering_config','menu_catalog'));
-    if(!snap.exists()){
-      await setDoc(doc(db,'catering_config','menu_catalog'),{...MENU_SEED,updatedAt:Timestamp.now()});
+    const stored=snap.exists()?snap.data():null;
+    const needsUpdate=!stored||(stored.version||1)<MENU_VERSION;
+    if(needsUpdate){
+      await setDoc(doc(db,'catering_config','menu_catalog'),
+        {...MENU_SEED,version:MENU_VERSION,updatedAt:Timestamp.now()});
       MENU_CATALOG={coffee:MENU_SEED.coffee,lunch:MENU_SEED.lunch};
     } else {
-      const d=snap.data();
-      MENU_CATALOG={coffee:d.coffee||[],lunch:d.lunch||[]};
+      MENU_CATALOG={coffee:stored.coffee||[],lunch:stored.lunch||[]};
     }
   }catch(e){console.warn('No se pudo sincronizar el catálogo:',e.message);}
 }
@@ -4661,8 +5109,37 @@ const DEFAULT_GUIDELINES=`- Cocina de producto real, sin ultraprocesados.
 - Priorizar producto de temporada y proveedor de proximidad.
 - Ajustar cantidades al número de comensales, sin excesos.`;
 
+// Solo se aceptan CECO que empiecen por estos prefijos
+const VALID_CECO_PREFIXES=['304','903'];
+function cecoIsValid(v){
+  const c=(v||'').trim();
+  if(!c)return null; // vacío: no se valida
+  return VALID_CECO_PREFIXES.some(p=>c.startsWith(p));
+}
+
 const SERVICE_TYPES=['Coffee break','Desayuno','Lunch','Finger lunch','Comida a la carta','Cóctel','Evento','Otro'];
 const MEETING_EVENT_TYPES=['Reunión interna','Reunión con cliente','Formación','Celebración','Presentación','Visita externa','Otro'];
+
+// Tramos de coste de servicio por número de comensales
+const DEFAULT_SERVICE_TIERS=[
+  {minPax:30,maxPax:49,amount:75,adhoc:false},
+  {minPax:50,maxPax:null,amount:0,adhoc:true},
+];
+async function loadServiceTiers(){
+  const snap=await getDoc(doc(db,'catering_config','serviceTiers'));
+  return snap.exists()&&Array.isArray(snap.data().tiers)?snap.data().tiers:DEFAULT_SERVICE_TIERS;
+}
+// Devuelve el tramo aplicable a un número de comensales
+function tierForPax(tiers,pax){
+  const n=parseInt(pax)||0;
+  if(!n)return null;
+  return tiers.find(t=>n>=t.minPax&&(t.maxPax===null||t.maxPax===undefined||n<=t.maxPax))||null;
+}
+function tierLabel(t){
+  if(!t)return'';
+  const rango=t.maxPax?`${t.minPax}–${t.maxPax} pax`:`${t.minPax} pax o más`;
+  return t.adhoc?`${rango}: presupuesto a medida`:`${rango}: ${fmtMoney(t.amount)} de servicio`;
+}
 
 async function loadGuidelines(){
   const snap=await getDoc(doc(db,'catering_config','promptGuidelines'));
@@ -4688,7 +5165,7 @@ async function buildHistoricalContext(){
   }catch(e){return null;}
 }
 
-function buildPrompt(f,guidelines,hist,roomCapacity){
+function buildPrompt(f,guidelines,hist,roomCapacity,tier){
   const L=[];
   L.push('Actúa como chef y responsable de un servicio de catering corporativo. Necesito una propuesta de catering concreta y lista para presentar al cliente.');
   L.push('');
@@ -4700,8 +5177,12 @@ function buildPrompt(f,guidelines,hist,roomCapacity){
   if(f.deliveryTime)L.push(`- Hora de entrega: ${f.deliveryTime}`);
   if(f.pickupTime)L.push(`- Hora de recogida: ${f.pickupTime}`);
   if(f.requester)L.push(`- Solicitado por: ${f.requester}`);
-  if(f.ceco)L.push(`- CECO: ${f.ceco}`);
+  if(f.ceco)L.push(`- CECO: ${f.ceco}${cecoIsValid(f.ceco)===false?' ⚠ CÓDIGO NO VÁLIDO — solo se aceptan los que empiezan por '+VALID_CECO_PREFIXES.join(' o '):''}`);
   if(f.allergies)L.push(`- Alergias e intolerancias a respetar: ${f.allergies}`);
+  if(tier){
+    if(tier.adhoc)L.push(`- ATENCIÓN: con ${f.pax} comensales el servicio se presupuesta a medida, no se aplica el importe fijo. Indícame qué personal y material haría falta para que yo lo valore.`);
+    else L.push(`- Coste de servicio aplicable: ${fmtMoney(tier.amount)} (tramo de ${tier.minPax} a ${tier.maxPax} comensales). Súmalo al total, aparte de los productos.`);
+  }
   if(f.notes)L.push(`- Notas adicionales: ${f.notes}`);
   L.push('');
   L.push('## Nuestra carta disponible');
@@ -4714,7 +5195,7 @@ function buildPrompt(f,guidelines,hist,roomCapacity){
   if(hist){
     L.push('');
     L.push('## Contexto de nuestro histórico');
-    L.push(`Hemos servido ${hist.total} caterings. Los formatos más frecuentes son:`);
+    L.push(`Hemos servido ${hist.total} caterings. Estos son los formatos más pedidos (solo nombre, pax y precio; no tenemos registrada su composición):`);
     hist.top.forEach(([t,v])=>{
       const pp=v.pax?v.price/v.pax:0;
       L.push(`- ${t}: ${v.count} servicios${v.pax?`, ${Math.round(v.pax/v.count)} pax de media`:''}${pp?`, ${pp.toFixed(2)} €/pax`:''}`);
@@ -4724,7 +5205,7 @@ function buildPrompt(f,guidelines,hist,roomCapacity){
   L.push('');
   L.push('## Qué necesito de ti');
   L.push('1. Una selección de productos **de la carta anterior**, con las unidades de cada uno y el total para los comensales indicados.');
-  L.push('2. El precio total de la propuesta y el precio resultante por comensal, calculados con los precios de la carta.');
+  L.push('2. El precio total de la propuesta y el precio por comensal, calculados con los precios de la carta más el coste de servicio si aplica.');
   L.push('3. Confirmación de que la propuesta cubre las alergias e intolerancias indicadas, señalando qué productos son la alternativa para cada caso.');
   L.push('4. Una tabla resumen: producto · unidades · precio unitario · subtotal.');
   L.push('5. Indicaciones de montaje y material necesario para la sala indicada.');
@@ -4732,6 +5213,7 @@ function buildPrompt(f,guidelines,hist,roomCapacity){
   L.push('');
   L.push('Reglas importantes:');
   L.push('- No inventes productos que no estén en la carta. Si crees que falta algo necesario, dímelo explícitamente.');
+  L.push('- Los sets de leches ya incluyen un brick de leche y otro de bebida de avena, así que cubren la intolerancia a la lactosa sin añadir nada más.');
   L.push('- No cambies los precios de la carta.');
   L.push('- Si falta algún dato relevante para proponer, pregúntame antes en lugar de suponerlo.');
   return L.join('\n');
@@ -4742,26 +5224,35 @@ let proposalForm={pax:'',eventType:'',serviceType:'',room:'',deliveryTime:'',pic
 async function renderProposal(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Preparando…</span></div>`;
   try{
-    const [guidelines,hist]=await Promise.all([loadGuidelines(),buildHistoricalContext(),ensureMenuSeeded()]);
+    const [guidelines,hist,,tiers]=await Promise.all([loadGuidelines(),buildHistoricalContext(),ensureMenuSeeded(),loadServiceTiers()]);
     const f=proposalForm;
     const roomCap=f.room?getRoomCapacity(f.room):null;
     const overCap=roomCap&&f.pax&&+f.pax>roomCap;
-    const prompt=buildPrompt(f,guidelines,hist,roomCap);
+    const cecoOk=cecoIsValid(f.ceco);
+    const tier=tierForPax(tiers,f.pax);
+    const prompt=buildPrompt(f,guidelines,hist,roomCap,tier);
     const ready=f.pax&&f.serviceType;
 
     container.innerHTML=moduleHeader('Generar propuesta de catering','Rellena los datos y copia el texto para pegarlo en Claude')+`
-    ${overCap?renderAlerts([{type:'red',msg:`Aforo superado · la sala ${f.room} admite ${roomCap} personas y has indicado ${f.pax}`}]):''}
+    ${(()=>{
+      const al=[];
+      if(overCap)al.push({type:'red',msg:`Aforo superado · la sala ${f.room} admite ${roomCap} personas y has indicado ${f.pax}`});
+      if(cecoOk===false)al.push({type:'red',msg:`CECO no válido · "${escapeHtml(f.ceco)}" no empieza por ${VALID_CECO_PREFIXES.join(' ni ')}. Solo se aceptan esos códigos`});
+      if(tier&&tier.adhoc)al.push({type:'purple',msg:`Presupuesto a medida · con ${f.pax} comensales el servicio no lleva importe fijo, hay que valorarlo caso por caso`});
+      else if(tier)al.push({type:'amber',msg:`Coste de servicio · se aplican ${fmtMoney(tier.amount)} por el tramo de ${tier.minPax} a ${tier.maxPax} comensales`});
+      return al.length?renderAlerts(al):'';
+    })()}
     <div class="audit-section">
       <h3>Datos del servicio</h3>
       <div class="form-grid">
-        <div class="form-group"><label>Comensales (pax) *</label><input type="number" id="prPax" value="${escapeHtml(f.pax)}" min="1" placeholder="Ej. 25"></div>
+        <div class="form-group"><label>Comensales (pax) *${tier?(tier.adhoc?' <span style="color:var(--break-fg)">· a medida</span>':` <span style="color:var(--alert-amber-fg)">· +${fmtMoney(tier.amount)} servicio</span>`):''}</label><input type="number" id="prPax" value="${escapeHtml(f.pax)}" min="1" placeholder="Ej. 25"></div>
         <div class="form-group"><label>Tipo de servicio *</label><select id="prService"><option value="">Selecciona…</option>${SERVICE_TYPES.map(t=>`<option value="${t}" ${f.serviceType===t?'selected':''}>${t}</option>`).join('')}</select></div>
         <div class="form-group"><label>Tipo de evento</label><select id="prEvent"><option value="">Selecciona…</option>${MEETING_EVENT_TYPES.map(t=>`<option value="${t}" ${f.eventType===t?'selected':''}>${t}</option>`).join('')}</select></div>
         <div class="form-group"><label>Sala</label><input type="text" id="prRoom" value="${escapeHtml(f.room)}" list="roomList" placeholder="Nombre de la sala"><datalist id="roomList">${ROOM_DIRECTORY.slice(0,120).map(r=>`<option value="${escapeHtml(r.room)}">`).join('')}</datalist></div>
         <div class="form-group"><label>Hora de entrega</label><input type="time" id="prDelivery" value="${escapeHtml(f.deliveryTime)}"></div>
         <div class="form-group"><label>Hora de recogida</label><input type="time" id="prPickup" value="${escapeHtml(f.pickupTime)}"></div>
         <div class="form-group"><label>Persona solicitante</label><input type="text" id="prRequester" value="${escapeHtml(f.requester)}" placeholder="Nombre y apellidos"></div>
-        <div class="form-group"><label>CECO</label><input type="text" id="prCeco" value="${escapeHtml(f.ceco)}" placeholder="Centro de coste"></div>
+        <div class="form-group"><label>CECO${cecoOk===false?' <span style="color:var(--alert-red-fg)">· no válido</span>':cecoOk===true?' <span style="color:var(--ok-fg)">· correcto</span>':''}<br><span style="font-size:10.5px;color:var(--text-tertiary);font-weight:400">Debe empezar por ${VALID_CECO_PREFIXES.join(' o ')}</span></label><input type="text" id="prCeco" value="${escapeHtml(f.ceco)}" placeholder="Ej. 304xxxx" ${cecoOk===false?'class="input-required"':''}></div>
         <div class="form-group form-group-full"><label>Alergias e intolerancias</label><input type="text" id="prAllergies" value="${escapeHtml(f.allergies)}" placeholder="Ej. 2 sin gluten, 1 sin lactosa, 1 vegano"></div>
         <div class="form-group"><label>Carta a incluir</label><select id="prScope">
           <option value="both" ${(f.catalogScope||'both')==='both'?'selected':''}>Ambas cartas (${MENU_CATALOG.coffee.length+MENU_CATALOG.lunch.length} productos)</option>
@@ -4783,8 +5274,28 @@ async function renderProposal(container){
       <p id="prMsg" style="font-size:12px;margin-top:10px"></p>
     </div>
 
+    <div class="audit-section">
+      <h3>Tramos de coste de servicio</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Según el número de comensales se aplica un importe fijo de servicio, o se marca como presupuesto a medida. Deja el máximo vacío para "sin límite".</p>
+      ${tiers.map((t,i)=>`<div class="shift-row">
+        <span style="font-size:11.5px;color:var(--text-tertiary);width:34px">Desde</span>
+        <input class="staff-inline-input" style="width:62px;text-align:right" type="number" data-tier-idx="${i}" data-tier-f="minPax" value="${t.minPax}" min="1">
+        <span style="font-size:11.5px;color:var(--text-tertiary)">hasta</span>
+        <input class="staff-inline-input" style="width:62px;text-align:right" type="number" data-tier-idx="${i}" data-tier-f="maxPax" value="${t.maxPax!==null&&t.maxPax!==undefined?t.maxPax:''}" min="1" placeholder="∞">
+        <span style="font-size:11.5px;color:var(--text-tertiary)">pax →</span>
+        <input class="staff-inline-input" style="width:78px;text-align:right" type="number" data-tier-idx="${i}" data-tier-f="amount" value="${t.amount||''}" step="5" min="0" placeholder="0" ${t.adhoc?'disabled':''}>
+        <span style="font-size:11.5px;color:var(--text-tertiary)">€</span>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-secondary);cursor:pointer">
+          <input type="checkbox" data-tier-idx="${i}" data-tier-f="adhoc" ${t.adhoc?'checked':''}> a medida
+        </label>
+        <button class="btn-del-staff" data-del-tier="${i}" title="Eliminar tramo">✕</button>
+      </div>`).join('')}
+      <button class="btn-action" id="btnAddTier" style="margin-top:10px">+ Añadir tramo</button>
+      <p id="tierMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+
     <div style="font-size:11.5px;color:var(--text-tertiary);line-height:1.6;margin-bottom:10px">
-      ℹ️ Esta pantalla no llama a ninguna IA por su cuenta: prepara el texto para que lo pegues donde quieras. Incluye vuestra carta completa (${MENU_CATALOG.coffee.length+MENU_CATALOG.lunch.length} productos con precios y alérgenos)${hist?` y datos de ${hist.total} caterings del histórico`:''}.
+      ℹ️ Esta pantalla no llama a ninguna IA por su cuenta: prepara el texto para que lo pegues donde quieras. Incluye vuestra carta completa (${MENU_CATALOG.coffee.length+MENU_CATALOG.lunch.length} productos con precios y alérgenos)${hist?`. Del histórico de ${hist.total} pedidos solo se aportan datos agregados (formatos más pedidos, pax medio y precio por comensal), no la composición de los menús, porque las importaciones no la incluyen`:''}.
     </div>`;
 
     const bind=(id,field,rerender)=>{
@@ -4814,6 +5325,37 @@ async function renderProposal(container){
       }
       setTimeout(()=>{if(msg)msg.textContent='';},2500);
     });
+    // Edición de tramos de servicio
+    const saveTiers=async list=>{
+      const msg=container.querySelector('#tierMsg');
+      try{
+        await setDoc(doc(db,'catering_config','serviceTiers'),{tiers:list,updatedAt:Timestamp.now()});
+        renderProposal(container);
+      }catch(e){if(msg){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}}
+    };
+    container.querySelectorAll('[data-tier-idx]').forEach(el=>{
+      el.addEventListener('change',async()=>{
+        const i=+el.dataset.tierIdx,f=el.dataset.tierF;
+        if(f==='adhoc')tiers[i].adhoc=el.checked;
+        else if(f==='maxPax')tiers[i].maxPax=el.value===''?null:(parseInt(el.value)||null);
+        else tiers[i][f]=parseFloat(el.value)||0;
+        await saveTiers(tiers);
+      });
+    });
+    container.querySelectorAll('[data-del-tier]').forEach(b=>{
+      b.addEventListener('click',async()=>{
+        const i=+b.dataset.delTier;
+        if(!confirm('¿Eliminar este tramo?'))return;
+        tiers.splice(i,1);
+        await saveTiers(tiers);
+      });
+    });
+    const btnAddTier=container.querySelector('#btnAddTier');
+    if(btnAddTier)btnAddTier.addEventListener('click',async()=>{
+      tiers.push({minPax:1,maxPax:null,amount:0,adhoc:false});
+      await saveTiers(tiers);
+    });
+
     const btnReset=container.querySelector('#btnResetProposal');
     if(btnReset)btnReset.addEventListener('click',()=>{
       proposalForm={pax:'',eventType:'',serviceType:'',room:'',deliveryTime:'',pickupTime:'',requester:'',ceco:'',allergies:'',notes:'',catalogScope:'both'};
@@ -5064,7 +5606,13 @@ async function loadForecastData(){
 }
 
 async function saveForecast(monthKey,section,data){
-  await setDoc(doc(db,'forecast_config',monthKey),{[section]:data,updatedAt:Timestamp.now()},{merge:true});
+  // No se puede usar merge: en Firestore fusiona los mapas y las claves borradas persistirían.
+  // Se reescribe el documento completo conservando el resto de secciones.
+  const ref=doc(db,'forecast_config',monthKey);
+  const snap=await getDoc(ref);
+  const current=snap.exists()?snap.data():{};
+  const next={...current,[section]:data,updatedAt:Timestamp.now()};
+  await setDoc(ref,next);
 }
 
 function monthDays(refDate){
@@ -5084,7 +5632,7 @@ function devBadge(real,fcast){
 
 function fcNav(label,title){
   return`<div class="module-header">
-    <h1 class="module-title">Forecast · ${title||''}</h1>
+    <h1 class="module-title">Forecast &amp; sales · ${title||''}</h1>
     <p class="module-sub">${label}</p>
   </div>
   <div class="cumulative-controls">
@@ -5093,10 +5641,18 @@ function fcNav(label,title){
       <span class="date-nav-label" style="cursor:default;min-width:130px">${label}</span>
       <button class="date-nav-btn" id="fcNext">▶</button>
     </div>
+    <input type="month" class="month-picker" id="fcMonthPick" value="${monthInputValue(fcRefDate)}" title="Ir a un mes concreto">
   </div>`;
 }
 
 function bindFcNav(container){
+  const mp=container.querySelector('#fcMonthPick');
+  if(mp)mp.addEventListener('change',()=>{
+    if(!mp.value)return;
+    const [y,m]=mp.value.split('-');
+    fcRefDate=new Date(+y,+m-1,1);
+    renderForecast(container);
+  });
   const p=container.querySelector('#fcPrev'),n=container.querySelector('#fcNext');
   if(p)p.addEventListener('click',()=>{fcRefDate=new Date(fcRefDate.getFullYear(),fcRefDate.getMonth()-1,1);renderForecast(container);});
   if(n)n.addEventListener('click',()=>{fcRefDate=new Date(fcRefDate.getFullYear(),fcRefDate.getMonth()+1,1);renderForecast(container);});
@@ -5136,7 +5692,7 @@ async function renderFcSales(container){
       const realTotal=dailyCh.reduce((s,c)=>s+(realDay[c.k]||0),0);
       accFc+=fcTotal;accReal+=realTotal;
       const accDev=accFc?((accReal-accFc)/accFc*100):0;
-      const inputs=dailyCh.map(c=>`<td><input type="number" class="fc-input" data-fc-day="${d.date}" data-fc-ch="${c.k}" value="${fcDay[c.k]||''}" placeholder="0" step="10" min="0"></td>`).join('');
+      const inputs=dailyCh.map(c=>`<td><input type="number" class="fc-input" data-fc-day="${d.date}" data-fc-ch="${c.k}" value="${fcDay[c.k]||''}" placeholder="0" step="0.01" min="0"></td>`).join('');
       const reals=dailyCh.map(c=>`<td class="fc-real">${realDay[c.k]?fmtMoney(realDay[c.k]):'—'}</td>`).join('');
       return`<tr class="${d.isWeekend?'fc-weekend':''}">
         <td class="fc-day">${d.day}<span class="fc-wd">${['D','L','M','X','J','V','S'][d.weekday]}</span></td>
@@ -5159,13 +5715,13 @@ async function renderFcSales(container){
       const f=salesMonthly[c.k]||0,r=realMonthly[c.k]||0;
       return`<div class="fc-monthly-row">
         <span class="fc-monthly-lbl">${c.lbl}</span>
-        <input type="number" class="fc-input" style="width:100px" data-fc-monthly="${c.k}" value="${f||''}" placeholder="0" step="100" min="0">
+        <input type="number" class="fc-input" style="width:100px" data-fc-monthly="${c.k}" value="${f||''}" placeholder="0" step="0.01" min="0">
         <span class="fc-monthly-real">Real: <strong>${fmtMoney(r)}</strong></span>
         <span>${devBadge(r,f)}</span>
       </div>`;
     }).join('');
 
-    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Forecast & sales')+`
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Ventas')+`
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Previsión total del mes</div><div class="kpi-value">${fmtMoney(totalFc)}</div><div class="kpi-sub">mensual + diaria</div></div>
       <div class="kpi-card"><div class="kpi-label">Real acumulado</div><div class="kpi-value">${fmtMoney(totalReal)}</div></div>
@@ -5255,7 +5811,7 @@ async function renderFcPurchases(container){
         <td class="fc-day">${d.day}<span class="fc-wd">${['D','L','M','X','J','V','S'][d.weekday]}</span></td>
         <td class="fc-real">${salesFc?fmtMoney(salesFc):'—'}</td>
         <td class="fc-sep">${target?fmtMoney(target):'—'}</td>
-        <td><input type="number" class="fc-input" data-fc-pur="${d.date}" value="${real||''}" placeholder="0" step="10" min="0"></td>
+        <td><input type="number" class="fc-input" data-fc-pur="${d.date}" value="${real||''}" placeholder="0" step="0.01" min="0"></td>
         <td style="color:${dayDevColor};font-family:var(--font-mono);font-size:11px">${target?`${real-target>=0?'+':''}${fmtMoney(real-target)}`:'—'}</td>
         <td class="fc-real" style="${realPct>targetPct?'color:var(--alert-red-fg);font-weight:500':''}">${salesFc&&real?`${realPct.toFixed(1)}%`:'—'}</td>
         <td class="fc-acc" style="color:${accReal<=accTarget?'var(--ok-fg)':'var(--alert-red-fg)'}">${accTarget?`${accDev>=0?'+':''}${accDev.toFixed(0)}%`:'—'}</td>
@@ -5416,6 +5972,61 @@ document.getElementById('forecastTabs').addEventListener('click',e=>{
   renderForecast(document.getElementById('forecastContent'));
 });
 
+// ══ PERMISOS POR USUARIO ══════════════════════════════════════════
+// El propietario ve todo. El resto solo los módulos que se le asignen.
+const OWNER_EMAIL='solvives186@gmail.com';
+const ALL_MODULES=['catering','audit','pnl','staff','billing','forecast','minutes','records','looker'];
+const MODULE_LABELS={catering:'Catering',audit:'Auditoría',pnl:'Cuenta de explotación',staff:'Personal',
+  billing:'Facturación',forecast:'Forecast',minutes:'Actas',records:'Registros',looker:'Looker'};
+let userModules=ALL_MODULES;   // módulos permitidos al usuario actual
+let isOwner=true;
+
+async function loadPermissions(email){
+  if(!email)return{modules:[],owner:false};
+  if(email===OWNER_EMAIL)return{modules:ALL_MODULES,owner:true};
+  try{
+    const snap=await getDoc(doc(db,'app_config','permissions'));
+    const map=snap.exists()?(snap.data().users||{}):{};
+    const entry=map[email];
+    return{modules:entry&&Array.isArray(entry.modules)?entry.modules:[],owner:false};
+  }catch(e){
+    console.warn('No se pudieron cargar los permisos:',e.message);
+    return{modules:[],owner:false};
+  }
+}
+
+// Oculta del hub los módulos no permitidos y recoloca la rejilla
+function applyPermissionsToHub(){
+  document.querySelectorAll('.hub-card').forEach(card=>{
+    const mod=card.dataset.module;
+    const allowed=userModules.includes(mod);
+    card.hidden=!allowed;
+  });
+  // Si solo hay un módulo permitido, la tarjeta de Catering no debe ocupar doble
+  const visible=[...document.querySelectorAll('.hub-card')].filter(c=>!c.hidden);
+  const grid=document.querySelector('.hub-grid');
+  if(grid){
+    const cells=visible.reduce((n,c)=>n+(c.classList.contains('hub-wide')?2:1),0);
+    // Busca el número de columnas que deja filas completas
+    let cols=5;
+    for(const c of [5,4,3,2]){ if(cells%c===0){cols=c;break;} }
+    if(visible.length<=2)cols=visible.length||1;
+    grid.style.gridTemplateColumns=`repeat(${cols},minmax(0,1fr))`;
+  }
+  const sub=document.getElementById('hubSubtitle');
+  if(sub&&!isOwner){
+    const n=visible.length;
+    sub.textContent=`${n} módulo${n!==1?'s':''} disponible${n!==1?'s':''}`;
+  }
+}
+
+// Impide entrar a un módulo sin permiso
+function canAccess(mod){
+  if(userModules.includes(mod))return true;
+  alert('No tienes acceso a este módulo.\n\nSi crees que deberías tenerlo, pídelo al responsable del centro.');
+  return false;
+}
+
 // ══ DATOS EN VIVO DEL HUB ═════════════════════════════════════════
 const st=(num,lbl,cls)=>`<div class="hub-st"><span class="hub-num ${cls||''}">${num}</span><span class="hub-lbl">${lbl}</span></div>`;
 const pct=v=>`${v>=0?'+':''}${v.toFixed(1)} %`;
@@ -5554,6 +6165,32 @@ async function loadHubStats(){
     }catch(e){fail('hubBillingStats');}
   })();
 
+  // ── Registros: mermas del mes y temperaturas fuera de rango ──
+  (async()=>{
+    try{
+      const now=new Date();
+      const mk=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      const [wS,tS,eS]=await Promise.all([
+        getDoc(doc(db,'records_waste',mk)),
+        getDoc(doc(db,'records_temp',mk)),
+        getDoc(doc(db,'records_config','equipment'))
+      ]);
+      const waste=wS.exists()?(wS.data().list||[]):[];
+      const temps=tS.exists()?(tS.data().list||[]):[];
+      const equip=eS.exists()?(eS.data().list||DEFAULT_EQUIPMENT):DEFAULT_EQUIPMENT;
+      if(!waste.length&&!temps.length){set('hubRecordsStats','<span class="hub-empty">Sin registros este mes</span>');return;}
+      const wasteCost=waste.reduce((s2,w)=>s2+(w.cost||0),0);
+      const bad=temps.filter(t=>{const eq=equip.find(e=>e.id===t.equipmentId);return eq&&(t.value<eq.min||t.value>eq.max);});
+      const todayStr=localISODate(now);
+      const todayTemps=temps.filter(t=>t.date===todayStr).length;
+      let html='';
+      if(wasteCost)html+=st(fmtMoney(wasteCost),'mermas mes','warn');
+      html+=st(todayTemps,'lecturas hoy',todayTemps===0?'warn':'');
+      if(bad.length)html+=st(bad.length,'fuera de rango','neg');
+      set('hubRecordsStats',html);
+    }catch(e){fail('hubRecordsStats');}
+  })();
+
   // ── Actas: número de actas y última reunión ──
   (async()=>{
     try{
@@ -5636,6 +6273,7 @@ const forecastScreen=document.getElementById('forecastScreen');
 const minutesScreen=document.getElementById('minutesScreen');
 const cateringChoiceScreen=document.getElementById('cateringChoiceScreen');
 const proposalScreen=document.getElementById('proposalScreen');
+const recordsScreen=document.getElementById('recordsScreen');
 
 function showScreen(name){
   if(name==='hub')setTimeout(loadHubStats,50);
@@ -5648,6 +6286,7 @@ function showScreen(name){
   minutesScreen.hidden=name!=='minutes';
   cateringChoiceScreen.hidden=name!=='cateringChoice';
   proposalScreen.hidden=name!=='proposal';
+  recordsScreen.hidden=name!=='records';
   document.getElementById('app').hidden=name!=='catering';
 }
 
@@ -5655,6 +6294,7 @@ document.querySelectorAll('.hub-card').forEach(card=>{
   card.addEventListener('click',()=>{
     if(card.classList.contains('disabled'))return;
     const mod=card.dataset.module;
+    if(!canAccess(mod))return;
     if(mod==='catering'){
       showScreen('cateringChoice');
     } else if(mod==='audit'){
@@ -5672,6 +6312,9 @@ document.querySelectorAll('.hub-card').forEach(card=>{
     } else if(mod==='forecast'){
       showScreen('forecast');
       renderForecast(document.getElementById('forecastContent'));
+    } else if(mod==='records'){
+      showScreen('records');
+      renderRecords(document.getElementById('recordsContent'));
     } else if(mod==='minutes'){
       showScreen('minutes');
       renderMinutes(document.getElementById('minutesContent'));
@@ -5689,6 +6332,7 @@ document.getElementById('btnBackFromBilling').addEventListener('click',()=>showS
 document.getElementById('btnBackFromForecast').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromMinutes').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromChoice').addEventListener('click',()=>showScreen('hub'));
+document.getElementById('btnBackFromRecords').addEventListener('click',()=>showScreen('hub'));
 document.getElementById('btnBackFromProposal').addEventListener('click',()=>showScreen('cateringChoice'));
 document.getElementById('btnEditGuidelines').addEventListener('click',()=>openGuidelinesModal(document.getElementById('proposalContent')));
 document.querySelectorAll('.choice-card').forEach(card=>{
@@ -5780,7 +6424,16 @@ onAuthStateChanged(auth, user=>{
     document.getElementById('hubDate').textContent=dLbl;
     const sub=document.getElementById('hubSubtitle');
     if(sub)sub.textContent=dLbl.charAt(0).toUpperCase()+dLbl.slice(1);
-    ensureConfigSeeded().then(loadHubStats).catch(loadHubStats);
+    loadPermissions(user.email).then(perm=>{
+      userModules=perm.modules;
+      isOwner=perm.owner;
+      applyPermissionsToHub();
+      if(!userModules.length){
+        const g=document.querySelector('.hub-grid');
+        if(g)g.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><p>Tu cuenta no tiene módulos asignados</p><p style="font-size:12px;margin-top:6px">Pide al responsable del centro que te dé acceso.</p></div>`;
+      }
+      ensureConfigSeeded().then(loadHubStats).catch(loadHubStats);
+    });
   } else {
     loginScreen.hidden=false;
     hubScreen.hidden=true;
@@ -5792,6 +6445,7 @@ onAuthStateChanged(auth, user=>{
     minutesScreen.hidden=true;
     cateringChoiceScreen.hidden=true;
     proposalScreen.hidden=true;
+    recordsScreen.hidden=true;
     appEl.hidden=true;
   }
 });
@@ -5843,7 +6497,7 @@ document.getElementById('btnForgotPassword').addEventListener('click', async(e)=
 loginPassword.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 loginEmail.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-['btnLogout','btnLogoutHub','btnLogoutAudit','btnLogoutStaff','btnLogoutPnl','btnLogoutBilling','btnLogoutForecast','btnLogoutMinutes','btnLogoutChoice','btnLogoutProposal'].forEach(id=>{
+['btnLogout','btnLogoutHub','btnLogoutAudit','btnLogoutStaff','btnLogoutPnl','btnLogoutBilling','btnLogoutForecast','btnLogoutMinutes','btnLogoutChoice','btnLogoutProposal','btnLogoutRecords'].forEach(id=>{
   const b=document.getElementById(id);
   if(b)b.addEventListener('click',async()=>{await signOut(auth);});
 });
