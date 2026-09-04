@@ -81,6 +81,14 @@ mark.hl{background:var(--alert-amber-border);color:var(--text-primary);border-ra
   .minute-lbl{width:auto}
   .minute-search{min-width:0;max-width:none}
 }
+.temp-table td{padding:4px 3px}
+.temp-cell{display:flex;flex-direction:column;gap:3px;align-items:center}
+.temp-time{font-family:var(--font-mono);font-size:10.5px;padding:2px 4px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-secondary);width:72px}
+.temp-val{font-family:var(--font-mono);font-size:12.5px;font-weight:600;padding:4px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary);width:72px;text-align:center}
+.temp-val:focus{border-color:var(--text-primary);outline:none}
+.temp-val.temp-ok{background:var(--ok-bg);border-color:#8FD455;color:var(--ok-fg)}
+.temp-val.temp-bad{background:var(--alert-red-bg);border-color:var(--alert-red-border);color:var(--alert-red-fg)}
+.temp-row-bad{background:var(--alert-red-bg)}
 .month-picker{font-family:var(--font-sans);font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-card);color:var(--text-primary);cursor:pointer}
 .month-picker:hover{border-color:var(--text-secondary)}
 .month-picker:focus{border-color:var(--text-primary);outline:none}
@@ -667,8 +675,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
     </div>
     <nav class="tabs" id="recordsTabs">
       <button class="tab active" data-rec-view="waste">Mermas</button>
-      <button class="tab" data-rec-view="temp">Temperaturas</button>
-      <button class="tab" data-rec-view="equipment">Equipos</button>
+      <button class="tab" data-rec-view="temp">Temperaturas de línea</button>
     </nav>
     <div class="topbar-actions">
       <button class="btn-theme" id="btnThemeRecords" title="Modo noche">🌙</button>
@@ -4132,22 +4139,12 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
     const c=e.category||'Otros';
     extrasByCategory[c]=(extrasByCategory[c]||0)+(e.amount||0);
   });
-  // Los abonos por errores de TPV suman: Proppos nos devuelve el importe
-  const refunds=manualRefunds;
-  const revenue=cateringRevenue+comedor.billed+cafeteria.billed+extrasRevenue+transfersOut+refunds;
-  // Meses cubiertos por el rango, para prorratear costes mensuales
+  // ── Meses del rango e importes manuales (se calculan antes de los ingresos) ──
   let months=1;
   if(from&&to){
     months=Math.max(1,(to.getFullYear()-from.getFullYear())*12+(to.getMonth()-from.getMonth())+1);
   }
-  const sc=computeStaffCost(staff,costs,ettList);
-  const labourCost=-(sc.totalMonthly*months);
-  const labourPayroll=-(sc.payrollMonthly*months);
-  const labourLeave=-(sc.onLeaveMonthly*months);
-  const labourEtt=-(sc.ettMonthly*months);
-
-  // ── Costes manuales introducidos por mes (tienen prioridad sobre los calculados) ──
-  const manual=costs.manual||{};   // { 'YYYY-MM': {mmpp, iuo, transfers} }
+  const manual=costs.manual||{};   // { 'YYYY-MM': {mmpp, iuo, refunds} }
   const monthKeysInRange=[];
   if(from&&to){
     const cur=new Date(from.getFullYear(),from.getMonth(),1);
@@ -4159,6 +4156,16 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const manualRefunds=sumManual('refunds'); // abonos por errores de TPV (Proppos)
   const hasManualMmpp=manualMmpp>0;
   const hasManualIuo=manualIuo>0;
+
+  // Los abonos por errores de TPV suman: Proppos nos devuelve el importe
+  const refunds=manualRefunds;
+  const revenue=cateringRevenue+comedor.billed+cafeteria.billed+extrasRevenue+transfersOut+refunds;
+
+  const sc=computeStaffCost(staff,costs,ettList);
+  const labourCost=-(sc.totalMonthly*months);
+  const labourPayroll=-(sc.payrollMonthly*months);
+  const labourLeave=-(sc.onLeaveMonthly*months);
+  const labourEtt=-(sc.ettMonthly*months);
 
   // MMPP: importe real. Prioridad: importe manual de esta pantalla → compras reales del Forecast.
   // No se estima por porcentaje: si no hay dato real, la línea queda a cero y se avisa.
@@ -4603,28 +4610,25 @@ const WASTE_UNITS=['kg','unidades','litros','raciones'];
 function wasteReason(k){return WASTE_REASONS.find(r=>r.k===k)||WASTE_REASONS[6];}
 
 // Equipos con control de temperatura. Rango correcto según APPCC.
-const DEFAULT_EQUIPMENT=[
-  {id:'cam1',name:'Cámara de refrigeración 1',min:0,max:4},
-  {id:'cam2',name:'Cámara de refrigeración 2',min:0,max:4},
-  {id:'cong1',name:'Congelador 1',min:-22,max:-18},
-  {id:'exp1',name:'Expositor cafetería',min:0,max:6},
-];
+// Control de temperatura en línea de servicio (mantenimiento en caliente)
+// El APPCC exige mantener el producto caliente a 65 °C o más
+const DEFAULT_TEMP_CONFIG={minTemp:65,times:['12:00','13:00','14:00']};
 
 let currentRecordsView='waste';
 let recRefDate=new Date();
 
 async function loadRecords(){
   const monthKey=`${recRefDate.getFullYear()}-${String(recRefDate.getMonth()+1).padStart(2,'0')}`;
-  const [wSnap,tSnap,eSnap]=await Promise.all([
+  const [wSnap,tSnap,cSnap]=await Promise.all([
     getDoc(doc(db,'records_waste',monthKey)),
     getDoc(doc(db,'records_temp',monthKey)),
-    getDoc(doc(db,'records_config','equipment'))
+    getDoc(doc(db,'records_config','temp'))
   ]);
   return{
     monthKey,
     waste:wSnap.exists()?(wSnap.data().list||[]):[],
-    temps:tSnap.exists()?(tSnap.data().list||[]):[],
-    equipment:eSnap.exists()?(eSnap.data().list||DEFAULT_EQUIPMENT):DEFAULT_EQUIPMENT
+    tempDays:tSnap.exists()?(tSnap.data().days||{}):{},
+    tempCfg:cSnap.exists()?{...DEFAULT_TEMP_CONFIG,...cSnap.data()}:DEFAULT_TEMP_CONFIG
   };
 }
 
@@ -4764,164 +4768,208 @@ async function renderWaste(container){
 }
 
 // ── TEMPERATURAS ──────────────────────────────────────────────────
+let tempDay=localISODate(new Date());
+
+// ── TEMPERATURAS DE LÍNEA ─────────────────────────────────────────
 async function renderTemps(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando temperaturas…</span></div>`;
   try{
-    const {monthKey,temps,equipment}=await loadRecords();
-    const mLabel=recRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
-    const sorted=temps.slice().sort((a,b)=>`${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
-    const outOfRange=temps.filter(t=>{
-      const eq=equipment.find(e=>e.id===t.equipmentId);
-      if(!eq)return false;
-      return t.value<eq.min||t.value>eq.max;
-    });
-    const todayStr=localISODate(new Date());
-    const todayCount=temps.filter(t=>t.date===todayStr).length;
-    const pendingAction=outOfRange.filter(t=>!t.action);
+    const {tempDays,tempCfg}=await loadRecords();
+    const minT=tempCfg.minTemp;
+    const times=tempCfg.times||DEFAULT_TEMP_CONFIG.times;
+    const dishes=tempDays[tempDay]||[];
+    const dLabel=new Date(tempDay+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
-    const rows=sorted.map((t,i)=>{
-      const eq=equipment.find(e=>e.id===t.equipmentId);
-      const bad=eq&&(t.value<eq.min||t.value>eq.max);
-      const d=t.date?new Date(t.date+'T12:00:00'):null;
-      return`<div class="order-card" ${bad?'style="border-left:3px solid #F09595"':''}>
-        <div class="order-top">
-          <div class="order-who">
-            <span class="order-name">${bad?'⚠️ ':'✓ '}${escapeHtml(eq?eq.name:t.equipmentId||'Equipo')}</span>
-            <span class="order-loc">${d?d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}):'—'}${t.time?` · ${escapeHtml(t.time)}`:''}${t.recordedBy?` · ${escapeHtml(t.recordedBy)}`:''}</span>
+    // Evaluación del día en curso
+    const isBad=v=>v!==null&&v!==undefined&&v!==''&&+v<minT;
+    let totalReadings=0,badReadings=0,missing=0;
+    dishes.forEach(d=>{
+      times.forEach((_,i)=>{
+        const r=(d.readings||[])[i];
+        const v=r&&r.value!==''&&r.value!==null&&r.value!==undefined?+r.value:null;
+        if(v===null)missing++;else{totalReadings++;if(v<minT)badReadings++;}
+      });
+    });
+
+    // Tabla del día: un plato por fila, tres lecturas por columna
+    const rows=dishes.map((d,di)=>{
+      const cells=times.map((t,ti)=>{
+        const r=(d.readings||[])[ti]||{};
+        const v=r.value!==undefined&&r.value!==null?r.value:'';
+        const bad=isBad(v);
+        return`<td>
+          <div class="temp-cell">
+            <input type="time" class="temp-time" data-dish="${di}" data-slot="${ti}" data-tf="time" value="${escapeHtml(r.time||t)}">
+            <input type="number" class="temp-val ${bad?'temp-bad':v!==''?'temp-ok':''}" data-dish="${di}" data-slot="${ti}" data-tf="value" value="${v}" step="0.1" placeholder="—">
           </div>
-          <div class="order-pills">
-            <span class="pill ${bad?'pill-cancel':'pill-ok'}" style="font-family:var(--font-mono);font-weight:600">${t.value} °C</span>
-            ${eq?`<span class="pill pill-other" style="font-size:10px">rango ${eq.min} a ${eq.max}</span>`:''}
-            <button class="btn-del-staff" data-del-temp="${i}" title="Eliminar">✕</button>
-          </div>
-        </div>
-        ${bad&&!t.action?`<div class="comment-internal" style="color:var(--alert-red-fg);font-style:normal">⚠️ Fuera de rango sin acción correctiva registrada</div>`:''}
-        ${t.action?`<div class="comment-internal" style="font-style:normal">🔧 ${escapeHtml(t.action)}</div>`:''}
+        </td>`;
+      }).join('');
+      const dishBad=times.some((_,ti)=>{const r=(d.readings||[])[ti];return r&&isBad(r.value);});
+      return`<tr class="${dishBad?'temp-row-bad':''}">
+        <td class="sched-name"><input class="staff-inline-input" style="width:100%;min-width:150px" data-dish="${di}" data-tf="dish" value="${escapeHtml(d.dish||'')}" placeholder="Nombre del plato"></td>
+        ${cells}
+        <td style="text-align:center">
+          ${dishBad?'<span class="pill pill-cancel" style="font-size:10px">Fuera</span>':''}
+          <button class="btn-del-staff" data-del-dish="${di}" title="Eliminar plato">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    // Historial del mes por día
+    const dayKeys=Object.keys(tempDays).sort((a,b)=>b.localeCompare(a));
+    const histRows=dayKeys.map(k=>{
+      const ds=tempDays[k]||[];
+      let tot=0,bad=0,miss=0;
+      ds.forEach(d=>times.forEach((_,i)=>{
+        const r=(d.readings||[])[i];
+        const v=r&&r.value!==''&&r.value!==null&&r.value!==undefined?+r.value:null;
+        if(v===null)miss++;else{tot++;if(v<minT)bad++;}
+      }));
+      const d=new Date(k+'T12:00:00');
+      const estado=bad>0?'<span class="pill pill-cancel">'+bad+' fuera de rango</span>'
+        :miss>0?'<span class="pill pill-pax-amber">'+miss+' sin registrar</span>'
+        :'<span class="pill pill-ok">Correcto</span>';
+      return`<div class="history-item" style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer" data-goto-day="${k}">
+        <span style="font-size:12.5px">${d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})} · ${ds.length} plato${ds.length!==1?'s':''} · ${tot} lectura${tot!==1?'s':''}</span>
+        ${estado}
       </div>`;
     }).join('');
 
-    container.innerHTML=recNav(mLabel,'Temperaturas')+`
+    container.innerHTML=recNav(recRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Temperaturas de línea')+`
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Lecturas del mes</div><div class="kpi-value">${temps.length}</div><div class="kpi-sub">${todayCount} hoy</div></div>
-      <div class="kpi-card"><div class="kpi-label">Fuera de rango</div><div class="kpi-value ${outOfRange.length>0?'alert':''}">${outOfRange.length}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Sin acción correctiva</div><div class="kpi-value ${pendingAction.length>0?'alert':''}">${pendingAction.length}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Equipos controlados</div><div class="kpi-value">${equipment.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Platos del día</div><div class="kpi-value">${dishes.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Lecturas tomadas</div><div class="kpi-value">${totalReadings}</div><div class="kpi-sub">de ${dishes.length*times.length} previstas</div></div>
+      <div class="kpi-card"><div class="kpi-label">Fuera de rango</div><div class="kpi-value ${badReadings>0?'alert':''}">${badReadings}</div><div class="kpi-sub">menos de ${minT} °C</div></div>
+      <div class="kpi-card"><div class="kpi-label">Sin registrar</div><div class="kpi-value ${missing>0?'warn':''}">${missing}</div></div>
     </div>
-    ${pendingAction.length?renderAlerts([{type:'red',msg:`${pendingAction.length} lectura${pendingAction.length>1?'s':''} fuera de rango sin acción correctiva registrada`}]):''}
-    <div class="audit-section">
-      <h3>Registrar temperatura</h3>
+    ${badReadings>0?renderAlerts([{type:'red',msg:`${badReadings} lectura${badReadings>1?'s':''} por debajo de ${minT} °C · revisa y anota la acción correctiva en observaciones`}]):''}
+
+    <div class="cumulative-controls" style="margin-bottom:10px">
+      <span style="font-size:12.5px;color:var(--text-secondary)">Día:</span>
+      <input type="date" class="month-picker" id="tempDayPick" value="${tempDay}">
+      <button class="btn-action" id="tempToday">Hoy</button>
+      <span style="font-size:12px;color:var(--text-tertiary)">${dLabel}</span>
+    </div>
+
+    <div class="sched-wrap">
+      <table class="sched-table temp-table">
+        <thead><tr>
+          <th class="sched-name">Plato</th>
+          ${times.map((t,i)=>`<th>Toma ${i+1}</th>`).join('')}
+          <th style="width:70px"></th>
+        </tr></thead>
+        <tbody>${rows||`<tr><td colspan="${times.length+2}" style="padding:14px;font-size:12.5px;color:var(--text-tertiary);text-align:center">Sin platos registrados este día. Añade el primero abajo.</td></tr>`}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+      <input type="text" id="newDishName" class="staff-inline-input" style="border:1px solid var(--border);background:var(--bg);min-width:220px" placeholder="Nombre del plato a añadir">
+      <button class="btn-primary" id="btnAddDish" style="max-width:190px">+ Añadir plato</button>
+      <input type="text" id="tempBy" class="staff-inline-input" style="border:1px solid var(--border);background:var(--bg);min-width:150px" placeholder="Registrado por" value="${escapeHtml((dishes[0]&&dishes[0].by)||'')}">
+    </div>
+    <p id="tempMsg" style="font-size:12px;margin-top:10px"></p>
+
+    <div class="audit-section" style="margin-top:16px">
+      <h3>Configuración</h3>
       <div class="form-grid">
-        <div class="form-group"><label>Fecha *</label><input type="date" id="tDate" value="${localISODate(new Date())}"></div>
-        <div class="form-group"><label>Hora *</label><input type="time" id="tTime" value="${new Date().toTimeString().slice(0,5)}"></div>
-        <div class="form-group"><label>Equipo *</label><select id="tEquip">${equipment.map(e=>`<option value="${escapeHtml(e.id)}">${escapeHtml(e.name)} (${e.min} a ${e.max} °C)</option>`).join('')}</select></div>
-        <div class="form-group"><label>Temperatura (°C) *</label><input type="number" id="tValue" value="" step="0.1" placeholder="0,0"></div>
-        <div class="form-group"><label>Registrado por</label><input type="text" id="tBy" placeholder="Nombre"></div>
-        <div class="form-group form-group-full"><label>Acción correctiva<br><span style="font-size:10.5px;color:var(--text-tertiary);font-weight:400">Obligatoria si la lectura sale de rango</span></label><input type="text" id="tAction" placeholder="Qué se hizo al detectarlo"></div>
+        <div class="form-group"><label>Temperatura mínima (°C)</label><input type="number" id="cfgMinTemp" value="${minT}" step="1" min="0"></div>
+        ${times.map((t,i)=>`<div class="form-group"><label>Hora de la toma ${i+1}</label><input type="time" id="cfgTime${i}" value="${t}"></div>`).join('')}
       </div>
-      <button class="btn-primary" id="btnSaveTemp" style="max-width:220px">Guardar lectura</button>
-      <p id="tMsg" style="font-size:12px;margin-top:10px"></p>
+      <button class="btn-primary" id="btnSaveTempCfg" style="max-width:220px">Guardar configuración</button>
+      <p id="cfgMsg" style="font-size:12px;margin-top:10px"></p>
     </div>
-    ${temps.length?`<p class="section-label">Lecturas de ${mLabel}</p><div class="orders">${rows}</div>`:'<div class="empty-state"><p>Sin lecturas registradas este mes</p></div>'}`;
+
+    ${dayKeys.length?`<p class="section-label">Historial del mes · pulsa un día para verlo</p>${histRows}`:''}`;
 
     bindRecNav(container);
-    const btn=container.querySelector('#btnSaveTemp');
-    if(btn)btn.addEventListener('click',async()=>{
-      const msg=container.querySelector('#tMsg');
-      const date=container.querySelector('#tDate').value;
-      const time=container.querySelector('#tTime').value;
-      const equipmentId=container.querySelector('#tEquip').value;
-      const raw=container.querySelector('#tValue').value;
-      if(!date||!time||raw===''){msg.textContent='Rellena fecha, hora y temperatura';msg.style.color='var(--alert-red-fg)';return;}
-      const value=parseFloat(raw);
-      const eq=equipment.find(e=>e.id===equipmentId);
-      const action=container.querySelector('#tAction').value.trim();
-      const bad=eq&&(value<eq.min||value>eq.max);
-      if(bad&&!action){
-        msg.textContent=`${value} °C está fuera del rango de ${eq.name} (${eq.min} a ${eq.max} °C). Indica la acción correctiva para poder guardar.`;
-        msg.style.color='var(--alert-red-fg)';return;
-      }
-      const key=date.slice(0,7);
-      btn.disabled=true;btn.textContent='Guardando…';
+
+    const saveDay=async(list)=>{
+      const msg=container.querySelector('#tempMsg');
       try{
-        const snap=await getDoc(doc(db,'records_temp',key));
-        const list=snap.exists()?(snap.data().list||[]):[];
-        list.push({date,time,equipmentId,value,action,recordedBy:container.querySelector('#tBy').value.trim()});
-        await setDoc(doc(db,'records_temp',key),{list,updatedAt:Timestamp.now()});
-        recRefDate=new Date(date+'T12:00:00');
+        const key=tempDay.slice(0,7);
+        const ref=doc(db,'records_temp',key);
+        const snap=await getDoc(ref);
+        const days=snap.exists()?(snap.data().days||{}):{};
+        if(list.length)days[tempDay]=list;else delete days[tempDay];
+        await setDoc(ref,{days,updatedAt:Timestamp.now()});
+        if(msg){msg.textContent='✓ Guardado';msg.style.color='var(--ok-fg)';setTimeout(()=>{if(msg)msg.textContent='';},1200);}
         renderTemps(container);
-      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
-      btn.disabled=false;btn.textContent='Guardar lectura';
+      }catch(e){if(msg){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}}
+    };
+
+    // Edición de nombre de plato y de cada lectura
+    container.querySelectorAll('[data-tf]').forEach(el=>{
+      el.addEventListener('change',async()=>{
+        const di=+el.dataset.dish,f=el.dataset.tf;
+        const list=dishes.map(d=>({...d,readings:[...(d.readings||[])]}));
+        if(f==='dish'){list[di].dish=el.value.trim();}
+        else{
+          const ti=+el.dataset.slot;
+          while(list[di].readings.length<=ti)list[di].readings.push({});
+          const r={...list[di].readings[ti]};
+          if(f==='value')r.value=el.value===''?'':parseFloat(el.value);
+          else r.time=el.value;
+          list[di].readings[ti]=r;
+        }
+        const by=container.querySelector('#tempBy');
+        if(by&&by.value.trim())list[di].by=by.value.trim();
+        await saveDay(list);
+      });
     });
-    container.querySelectorAll('[data-del-temp]').forEach(b=>{
+    container.querySelectorAll('[data-del-dish]').forEach(b=>{
       b.addEventListener('click',async()=>{
-        const target=sorted[+b.dataset.delTemp];
-        if(!confirm('¿Eliminar esta lectura?'))return;
-        const list=temps.filter(t=>t!==target&&!(t.date===target.date&&t.time===target.time&&t.equipmentId===target.equipmentId));
-        await setDoc(doc(db,'records_temp',monthKey),{list,updatedAt:Timestamp.now()});
+        const di=+b.dataset.delDish;
+        if(!confirm(`¿Eliminar "${dishes[di].dish||'este plato'}" y sus lecturas?`))return;
+        const list=dishes.filter((_,i)=>i!==di);
+        await saveDay(list);
+      });
+    });
+    const addBtn=container.querySelector('#btnAddDish');
+    if(addBtn)addBtn.addEventListener('click',async()=>{
+      const inp=container.querySelector('#newDishName');
+      const name=inp.value.trim();
+      const msg=container.querySelector('#tempMsg');
+      if(!name){msg.textContent='Escribe el nombre del plato';msg.style.color='var(--alert-red-fg)';return;}
+      const by=container.querySelector('#tempBy');
+      const list=[...dishes,{dish:name,readings:times.map(t=>({time:t,value:''})),by:by?by.value.trim():''}];
+      await saveDay(list);
+    });
+    const dayPick=container.querySelector('#tempDayPick');
+    if(dayPick)dayPick.addEventListener('change',()=>{
+      if(!dayPick.value)return;
+      tempDay=dayPick.value;
+      recRefDate=new Date(tempDay+'T12:00:00');
+      renderTemps(container);
+    });
+    const todayBtn=container.querySelector('#tempToday');
+    if(todayBtn)todayBtn.addEventListener('click',()=>{
+      tempDay=localISODate(new Date());
+      recRefDate=new Date();
+      renderTemps(container);
+    });
+    container.querySelectorAll('[data-goto-day]').forEach(el=>{
+      el.addEventListener('click',()=>{
+        tempDay=el.dataset.gotoDay;
         renderTemps(container);
       });
+    });
+    const cfgBtn=container.querySelector('#btnSaveTempCfg');
+    if(cfgBtn)cfgBtn.addEventListener('click',async()=>{
+      const msg=container.querySelector('#cfgMsg');
+      const minTemp=parseFloat(container.querySelector('#cfgMinTemp').value)||65;
+      const newTimes=times.map((_,i)=>container.querySelector('#cfgTime'+i).value).filter(Boolean);
+      try{
+        await setDoc(doc(db,'records_config','temp'),{minTemp,times:newTimes,updatedAt:Timestamp.now()});
+        renderTemps(container);
+      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
     });
   }catch(e){
     container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
   }
 }
 
-// ── EQUIPOS ───────────────────────────────────────────────────────
-async function renderEquipment(container){
-  container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando equipos…</span></div>`;
-  try{
-    const {equipment}=await loadRecords();
-    const rows=equipment.map((e,i)=>`<div class="shift-row">
-      <input class="staff-inline-input" style="flex:1;min-width:170px" data-eq-idx="${i}" data-eq-f="name" value="${escapeHtml(e.name)}" placeholder="Nombre del equipo">
-      <input class="staff-inline-input" style="width:70px;text-align:right" type="number" data-eq-idx="${i}" data-eq-f="min" value="${e.min}" step="0.5" title="Mínimo">
-      <span style="font-size:11px;color:var(--text-tertiary)">a</span>
-      <input class="staff-inline-input" style="width:70px;text-align:right" type="number" data-eq-idx="${i}" data-eq-f="max" value="${e.max}" step="0.5" title="Máximo">
-      <span style="font-size:11px;color:var(--text-tertiary)">°C</span>
-      <button class="btn-del-staff" data-del-eq="${i}" title="Eliminar equipo">✕</button>
-    </div>`).join('');
-    container.innerHTML=moduleHeader('Registros · Equipos','Define los equipos y su rango correcto de temperatura')+`
-    <div class="audit-section">
-      <h3>Equipos con control de temperatura</h3>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">El rango determina cuándo una lectura se marca fuera de norma y exige acción correctiva.</p>
-      ${rows}
-      <button class="btn-action" id="btnAddEq" style="margin-top:10px">+ Añadir equipo</button>
-      <p id="eqMsg" style="font-size:12px;margin-top:10px"></p>
-    </div>`;
-    const save=async list=>{
-      const msg=container.querySelector('#eqMsg');
-      try{
-        await setDoc(doc(db,'records_config','equipment'),{list,updatedAt:Timestamp.now()});
-        renderEquipment(container);
-      }catch(e){if(msg){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}}
-    };
-    container.querySelectorAll('[data-eq-idx]').forEach(inp=>{
-      inp.addEventListener('change',async()=>{
-        const i=+inp.dataset.eqIdx,f=inp.dataset.eqF;
-        equipment[i][f]=f==='name'?inp.value.trim():(parseFloat(inp.value)||0);
-        await save(equipment);
-      });
-    });
-    container.querySelectorAll('[data-del-eq]').forEach(b=>{
-      b.addEventListener('click',async()=>{
-        const i=+b.dataset.delEq;
-        if(!confirm(`¿Eliminar ${equipment[i].name}?`))return;
-        equipment.splice(i,1);
-        await save(equipment);
-      });
-    });
-    const add=container.querySelector('#btnAddEq');
-    if(add)add.addEventListener('click',async()=>{
-      equipment.push({id:'eq'+Date.now(),name:'Nuevo equipo',min:0,max:4});
-      await save(equipment);
-    });
-  }catch(e){
-    container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
-  }
-}
 
 function renderRecords(container){
   if(currentRecordsView==='temp')renderTemps(container);
-  else if(currentRecordsView==='equipment')renderEquipment(container);
   else renderWaste(container);
 }
 document.getElementById('recordsTabs').addEventListener('click',e=>{
@@ -6170,23 +6218,31 @@ async function loadHubStats(){
     try{
       const now=new Date();
       const mk=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-      const [wS,tS,eS]=await Promise.all([
+      const [wS,tS,cS]=await Promise.all([
         getDoc(doc(db,'records_waste',mk)),
         getDoc(doc(db,'records_temp',mk)),
-        getDoc(doc(db,'records_config','equipment'))
+        getDoc(doc(db,'records_config','temp'))
       ]);
       const waste=wS.exists()?(wS.data().list||[]):[];
-      const temps=tS.exists()?(tS.data().list||[]):[];
-      const equip=eS.exists()?(eS.data().list||DEFAULT_EQUIPMENT):DEFAULT_EQUIPMENT;
-      if(!waste.length&&!temps.length){set('hubRecordsStats','<span class="hub-empty">Sin registros este mes</span>');return;}
-      const wasteCost=waste.reduce((s2,w)=>s2+(w.cost||0),0);
-      const bad=temps.filter(t=>{const eq=equip.find(e=>e.id===t.equipmentId);return eq&&(t.value<eq.min||t.value>eq.max);});
+      const days=tS.exists()?(tS.data().days||{}):{};
+      const cfg=cS.exists()?{...DEFAULT_TEMP_CONFIG,...cS.data()}:DEFAULT_TEMP_CONFIG;
       const todayStr=localISODate(now);
-      const todayTemps=temps.filter(t=>t.date===todayStr).length;
+      const todayDishes=days[todayStr]||[];
+      // Lecturas del mes fuera de rango y pendientes de hoy
+      let badMonth=0,todayDone=0,todayExpected=todayDishes.length*(cfg.times||[]).length;
+      Object.values(days).forEach(ds=>ds.forEach(d=>(d.readings||[]).forEach(r=>{
+        if(r&&r.value!==''&&r.value!==null&&r.value!==undefined&&+r.value<cfg.minTemp)badMonth++;
+      })));
+      todayDishes.forEach(d=>(d.readings||[]).forEach(r=>{
+        if(r&&r.value!==''&&r.value!==null&&r.value!==undefined)todayDone++;
+      }));
+      if(!waste.length&&!Object.keys(days).length){set('hubRecordsStats','<span class="hub-empty">Sin registros este mes</span>');return;}
+      const wasteCost=waste.reduce((s2,w)=>s2+(w.cost||0),0);
       let html='';
       if(wasteCost)html+=st(fmtMoney(wasteCost),'mermas mes','warn');
-      html+=st(todayTemps,'lecturas hoy',todayTemps===0?'warn':'');
-      if(bad.length)html+=st(bad.length,'fuera de rango','neg');
+      if(todayExpected)html+=st(`${todayDone}/${todayExpected}`,'tomas hoy',todayDone<todayExpected?'warn':'pos');
+      else html+=st('0','platos hoy','warn');
+      if(badMonth)html+=st(badMonth,'fuera de rango','neg');
       set('hubRecordsStats',html);
     }catch(e){fail('hubRecordsStats');}
   })();
