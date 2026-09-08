@@ -964,10 +964,13 @@ async function getExistingOrderIds() {
   return new Set(snap.docs.map(d=>d.id));
 }
 async function getConfig() {
+  // Se guarda en memoria para que renderOrderCard pueda consultar los umbrales
   try{
     const snap=await getDoc(doc(db,'catering_config','settings'));
-    return snap.exists()?snap.data():{paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100,minGapMinutes:20,serviceCountAlert:15};
-  }catch(e){return {paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100,minGapMinutes:20,serviceCountAlert:15};}
+    const cfg=snap.exists()?snap.data():{paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100,minGapMinutes:20,serviceCountAlert:15,latePickupHour:17,minDurationMinutes:120};
+    window.__cateringConfig=cfg;
+    return cfg;
+  }catch(e){return {paxAlertIndividual:35,paxAlertHigh:50,paxAlertDayTotal:100,minGapMinutes:20,serviceCountAlert:15,latePickupHour:17,minDurationMinutes:120};}
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────
@@ -1236,6 +1239,26 @@ const ICON_WARN=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const ICON_INFO=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
 const ICON_OK=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
 
+// Hora en la que se libera la sala: la de recogida si consta, o la entrega más la duración mínima
+function effectivePickup(o,minDuration){
+  const d=toDate(o.deliveryAt);
+  if(!d)return null;
+  const parseOn=(str)=>{
+    const m=String(str||'').match(/(\d{1,2})[:.h](\d{2})/);
+    if(!m)return null;
+    const r=new Date(d);
+    r.setHours(+m[1],+m[2],0,0);
+    return r;
+  };
+  // Prioridad: hora de recogida, luego desmontaje, luego entrega + duración mínima
+  const fromPickup=parseOn(o.pickupTime);
+  if(fromPickup)return{at:fromPickup,source:'recogida'};
+  const fromTeardown=parseOn(o.teardownTime);
+  if(fromTeardown)return{at:fromTeardown,source:'desmontaje'};
+  const est=new Date(d.getTime()+(minDuration||120)*60000);
+  return{at:est,source:'estimada'};
+}
+
 function buildAlerts(orders,config){
   const alerts=[];
   const active=orders.filter(o=>o.orderStatus!=='CANCELADO');
@@ -1255,6 +1278,30 @@ function buildAlerts(orders,config){
       alerts.push({type:'red',msg:`Aforo superado · ${o.room} permite hasta ${capacity} pax — pedido de ${o.customerName} (${fmtTime(o.deliveryAt)}) es de ${o.pax} pax`});
     }
   });
+
+  // Recogidas fuera de horario: a partir de la hora límite no hay personal asignado
+  const lateHour=config.latePickupHour!==undefined?config.latePickupHour:17;
+  const minDur=config.minDurationMinutes||120;
+  const latePickups=[];
+  active.forEach(o=>{
+    const p=effectivePickup(o,minDur);
+    if(!p)return;
+    const h=p.at.getHours()+p.at.getMinutes()/60;
+    if(h>lateHour)latePickups.push({o,p});
+  });
+  if(latePickups.length){
+    latePickups.sort((a,b)=>a.p.at-b.p.at);
+    const ultima=latePickups[latePickups.length-1].p.at.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    // Aviso general destacado: sin personal a partir de la hora límite
+    alerts.push({type:'red',msg:`⚠ SIN PERSONAL PARA RECOGER · ${latePickups.length} servicio${latePickups.length>1?'s se recogen':' se recoge'} después de las ${lateHour}:00 (el último a las ${ultima}). Hay que designar a alguien expresamente para estas recogidas.`});
+    latePickups.forEach(({o,p})=>{
+      const hora=p.at.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      const nota=p.source==='estimada'
+        ? `estimada: entrega ${fmtTime(o.deliveryAt)} + ${Math.round(minDur/60)} h de ocupación mínima`
+        : `hora de ${p.source} indicada en el pedido`;
+      alerts.push({type:'red',msg:`Recoger a las ${hora} · ${o.customerName} en ${o.room||o.buildingRoom||'sala sin indicar'} (${nota}) — ¿quién la retira?`});
+    });
+  }
 
   // Carga total del día por pax acumulados
   const totalPax=active.reduce((s,o)=>s+(o.pax||0),0);
@@ -1378,7 +1425,14 @@ function renderOrderCard(o,showNew=true){
   const reviewBtn=(isPendingReview&&showNew)?`<button class="pill btn-review" data-order-id="${escapeHtml(o.orderId)}" style="background:var(--bg-hover);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer" title="Marcar como revisado">✓ Revisar</button>`:'';
   const loc=escapeHtml([o.building,o.floor,o.room?`Sala ${o.room}`:''].filter(Boolean).join(' · ')||o.buildingRoom||'—');
   const teardown=o.teardownTime?` – ${escapeHtml(o.teardownTime)}`:'';
-  const pickupInfo=o.pickupTime?`<span class="meta-item">📦 Recogida: ${escapeHtml(o.pickupTime)}</span>`:'';
+  // Aviso en la tarjeta si la recogida cae fuera del horario con personal
+  const lateCfg=window.__cateringConfig||{};
+  const lateH=lateCfg.latePickupHour!==undefined?lateCfg.latePickupHour:17;
+  const ep=isCancelled?null:effectivePickup(o,lateCfg.minDurationMinutes||120);
+  const isLatePickup=ep&&(ep.at.getHours()+ep.at.getMinutes()/60)>lateH;
+  const pickupInfo=o.pickupTime
+    ?`<span class="meta-item">📦 Recogida: ${escapeHtml(o.pickupTime)}</span>`
+    :(ep&&!isCancelled?`<span class="meta-item" style="color:var(--text-tertiary)">📦 Recogida estimada: ${ep.at.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>`:'');
   const prices=[];
   if(o.priceFood)prices.push(`Alim. ${fmtMoney(o.priceFood)}`);
   if(o.priceDrinks)prices.push(`Beb. ${fmtMoney(o.priceDrinks)}`);
@@ -1388,7 +1442,7 @@ function renderOrderCard(o,showNew=true){
   return`<div class="${classes.join(' ')}">
     <div class="order-top">
       <div class="order-who"><span class="order-name">${escapeHtml(o.customerName)||'—'}</span><span class="order-loc">Nº ${escapeHtml(o.orderId)} · ${loc}</span></div>
-      <div class="order-pills">${newBadge}${reviewBtn}${typePill(o)}${paxPill}${statusPill(o)}${o.isLate?`<span class="pill pill-pax-red">⚑ ${o.lateMinutes?o.lateMinutes+' min':'Tarde'}</span>`:''}</div>
+      <div class="order-pills">${newBadge}${reviewBtn}${typePill(o)}${paxPill}${statusPill(o)}${o.isLate?`<span class="pill pill-pax-red">⚑ ${o.lateMinutes?o.lateMinutes+' min':'Tarde'}</span>`:''}${isLatePickup?`<span class="pill pill-cancel" title="Después de las ${lateH}:00 no hay personal asignado a recogidas">📦 Sin personal</span>`:''}</div>
     </div>
     <div class="order-meta">
       ${o.deliveryAt?`<span class="meta-item">🕐 ${fmtTime(o.deliveryAt)}${teardown}</span>`:''}
@@ -2212,6 +2266,14 @@ async function renderLogic(container){
     <h3>🔴 Alertas de carga acumulada del día</h3>
     <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-red-border)"></span><span class="logic-rule-text"><strong>Producción total alta:</strong> la suma de pax de todos los servicios activos del día supera ${config.paxAlertDayTotal || 100} pax.</span></div>
     <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-red-border)"></span><span class="logic-rule-text"><strong>Volumen de pedidos alto:</strong> hay ${config.serviceCountAlert || 15} o más servicios el mismo día, aunque cada uno sea pequeño. Muchos pedidos pequeños también consumen tiempo de personal y logística.</span></div>
+  </div>
+
+  <div class="logic-section">
+    <h3>🔴 Recogidas sin personal</h3>
+    <p>A partir de las <strong>${config.latePickupHour !== undefined ? config.latePickupHour : 17}:00</strong> no hay personal asignado a recogidas. Todo servicio que se retire después de esa hora requiere designar expresamente a alguien.</p>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-red-border)"></span><span class="logic-rule-text"><strong>Aviso general:</strong> cuántos servicios quedan fuera de horario y a qué hora es el último.</span></div>
+    <div class="logic-rule"><span class="logic-rule-dot" style="background:var(--alert-red-border)"></span><span class="logic-rule-text"><strong>Un aviso por servicio:</strong> con la hora, la sala y el cliente, para poder repartir las recogidas una a una.</span></div>
+    <p style="font-size:12px;color:var(--text-tertiary);margin-top:8px">Se considera que un servicio ocupa la sala <strong>${Math.round((config.minDurationMinutes || 120)/60)} horas como mínimo</strong>. La hora de recogida se toma, por este orden: la indicada en el pedido, la de desmontaje, o la entrega más esa ocupación mínima.</p>
   </div>
 
   <div class="logic-section">
