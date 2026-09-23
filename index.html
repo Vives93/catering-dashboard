@@ -89,6 +89,14 @@ mark.hl{background:var(--alert-amber-border);color:var(--text-primary);border-ra
 .temp-val.temp-ok{background:var(--ok-bg);border-color:#8FD455;color:var(--ok-fg)}
 .temp-val.temp-bad{background:var(--alert-red-bg);border-color:var(--alert-red-border);color:var(--alert-red-fg)}
 .temp-row-bad{background:var(--alert-red-bg)}
+.cost-line{display:flex;align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap}
+.cost-lbl{font-size:13px;color:var(--text-primary);min-width:150px;font-weight:500}
+.cost-concept{flex:1;min-width:200px;font-family:var(--font-sans);font-size:12.5px;padding:6px 9px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary)}
+.cost-input{width:110px;font-family:var(--font-mono);font-size:12.5px;padding:6px 9px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary);text-align:right}
+.cost-input:focus,.cost-concept:focus{border-color:var(--text-primary);outline:none}
+.cost-note{font-size:11.5px;color:var(--text-tertiary)}
+.cost-total{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--text-secondary)}
+.cost-total strong{font-family:var(--font-mono);font-size:15px;color:var(--text-primary)}
 .month-picker{font-family:var(--font-sans);font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-card);color:var(--text-primary);cursor:pointer}
 .month-picker:hover{border-color:var(--text-secondary)}
 .month-picker:focus{border-color:var(--text-primary);outline:none}
@@ -1802,6 +1810,32 @@ async function renderCumulative(container){
 
   const byType={};
   active.forEach(o=>{const t=o.cateringType||'Otros';if(!byType[t])byType[t]={count:0,pax:0,price:0};byType[t].count++;byType[t].pax+=o.pax||0;byType[t].price+=o.priceTotal||0;});
+
+  // Tamaño del servicio: los tramos coinciden con los del coste de servicio
+  const SIZE_BANDS=[
+    {k:'small',lbl:'0 – 29 pax',min:0,max:29,color:'var(--text-primary)'},
+    {k:'mid',lbl:'30 – 49 pax',min:30,max:49,color:'var(--alert-amber-border)'},
+    {k:'big',lbl:'50 pax o más',min:50,max:Infinity,color:'var(--alert-red-border)'},
+  ];
+  const bySize={};
+  SIZE_BANDS.forEach(b=>{bySize[b.k]={count:0,pax:0,price:0};});
+  active.forEach(o=>{
+    const n=o.pax||0;
+    const b=SIZE_BANDS.find(x=>n>=x.min&&n<=x.max);
+    if(!b)return;
+    bySize[b.k].count++;bySize[b.k].pax+=n;bySize[b.k].price+=o.priceTotal||0;
+  });
+  const totalSizeCount=SIZE_BANDS.reduce((s2,b)=>s2+bySize[b.k].count,0)||1;
+  const maxSizeCount=Math.max(...SIZE_BANDS.map(b=>bySize[b.k].count),1);
+  const sizeRows=SIZE_BANDS.map(b=>{
+    const v=bySize[b.k];
+    const pctB=(v.count/totalSizeCount*100);
+    return`<div class="bar-row">
+      <span class="bar-label">${b.lbl}</span>
+      <div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v.count/maxSizeCount*100).toFixed(0)}%;background:${b.color}"></div></div>
+      <span class="bar-val" style="width:auto;min-width:150px">${v.count} ped. · ${pctB.toFixed(0)}%<br><span style="font-size:10px;color:var(--text-tertiary)">${v.pax} pax · ${fmtMoney(v.price)}</span></span>
+    </div>`;
+  }).join('');
   // Top clientes (por persona, no por empresa) — se excluyen cuentas internas / de prueba conocidas
   function isTestAccount(o){
     const name=(o.customerName||'').toLowerCase();
@@ -2076,6 +2110,12 @@ async function renderCumulative(container){
     </div>
   </div>
   <div class="stats-grid">
+    <div class="stat-card">
+      <h3>Servicios por tamaño</h3>
+      ${scopeOnly}
+      <div class="bar-chart">${sizeRows}</div>
+      <p style="font-size:11.5px;color:var(--text-tertiary);margin-top:10px;line-height:1.5">Los tramos coinciden con los del coste de servicio: sin cargo hasta 29 pax, cargo fijo de 30 a 49, y presupuesto a medida a partir de 50.</p>
+    </div>
     <div class="stat-card"><h3>Demanda por tipo de servicio (nº de pedidos)</h3>${scopeOnly}<div class="bar-chart">${typeRows}</div></div>
     <div class="stat-card"><h3>Clientes que más consumen — por facturación (top 10)</h3>${scopeOnly}<div class="bar-chart">${custRows}</div></div>
     <div class="stat-card"><h3>Salas con más pedidos (top 10)</h3>${scopeOnly}<div class="bar-chart">${roomRows}</div></div>
@@ -5275,7 +5315,7 @@ async function buildHistoricalContext(){
   }catch(e){return null;}
 }
 
-function buildPrompt(f,guidelines,hist,roomCapacity,tier){
+function buildPrompt(f,guidelines,hist,roomCapacity,tier,serviceAmount,otherCosts,otherTotal){
   const L=[];
   L.push('Actúa como chef y responsable de un servicio de catering corporativo. Necesito una propuesta de catering concreta y lista para presentar al cliente.');
   L.push('');
@@ -5289,9 +5329,15 @@ function buildPrompt(f,guidelines,hist,roomCapacity,tier){
   if(f.requester)L.push(`- Solicitado por: ${f.requester}`);
   if(f.ceco)L.push(`- CECO: ${f.ceco}${cecoIsValid(f.ceco)===false?' ⚠ CÓDIGO NO VÁLIDO — solo se aceptan los que empiezan por '+VALID_CECO_PREFIXES.join(' o '):''}`);
   if(f.allergies)L.push(`- Alergias e intolerancias a respetar: ${f.allergies}`);
-  if(tier){
-    if(tier.adhoc)L.push(`- ATENCIÓN: con ${f.pax} comensales el servicio se presupuesta a medida, no se aplica el importe fijo. Indícame qué personal y material haría falta para que yo lo valore.`);
-    else L.push(`- Coste de servicio aplicable: ${fmtMoney(tier.amount)} (tramo de ${tier.minPax} a ${tier.maxPax} comensales). Súmalo al total, aparte de los productos.`);
+  if(serviceAmount>0){
+    const origen=tier&&tier.adhoc?'presupuestado a medida':`tramo de ${tier.minPax} a ${tier.maxPax} comensales`;
+    L.push(`- Coste de servicio: ${fmtMoney(serviceAmount)} (${origen}). Súmalo al total, aparte de los productos.`);
+  } else if(tier&&tier.adhoc){
+    L.push(`- ATENCIÓN: con ${f.pax} comensales el servicio se presupuesta a medida y aún no se ha fijado el importe. Indícame qué personal y material haría falta para que yo lo valore.`);
+  }
+  if(otherCosts&&otherCosts.length){
+    L.push(`- Otros costes a repercutir (${fmtMoney(otherTotal)} en total):`);
+    otherCosts.forEach(c=>L.push(`    · ${c.concept||'Sin concepto'}: ${fmtMoney(parseFloat(c.amount)||0)}`));
   }
   if(f.notes)L.push(`- Notas adicionales: ${f.notes}`);
   L.push('');
@@ -5315,7 +5361,7 @@ function buildPrompt(f,guidelines,hist,roomCapacity,tier){
   L.push('');
   L.push('## Qué necesito de ti');
   L.push('1. Una selección de productos **de la carta anterior**, con las unidades de cada uno y el total para los comensales indicados.');
-  L.push('2. El precio total de la propuesta y el precio por comensal, calculados con los precios de la carta más el coste de servicio si aplica.');
+  L.push('2. El precio total de la propuesta y el precio por comensal: productos de la carta más el coste de servicio y los otros costes indicados.');
   L.push('3. Confirmación de que la propuesta cubre las alergias e intolerancias indicadas, señalando qué productos son la alternativa para cada caso.');
   L.push('4. Una tabla resumen: producto · unidades · precio unitario · subtotal.');
   L.push('5. Indicaciones de montaje y material necesario para la sala indicada.');
@@ -5329,7 +5375,7 @@ function buildPrompt(f,guidelines,hist,roomCapacity,tier){
   return L.join('\n');
 }
 
-let proposalForm={pax:'',eventType:'',serviceType:'',room:'',deliveryTime:'',pickupTime:'',requester:'',ceco:'',allergies:'',notes:'',catalogScope:'both'};
+let proposalForm={pax:'',eventType:'',serviceType:'',room:'',deliveryTime:'',pickupTime:'',requester:'',ceco:'',allergies:'',notes:'',catalogScope:'both',serviceCost:'',otherCosts:[]};
 
 async function renderProposal(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Preparando…</span></div>`;
@@ -5340,7 +5386,12 @@ async function renderProposal(container){
     const overCap=roomCap&&f.pax&&+f.pax>roomCap;
     const cecoOk=cecoIsValid(f.ceco);
     const tier=tierForPax(tiers,f.pax);
-    const prompt=buildPrompt(f,guidelines,hist,roomCap,tier);
+    const manualService=f.serviceCost!==''&&f.serviceCost!==null&&f.serviceCost!==undefined?parseFloat(f.serviceCost):null;
+    const serviceAmount=manualService!==null&&!isNaN(manualService)?manualService:(tier&&!tier.adhoc?tier.amount:0);
+    const needsManualService=tier&&tier.adhoc&&(manualService===null||isNaN(manualService));
+    const otherCosts=(f.otherCosts||[]).filter(c=>c.concept||c.amount);
+    const otherTotal=otherCosts.reduce((s2,c)=>s2+(parseFloat(c.amount)||0),0);
+    const prompt=buildPrompt(f,guidelines,hist,roomCap,tier,serviceAmount,otherCosts,otherTotal);
     const ready=f.pax&&f.serviceType;
 
     container.innerHTML=moduleHeader('Generar propuesta de catering','Rellena los datos y copia el texto para pegarlo en Claude')+`
@@ -5348,8 +5399,7 @@ async function renderProposal(container){
       const al=[];
       if(overCap)al.push({type:'red',msg:`Aforo superado · la sala ${f.room} admite ${roomCap} personas y has indicado ${f.pax}`});
       if(cecoOk===false)al.push({type:'red',msg:`CECO no válido · "${escapeHtml(f.ceco)}" no empieza por ${VALID_CECO_PREFIXES.join(' ni ')}. Solo se aceptan esos códigos`});
-      if(tier&&tier.adhoc)al.push({type:'purple',msg:`Presupuesto a medida · con ${f.pax} comensales el servicio no lleva importe fijo, hay que valorarlo caso por caso`});
-      else if(tier)al.push({type:'amber',msg:`Coste de servicio · se aplican ${fmtMoney(tier.amount)} por el tramo de ${tier.minPax} a ${tier.maxPax} comensales`});
+      if(needsManualService)al.push({type:'purple',msg:`Presupuesto a medida · con ${f.pax} comensales hay que fijar el coste de servicio a mano en el apartado de costes`});
       return al.length?renderAlerts(al):'';
     })()}
     <div class="audit-section">
@@ -5374,14 +5424,31 @@ async function renderProposal(container){
     </div>
 
     <div class="audit-section">
-      <h3>Texto generado</h3>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">${ready?'Cópialo y pégalo en Claude. Incluye tus pautas de cocina y el contexto de vuestro histórico.':'Rellena al menos los comensales y el tipo de servicio para generar el texto.'}</p>
-      <textarea id="prPrompt" class="prompt-box" rows="16" readonly>${escapeHtml(prompt)}</textarea>
-      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-        <button class="btn-primary" id="btnCopyPrompt" style="max-width:220px" ${ready?'':'disabled'}>Copiar texto</button>
-        <button class="btn-action" id="btnResetProposal">Vaciar formulario</button>
+      <h3>Costes del servicio</h3>
+      <div class="cost-line">
+        <span class="cost-lbl">Coste de servicio</span>
+        <input type="number" class="cost-input ${needsManualService?'input-required':''}" id="prServiceCost" value="${f.serviceCost}" step="0.01" min="0" placeholder="${tier&&!tier.adhoc?tier.amount.toFixed(2):'0,00'}">
+        <span class="cost-note">${
+          needsManualService?'⚠ A partir de '+tier.minPax+' pax hay que fijarlo a mano'
+          :(manualService!==null&&!isNaN(manualService)&&tier&&!tier.adhoc)?'sustituye al tramo de '+fmtMoney(tier.amount)
+          :tier&&!tier.adhoc?'aplicado automáticamente por el tramo de '+tier.minPax+'–'+tier.maxPax+' pax'
+          :tier&&tier.adhoc?'importe fijado a mano para este servicio'
+          :'sin tramo aplicable por debajo de '+(tiers[0]?tiers[0].minPax:30)+' pax'
+        }</span>
       </div>
-      <p id="prMsg" style="font-size:12px;margin-top:10px"></p>
+      <p class="section-label" style="margin:14px 0 8px">Otros costes</p>
+      <div id="otherCostsList">
+        ${(f.otherCosts||[]).map((c,i)=>`<div class="cost-line">
+          <input type="text" class="cost-concept" data-oc="${i}" data-ocf="concept" value="${escapeHtml(c.concept||'')}" placeholder="Concepto (ej. transporte, alquiler de menaje)">
+          <input type="number" class="cost-input" data-oc="${i}" data-ocf="amount" value="${c.amount||''}" step="0.01" min="0" placeholder="0,00">
+          <button class="btn-del-staff" data-del-oc="${i}" title="Eliminar">✕</button>
+        </div>`).join('')}
+      </div>
+      <button class="btn-action" id="btnAddOtherCost" style="margin-top:8px">+ Añadir coste</button>
+      <div class="cost-total">
+        <span>Total de costes añadidos</span>
+        <strong>${fmtMoney(serviceAmount+otherTotal)}</strong>
+      </div>
     </div>
 
     <div class="audit-section">
@@ -5402,6 +5469,17 @@ async function renderProposal(container){
       </div>`).join('')}
       <button class="btn-action" id="btnAddTier" style="margin-top:10px">+ Añadir tramo</button>
       <p id="tierMsg" style="font-size:12px;margin-top:10px"></p>
+    </div>
+
+    <div class="audit-section">
+      <h3>Texto generado</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">${ready?'Cópialo y pégalo en Claude. Incluye tus pautas de cocina y el contexto de vuestro histórico.':'Rellena al menos los comensales y el tipo de servicio para generar el texto.'}</p>
+      <textarea id="prPrompt" class="prompt-box" rows="16" readonly>${escapeHtml(prompt)}</textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn-primary" id="btnCopyPrompt" style="max-width:220px" ${ready?'':'disabled'}>Copiar texto</button>
+        <button class="btn-action" id="btnResetProposal">Vaciar formulario</button>
+      </div>
+      <p id="prMsg" style="font-size:12px;margin-top:10px"></p>
     </div>
 
     <div style="font-size:11.5px;color:var(--text-tertiary);line-height:1.6;margin-bottom:10px">
@@ -5435,6 +5513,32 @@ async function renderProposal(container){
       }
       setTimeout(()=>{if(msg)msg.textContent='';},2500);
     });
+    // Coste de servicio y otros costes
+    const sc=container.querySelector('#prServiceCost');
+    if(sc)sc.addEventListener('change',()=>{
+      proposalForm.serviceCost=sc.value;
+      renderProposal(container);
+    });
+    container.querySelectorAll('[data-oc]').forEach(el=>{
+      el.addEventListener('change',()=>{
+        const i=+el.dataset.oc,fld=el.dataset.ocf;
+        if(!proposalForm.otherCosts[i])proposalForm.otherCosts[i]={concept:'',amount:''};
+        proposalForm.otherCosts[i][fld]=el.value;
+        renderProposal(container);
+      });
+    });
+    container.querySelectorAll('[data-del-oc]').forEach(b=>{
+      b.addEventListener('click',()=>{
+        proposalForm.otherCosts.splice(+b.dataset.delOc,1);
+        renderProposal(container);
+      });
+    });
+    const addOC=container.querySelector('#btnAddOtherCost');
+    if(addOC)addOC.addEventListener('click',()=>{
+      proposalForm.otherCosts=[...(proposalForm.otherCosts||[]),{concept:'',amount:''}];
+      renderProposal(container);
+    });
+
     // Edición de tramos de servicio
     const saveTiers=async list=>{
       const msg=container.querySelector('#tierMsg');
@@ -5468,7 +5572,7 @@ async function renderProposal(container){
 
     const btnReset=container.querySelector('#btnResetProposal');
     if(btnReset)btnReset.addEventListener('click',()=>{
-      proposalForm={pax:'',eventType:'',serviceType:'',room:'',deliveryTime:'',pickupTime:'',requester:'',ceco:'',allergies:'',notes:'',catalogScope:'both'};
+      proposalForm={pax:'',eventType:'',serviceType:'',room:'',deliveryTime:'',pickupTime:'',requester:'',ceco:'',allergies:'',notes:'',catalogScope:'both',serviceCost:'',otherCosts:[]};
       renderProposal(container);
     });
   }catch(e){
