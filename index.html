@@ -5275,6 +5275,129 @@ function catalogWarnings(which){
   return all.filter(i=>i.o&&/revisar/i.test(i.o));
 }
 
+function buildPrompt(f,guidelines,hist,roomCapacity,tier,serviceAmount,otherCosts,otherTotal){
+  const L=[];
+  L.push('Actúa como chef y responsable de un servicio de catering corporativo. Necesito una propuesta de catering concreta y lista para presentar al cliente.');
+  L.push('');
+  L.push('## Datos del servicio');
+  L.push(`- Comensales: ${f.pax||'—'}`);
+  L.push(`- Tipo de evento: ${f.eventType||'—'}`);
+  L.push(`- Tipo de servicio: ${f.serviceType||'—'}`);
+  if(f.room)L.push(`- Sala: ${f.room}${roomCapacity?` (aforo ${roomCapacity} personas)`:''}`);
+  if(f.deliveryTime)L.push(`- Hora de entrega: ${f.deliveryTime}`);
+  if(f.pickupTime)L.push(`- Hora de recogida: ${f.pickupTime}`);
+  if(f.requester)L.push(`- Solicitado por: ${f.requester}`);
+  if(f.ceco)L.push(`- CECO: ${f.ceco}${cecoIsValid(f.ceco)===false?' ⚠ CÓDIGO NO VÁLIDO — solo se aceptan los que empiezan por '+VALID_CECO_PREFIXES.join(' o '):''}`);
+  if(f.allergies)L.push(`- Alergias e intolerancias a respetar: ${f.allergies}`);
+  if(serviceAmount>0){
+    const origen=tier&&tier.adhoc?'presupuestado a medida':`tramo de ${tier.minPax} a ${tier.maxPax} comensales`;
+    L.push(`- Coste de servicio: ${fmtMoney(serviceAmount)} (${origen}). Súmalo al total, aparte de los productos.`);
+  } else if(tier&&tier.adhoc){
+    L.push(`- ATENCIÓN: con ${f.pax} comensales el servicio se presupuesta a medida y aún no se ha fijado el importe. Indícame qué personal y material haría falta para que yo lo valore.`);
+  }
+  if(otherCosts&&otherCosts.length){
+    L.push(`- Otros costes a repercutir (${fmtMoney(otherTotal)} en total):`);
+    otherCosts.forEach(c=>L.push(`    · ${c.concept||'Sin concepto'}: ${fmtMoney(parseFloat(c.amount)||0)}`));
+  }
+  if(f.notes)L.push(`- Notas adicionales: ${f.notes}`);
+  L.push('');
+  L.push('## Nuestra carta disponible');
+  L.push('Debes construir la propuesta **exclusivamente** con estos productos, respetando nombres y precios:');
+  L.push('');
+  L.push(catalogBlock(f.catalogScope||'both'));
+  L.push('');
+  L.push('## Pautas de nuestra cocina');
+  L.push(guidelines);
+  if(hist){
+    L.push('');
+    L.push('## Contexto de nuestro histórico');
+    L.push(`Hemos servido ${hist.total} caterings. Estos son los formatos más pedidos (solo nombre, pax y precio; no tenemos registrada su composición):`);
+    hist.top.forEach(([t,v])=>{
+      const pp=v.pax?v.price/v.pax:0;
+      L.push(`- ${t}: ${v.count} servicios${v.pax?`, ${Math.round(v.pax/v.count)} pax de media`:''}${pp?`, ${pp.toFixed(2)} €/pax`:''}`);
+    });
+    if(hist.avgPerPax)L.push(`Nuestro precio medio histórico es de ${hist.avgPerPax.toFixed(2)} € por comensal (sin IVA).`);
+  }
+  L.push('');
+  L.push('## Qué necesito de ti');
+  L.push('1. Una selección de productos **de la carta anterior**, con las unidades de cada uno y el total para los comensales indicados.');
+  L.push('2. El precio total de la propuesta y el precio por comensal: productos de la carta más el coste de servicio y los otros costes indicados.');
+  L.push('3. Confirmación de que la propuesta cubre las alergias e intolerancias indicadas, señalando qué productos son la alternativa para cada caso.');
+  L.push('4. Una tabla resumen: producto · unidades · precio unitario · subtotal.');
+  L.push('5. Indicaciones de montaje y material necesario para la sala indicada.');
+  L.push('6. Una breve justificación de por qué esa combinación encaja con el tipo de evento y la franja horaria.');
+  L.push('');
+  L.push('Reglas importantes:');
+  L.push('- No inventes productos que no estén en la carta. Si crees que falta algo necesario, dímelo explícitamente.');
+  L.push('- No cambies los precios de la carta.');
+  L.push('- Los sets de leches ya incluyen un brick de leche y otro de bebida de avena, así que cubren la intolerancia a la lactosa sin añadir nada más.');
+  const dudosos=catalogWarnings(f.catalogScope||'both');
+  if(dudosos.length){
+    L.push('- Los siguientes productos tienen la declaración de dieta o alérgenos pendiente de revisar. NO los uses para cubrir una alergia o intolerancia:');
+    dudosos.forEach(i=>L.push(`    · ${i.n} (${i.o})`));
+  }
+  L.push('- Si falta algún dato relevante para proponer, pregúntame antes en lugar de suponerlo.');
+  return L.join('\n');
+}
+
+const DEFAULT_GUIDELINES=`- Cocina de producto real, sin ultraprocesados.
+- Ofrecer siempre una opción vegetariana y una sin gluten.
+- Indicar los alérgenos de cada elaboración.
+- Presentación cuidada: el montaje importa tanto como el sabor.
+- Priorizar producto de temporada y proveedor de proximidad.
+- Ajustar cantidades al número de comensales, sin excesos.`;
+
+const SERVICE_TYPES=['Coffee break','Desayuno','Lunch','Finger lunch','Comida a la carta','Cóctel','Evento','Otro'];
+const MEETING_EVENT_TYPES=['Reunión interna','Reunión con cliente','Formación','Celebración','Presentación','Visita externa','Otro'];
+
+// Solo se aceptan CECO que empiecen por estos prefijos
+const VALID_CECO_PREFIXES=['304','903'];
+function cecoIsValid(v){
+  const c=(v||'').trim();
+  if(!c)return null; // vacío: no se valida
+  return VALID_CECO_PREFIXES.some(p=>c.startsWith(p));
+}
+
+// Tramos de coste de servicio por número de comensales
+const DEFAULT_SERVICE_TIERS=[
+  {minPax:30,maxPax:49,amount:75,adhoc:false},
+  {minPax:50,maxPax:null,amount:0,adhoc:true},
+];
+async function loadServiceTiers(){
+  const snap=await getDoc(doc(db,'catering_config','serviceTiers'));
+  return snap.exists()&&Array.isArray(snap.data().tiers)?snap.data().tiers:DEFAULT_SERVICE_TIERS;
+}
+// Devuelve el tramo aplicable a un número de comensales
+function tierForPax(tiers,pax){
+  const n=parseInt(pax)||0;
+  if(!n)return null;
+  return tiers.find(t=>n>=t.minPax&&(t.maxPax===null||t.maxPax===undefined||n<=t.maxPax))||null;
+}
+
+async function loadGuidelines(){
+  const snap=await getDoc(doc(db,'catering_config','promptGuidelines'));
+  return snap.exists()?(snap.data().text||DEFAULT_GUIDELINES):DEFAULT_GUIDELINES;
+}
+
+// Contexto histórico que se adjunta al prompt para que la propuesta sea realista
+async function buildHistoricalContext(){
+  try{
+    const orders=(await getOrders()).filter(o=>o.orderStatus!=='CANCELADO');
+    if(!orders.length)return null;
+    const byType={};
+    orders.forEach(o=>{
+      const t=o.cateringType||'Otros';
+      if(!byType[t])byType[t]={count:0,pax:0,price:0};
+      byType[t].count++;byType[t].pax+=o.pax||0;byType[t].price+=o.priceTotal||0;
+    });
+    const top=Object.entries(byType).sort((a,b)=>b[1].count-a[1].count).slice(0,8);
+    const withPax=orders.filter(o=>o.pax>0&&o.priceTotal>0);
+    const avgPerPax=withPax.length?withPax.reduce((s,o)=>s+o.priceTotal/o.pax,0)/withPax.length:0;
+    const avgPax=orders.filter(o=>o.pax>0).reduce((s,o,_,a)=>s+o.pax/a.length,0);
+    return{top,avgPerPax,avgPax,total:orders.length};
+  }catch(e){return null;}
+}
+
 let proposalForm={pax:'',eventType:'',serviceType:'',room:'',deliveryTime:'',pickupTime:'',requester:'',ceco:'',allergies:'',notes:'',catalogScope:'both',serviceCost:'',otherCosts:[]};
 
 async function renderProposal(container){
