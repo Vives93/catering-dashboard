@@ -89,6 +89,11 @@ mark.hl{background:var(--alert-amber-border);color:var(--text-primary);border-ra
 .temp-val.temp-ok{background:var(--ok-bg);border-color:#8FD455;color:var(--ok-fg)}
 .temp-val.temp-bad{background:var(--alert-red-bg);border-color:var(--alert-red-border);color:var(--alert-red-fg)}
 .temp-row-bad{background:var(--alert-red-bg)}
+.order-alerts{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.order-alert{font-size:12px;line-height:1.45;padding:6px 10px;border-radius:var(--radius-sm);border-left:3px solid}
+.order-alert-red{background:var(--alert-red-bg);color:var(--alert-red-fg);border-color:var(--alert-red-border)}
+.order-alert-amber{background:var(--alert-amber-bg);color:var(--alert-amber-fg);border-color:var(--alert-amber-border)}
+.order-alert-purple{background:var(--alert-purple-bg);color:var(--alert-purple-fg);border-color:var(--alert-purple-border)}
 .cost-line{display:flex;align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap}
 .cost-lbl{font-size:13px;color:var(--text-primary);min-width:150px;font-weight:500}
 .cost-concept{flex:1;min-width:200px;font-family:var(--font-sans);font-size:12.5px;padding:6px 9px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary)}
@@ -971,6 +976,14 @@ async function getExistingOrderIds() {
   const snap=await getDocs(collection(db,'catering_orders'));
   return new Set(snap.docs.map(d=>d.id));
 }
+// Lee un pedido ya guardado, para no perder datos que la nueva exportación no incluya
+async function getOrderById(orderId){
+  try{
+    const safeId=String(orderId).replace(/[\/\s]+/g,'_').slice(0,300);
+    const snap=await getDoc(doc(db,'catering_orders',safeId));
+    return snap.exists()?snap.data():null;
+  }catch(e){return null;}
+}
 async function getConfig() {
   // Se guarda en memoria para que renderOrderCard pueda consultar los umbrales
   try{
@@ -1056,6 +1069,36 @@ function findValue(raw,keywords){
   }
   return '';
 }
+// Convierte a número admitiendo coma decimal, símbolo de euro y separador de miles
+function toNum(v){
+  if(v===null||v===undefined)return 0;
+  let t=String(v).replace(/[€\s]/g,'').trim();
+  if(!t)return 0;
+  const tieneComa=t.includes(','),tienePunto=t.includes('.');
+  if(tieneComa&&tienePunto){
+    // 1.234,56 → el punto es separador de miles
+    t=t.replace(/\./g,'').replace(',','.');
+  } else if(tieneComa){
+    // 1234,56 → coma decimal
+    t=t.replace(',','.');
+  } else if(tienePunto){
+    // Ambiguo: 1.250 en España son mil doscientos cincuenta; 1.25 es un decimal.
+    // Se trata como miles solo si tras el punto hay exactamente tres cifras.
+    if(/^\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');
+  }
+  return parseFloat(t)||0;
+}
+// Busca el importe total probando varios nombres de columna habituales
+function findTotal(raw,parts){
+  const intentos=[['total','iva'],['precio','total'],['importe','total'],['total'],['importe'],['precio']];
+  for(const kws of intentos){
+    const v=findValue(raw,kws);
+    const n=toNum(v);
+    if(n>0)return n;
+  }
+  // Si no aparece ninguna columna de total, se suma el desglose
+  return parts.reduce((s2,x)=>s2+x,0);
+}
 function truthy(v){return !!(v&&v!=='--'&&v.trim());}
 
 function mapRow(raw){
@@ -1064,20 +1107,24 @@ function mapRow(raw){
   const deliveryAt=parseDate(raw['fecha entrega / hora']||raw['fecha entrega']||'');
   const {building,floor,room}=parseBR(raw['edificio y sala']||'');
   const pax=parseInt(raw['cantidad personas']||'0',10)||0;
-  const priceFood=parseFloat((findValue(raw,['aliment'])||'0').toString().replace(',','.'))||0;
-  const priceDrinks=parseFloat((findValue(raw,['bebida'])||'0').toString().replace(',','.'))||0;
-  const priceTransport=parseFloat((findValue(raw,['transporte'])||'0').toString().replace(',','.'))||0;
-  const priceStaff=parseFloat((findValue(raw,['camarero'])||findValue(raw,['personal'])||'0').toString().replace(',','.'))||0;
-  const priceTotal=parseFloat((findValue(raw,['total','iva'])||'0').toString().replace(',','.'))||0;
+  const priceFood=toNum(findValue(raw,['aliment']));
+  const priceDrinks=toNum(findValue(raw,['bebida']));
+  const priceTransport=toNum(findValue(raw,['transporte']));
+  const priceStaff=toNum(findValue(raw,['camarero'])||findValue(raw,['personal']));
+  const priceTotal=findTotal(raw,[priceFood,priceDrinks,priceTransport,priceStaff]);
   const hasDeliveryPhoto=truthy(findValue(raw,['imagen','entrega']));
   const hasPickupPhoto=truthy(findValue(raw,['imagen','recogida']));
   const isLate=(raw['tarde?']||'').toLowerCase().startsWith('s');
   const lateMinutes=parseInt(raw['cuanto de tarde']||'0',10)||0;
-  const orderStatus=normalizeStatus(raw['estado pedido']||'');
+  // La exportación no siempre trae el estado: si falta, se deja vacío para no pisar el guardado
+  const estadoRaw=raw['estado pedido']||raw['estado']||'';
+  const orderStatus=estadoRaw?normalizeStatus(estadoRaw):'';
   const createdAt=parseDate(findValue(raw,['fecha','creaci'])||'');
   const costCenter=findValue(raw,['centro','coste'])||'';
-  const pickupTime=findValue(raw,['hora','recogida'])||'';
+  // La hora de desmontaje sirve como hora de recogida cuando no hay columna propia
+  const pickupTime=findValue(raw,['hora','recogida'])||findValue(raw,['hora','desmontaje'])||'';
   const billingNotes=findValue(raw,['notas','facturaci'])||'';
+  const quoteNumber=findValue(raw,['presupuesto'])||'';
   return{
     orderId:orderId.trim(),customerId:raw['id']||'',center:raw['centro']||'',
     buildingRoom:raw['edificio y sala']||'',building:raw['centro']||'',floor,room,
@@ -1094,7 +1141,7 @@ function mapRow(raw){
     userComment:raw['comentario usuario']||'',internalComment:raw['comentario interno']||'',
     billingNotes,
     hasDeliveryPhoto,hasPickupPhoto,isLate,lateMinutes,
-    costCenter,department:raw['departamento']||'',
+    costCenter,department:raw['departamento']||'',quoteNumber,
     priceFood,priceDrinks,priceTransport,priceStaff,priceTotal,
     itemsMenu:'',internalAnnotation:'',address:'',purchaseOrder:'',
     isManual:false,source:'csv',
@@ -1109,11 +1156,11 @@ function mapRowSQL(raw){
   const deliveryAt=parseDate(raw['date']||'');
   const {building,floor,room}=parseBR(raw['edificio_sala']||'');
   const pax=parseInt(raw['people_quantity']||'0',10)||0;
-  const priceFood=parseFloat((raw['food_import']||'0').toString().replace(',','.'))||0;
-  const priceDrinks=parseFloat((raw['drinks_import']||'0').toString().replace(',','.'))||0;
-  const priceTransport=parseFloat((raw['transport_service_import']||'0').toString().replace(',','.'))||0;
-  const priceStaff=parseFloat((raw['camareros_import']||'0').toString().replace(',','.'))||0;
-  const priceTotal=parseFloat((raw['total_price']||'0').toString().replace(',','.'))||0;
+  const priceFood=toNum(raw['food_import']);
+  const priceDrinks=toNum(raw['drinks_import']);
+  const priceTransport=toNum(raw['transport_service_import']);
+  const priceStaff=toNum(raw['camareros_import']);
+  const priceTotal=toNum(raw['total_price'])||(priceFood+priceDrinks+priceTransport+priceStaff);
   const hasDeliveryPhoto=truthy(raw['date_img_envio']);
   const hasPickupPhoto=truthy(raw['date_img_recogida']);
   const orderStatus=normalizeStatus(raw['estado_pedido']||'');
@@ -1275,15 +1322,15 @@ function buildAlerts(orders,config){
 
   // Alertas individuales por pax (montaje / refuerzo puntual)
   active.forEach(o=>{
-    if(o.pax>=config.paxAlertHigh)alerts.push({type:'red',msg:`Montaje grande · ${o.customerName} (${fmtTime(o.deliveryAt)}) — ${o.pax} pax · valorar 2 personas para el montaje`});
-    else if(o.pax>=config.paxAlertIndividual)alerts.push({type:'amber',msg:`Volumen elevado · ${o.customerName} (${fmtTime(o.deliveryAt)}) — ${o.pax} pax`});
+    if(o.pax>=config.paxAlertHigh)alerts.push({type:'red',ids:[o.orderId],msg:`Montaje grande · ${o.pax} pax · valorar 2 personas para el montaje`});
+    else if(o.pax>=config.paxAlertIndividual)alerts.push({type:'amber',ids:[o.orderId],msg:`Volumen elevado · ${o.pax} pax`});
   });
 
   // Aforo de sala superado (según directorio oficial de salas)
   active.forEach(o=>{
     const capacity=getRoomCapacity(o.room);
     if(capacity!=null&&o.pax>capacity){
-      alerts.push({type:'red',msg:`Aforo superado · ${o.room} permite hasta ${capacity} pax — pedido de ${o.customerName} (${fmtTime(o.deliveryAt)}) es de ${o.pax} pax`});
+      alerts.push({type:'red',ids:[o.orderId],msg:`Aforo superado · la sala permite ${capacity} pax y el pedido es de ${o.pax}`});
     }
   });
 
@@ -1307,7 +1354,7 @@ function buildAlerts(orders,config){
       const nota=p.source==='estimada'
         ? `estimada: entrega ${fmtTime(o.deliveryAt)} + ${Math.round(minDur/60)} h de ocupación mínima`
         : `hora de ${p.source} indicada en el pedido`;
-      alerts.push({type:'red',msg:`Recoger a las ${hora} · ${o.customerName} en ${o.room||o.buildingRoom||'sala sin indicar'} (${nota}) — ¿quién la retira?`});
+      alerts.push({type:'red',ids:[o.orderId],msg:`Recoger a las ${hora} · fuera del horario con personal (${nota}) — ¿quién la retira?`});
     });
   }
 
@@ -1334,7 +1381,7 @@ function buildAlerts(orders,config){
       const aS=toDate(a.deliveryAt),bS=toDate(b.deliveryAt);
       if(aS&&bS&&Math.abs(aS-bS)<60*60*1000){
         const loc=a.room?`sala ${a.room}`:a.buildingRoom;
-        alerts.push({type:'red',msg:`Solapamiento · ${fmtTime(a.deliveryAt)} — ${a.customerName} y ${b.customerName} en ${loc}`});
+        alerts.push({type:'red',ids:[a.orderId,b.orderId],msg:`Solapamiento · ${fmtTime(a.deliveryAt)} con ${a.customerName} / ${b.customerName} en ${loc}`});
       }
     }}
   });
@@ -1355,12 +1402,25 @@ function buildAlerts(orders,config){
       flaggedPairs.add(key);
       const sameBuilding=a.center&&b.center&&a.center===b.center;
       const locNote=sameBuilding?`mismo edificio (${a.center})`:`${a.center||'—'} → ${b.center||'—'}`;
-      alerts.push({type:'purple',msg:`Entregas próximas · ${fmtTime(a.deliveryAt)} y ${fmtTime(b.deliveryAt)} (${Math.round(gap/60000)} min) — ${a.customerName} / ${b.customerName} · ${locNote} · verificar personal disponible`});
+      alerts.push({type:'purple',ids:[a.orderId,b.orderId],msg:`Entrega próxima a otra · ${fmtTime(a.deliveryAt)} y ${fmtTime(b.deliveryAt)} (${Math.round(gap/60000)} min) · ${locNote}`});
     }
   }
 
   return alerts;
 }
+
+// Las alertas con 'ids' pertenecen a un pedido concreto y se muestran bajo su tarjeta
+function splitAlerts(alerts){
+  const generales=alerts.filter(a=>!a.ids||!a.ids.length);
+  const porPedido={};
+  alerts.filter(a=>a.ids&&a.ids.length).forEach(a=>{
+    a.ids.forEach(id=>{(porPedido[id]=porPedido[id]||[]).push(a);});
+  });
+  return{generales,porPedido};
+}
+// Guarda las alertas de cada pedido para que renderOrderCard las pinte
+function setOrderAlerts(map){window.__orderAlerts=map||{};}
+function alertsForOrder(id){return (window.__orderAlerts||{})[id]||[];}
 
 function renderAlerts(alerts){
   if(!alerts.length)return'';
@@ -1466,6 +1526,13 @@ function renderOrderCard(o,showNew=true){
     ${o.internalComment?`<div class="comment-internal">📋 ${escapeHtml(o.internalComment)}</div>`:''}
     ${o.internalAnnotation?`<div class="comment-internal">📌 ${escapeHtml(o.internalAnnotation)}</div>`:''}
     ${o.itemsMenu?`<div class="comment-internal" style="font-style:normal">🍽️ ${escapeHtml(o.itemsMenu)}</div>`:''}
+    ${(()=>{
+      const own=alertsForOrder(o.orderId);
+      if(!own.length)return'';
+      return`<div class="order-alerts">${own.map(a=>
+        `<div class="order-alert order-alert-${a.type==='red'?'red':a.type==='purple'?'purple':'amber'}">${escapeHtml(a.msg)}</div>`
+      ).join('')}</div>`;
+    })()}
   </div>`;
 }
 
@@ -1477,8 +1544,12 @@ async function renderToday(container,now=new Date()){
     if(!da&&!db)return 0;if(!da)return 1;if(!db)return -1;
     return da-db;
   });
-  const alerts=buildAlerts(orders,config);
-  container.innerHTML=renderKPIs(orders,config)+renderAlerts(alerts)+renderTimeline(orders)+`<p class="section-label">Pedidos</p><div class="orders">${sorted.map(o=>renderOrderCard(o)).join('')}</div>`;
+  const {generales,porPedido}=splitAlerts(buildAlerts(orders,config));
+  setOrderAlerts(porPedido);
+  const conAviso=Object.keys(porPedido).length;
+  const resumen=conAviso?`<p class="section-label">Pedidos <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--alert-red-fg)">· ${conAviso} con avisos propios</span></p>`:'<p class="section-label">Pedidos</p>';
+  container.innerHTML=renderKPIs(orders,config)+renderAlerts(generales)+renderTimeline(orders)+resumen+`<div class="orders">${sorted.map(o=>renderOrderCard(o)).join('')}</div>`;
+  setOrderAlerts({});
 }
 
 async function renderWeek(container,now=new Date()){
@@ -1540,14 +1611,18 @@ async function renderWeek(container,now=new Date()){
     const dayPrice=dayActive.reduce((s,o)=>s+(o.priceTotal||0),0);
     const label=fmtDateShort(new Date(key+'T12:00:00'));
     const isToday=key===todayKey;
-    const dayHasAlert=dayActive.some(o=>o.pax>=config.paxAlertIndividual||o.userComment||o.internalComment);
+    // Alertas calculadas día a día: las de cada pedido van dentro de su tarjeta
+    const {generales:genDia,porPedido:pedDia}=splitAlerts(buildAlerts(dayOrders,config));
+    setOrderAlerts(pedDia);
+    const dayHasAlert=genDia.length>0||Object.keys(pedDia).length>0;
     html+=`<div class="period-day">
       <div class="period-day-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
         <span class="period-day-title">${label}${isToday?' <span style="color:var(--text-tertiary);font-weight:400;font-size:12px">· hoy</span>':''}${dayHasAlert?' <span style="color:#C45A00;font-size:11px">⚑</span>':''}</span>
         <span class="period-day-meta"><span>${dayActive.length} servicios</span><span>${dayPax} pax</span><span>${fmtMoney(dayPrice)}</span></span>
       </div>
-      <div class="period-day-body ${isToday?'':'collapsed'}">${dayOrders.map(o=>renderOrderCard(o,false)).join('')}</div>
+      <div class="period-day-body ${isToday?'':'collapsed'}">${genDia.filter(a=>a.type!=='new').map(a=>`<div class="order-alert order-alert-${a.type==='red'?'red':a.type==='purple'?'purple':'amber'}" style="margin-bottom:8px">${escapeHtml(a.msg)}</div>`).join('')}${dayOrders.map(o=>renderOrderCard(o,false)).join('')}</div>
     </div>`;
+    setOrderAlerts({});
   });
   html+='</div>';
   container.innerHTML=html;
@@ -6802,7 +6877,13 @@ async function handleFile(file){
     const newOrders=orders.filter(o=>!existingIds.has(o.orderId));
     const updatedOrders=orders.filter(o=>existingIds.has(o.orderId));
     pendingImport={orders,newOrders,updatedOrders};
-    importSummary.innerHTML=`<strong>${orders.length}</strong> pedidos en el archivo<br><span style="color:var(--ok-fg)">✓ ${newOrders.length} nuevos</span> &nbsp;·&nbsp; <span style="color:var(--text-secondary)">${updatedOrders.length} ya existentes (se actualizarán)</span>`;
+    const conImporte=orders.filter(o=>(o.priceTotal||0)>0).length;
+    const avisoImporte=conImporte===0
+      ? `<div style="margin-top:8px;padding:8px 10px;background:var(--alert-amber-bg);border:1px solid var(--alert-amber-border);border-radius:var(--radius-sm);font-size:12px;color:var(--alert-amber-fg);line-height:1.5">⚠️ <strong>El archivo no incluye columna de importe.</strong> Los pedidos se guardarán sin precio, pero <strong>no se borrará</strong> el que ya tuvieran de importaciones anteriores. Si necesitas la facturación, pide que la exportación vuelva a incluir el precio, o impórtala desde el Excel de Holded.</div>`
+      : conImporte<orders.length
+        ? `<div style="margin-top:8px;font-size:12px;color:var(--alert-amber-fg)">⚠️ ${orders.length-conImporte} de ${orders.length} pedidos sin importe</div>`
+        : '';
+    importSummary.innerHTML=`<strong>${orders.length}</strong> pedidos en el archivo<br><span style="color:var(--ok-fg)">✓ ${newOrders.length} nuevos</span> &nbsp;·&nbsp; <span style="color:var(--text-secondary)">${updatedOrders.length} ya existentes (se actualizarán)</span>${avisoImporte}`;
     importNewList.innerHTML=newOrders.length>0?newOrders.map(o=>`<div class="import-new-item"><span>${escapeHtml(o.customerName)} · ${escapeHtml(o.buildingRoom)}</span><span>${o.deliveryAtISO?new Date(o.deliveryAtISO).toLocaleDateString('es-ES'):'—'}</span></div>`).join(''):'<div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">No hay pedidos nuevos — solo actualizaciones</div>';
     importPreview.hidden=false;
   }catch(e){alert('Error al procesar el archivo: '+e.message);}
@@ -6815,10 +6896,25 @@ btnConfirm.addEventListener('click',async()=>{
   importProgress.hidden=false;
   const newIds=new Set(pendingImport.newOrders.map(o=>o.orderId));
   let done=0;
+  // Campos que la exportación puede haber dejado de incluir: si vienen vacíos,
+  // se conserva lo que ya hubiera guardado en vez de borrarlo con un cero.
+  const CAMPOS_PRESERVABLES=['priceTotal','priceFood','priceDrinks','priceTransport','priceStaff','ceco','purchaseOrder','itemsMenu','internalAnnotation','orderStatus','internalComment','costCenter','billingNotes','quoteNumber','pickupTime','setupTime'];
   for(const order of pendingImport.orders){
     const isNew=newIds.has(order.orderId);
     const payload={...order,isNew};
     if(isNew)payload.reviewed=false;
+    if(!isNew){
+      const previo=await getOrderById(order.orderId);
+      if(previo){
+        CAMPOS_PRESERVABLES.forEach(k=>{
+          const nuevo=payload[k];
+          const vacio=nuevo===undefined||nuevo===null||nuevo===''||nuevo===0;
+          if(vacio&&previo[k])payload[k]=previo[k];
+        });
+      }
+    }
+    // Si tras preservar sigue sin estado, se marca como pendiente
+    if(!payload.orderStatus)payload.orderStatus='PENDIENTE';
     await saveOrder(payload);
     done++;
     const pct=Math.round(done/pendingImport.orders.length*100);
