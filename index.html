@@ -1037,6 +1037,9 @@ function parseCSV(text){
     const order=isSQLFormat?mapRowSQL(raw):mapRow(raw);
     if(order)rows.push(order);
   }
+  if(!rows.length){
+    throw new Error('No se reconoció ningún pedido. Falta la columna del identificador: se esperaba "Id de pedido" o "Nº pedido".\n\nColumnas encontradas: '+rawHeaders.filter(Boolean).join(' · '));
+  }
   return rows;
 }
 function splitLine(line,sep){
@@ -1102,7 +1105,10 @@ function findTotal(raw,parts){
 function truthy(v){return !!(v&&v!=='--'&&v.trim());}
 
 function mapRow(raw){
-  const orderId=raw['id de pedido']||'';
+  // El nombre de la columna del identificador ha ido cambiando entre exportaciones
+  const orderId=raw['id de pedido']||raw['nº pedido']||raw['n pedido']||raw['no pedido']
+    ||raw['número de pedido']||raw['numero de pedido']||raw['id pedido']
+    ||findValue(raw,['pedido','id'])||findValue(raw,['nº','pedido'])||'';
   if(!orderId)return null;
   const deliveryAt=parseDate(raw['fecha entrega / hora']||raw['fecha entrega']||'');
   const {building,floor,room}=parseBR(raw['edificio y sala']||'');
@@ -1117,14 +1123,14 @@ function mapRow(raw){
   const isLate=(raw['tarde?']||'').toLowerCase().startsWith('s');
   const lateMinutes=parseInt(raw['cuanto de tarde']||'0',10)||0;
   // La exportación no siempre trae el estado: si falta, se deja vacío para no pisar el guardado
-  const estadoRaw=raw['estado pedido']||raw['estado']||'';
+  const estadoRaw=raw['estado pedido']||raw['estado comercial']||raw['estado']||'';
   const orderStatus=estadoRaw?normalizeStatus(estadoRaw):'';
   const createdAt=parseDate(findValue(raw,['fecha','creaci'])||'');
   const costCenter=findValue(raw,['centro','coste'])||'';
   // La hora de desmontaje sirve como hora de recogida cuando no hay columna propia
   const pickupTime=findValue(raw,['hora','recogida'])||findValue(raw,['hora','desmontaje'])||'';
   const billingNotes=findValue(raw,['notas','facturaci'])||'';
-  const quoteNumber=findValue(raw,['presupuesto'])||'';
+  const quoteNumber=raw['nº presupuesto']||raw['número de presupuesto']||findValue(raw,['presupuesto'])||'';
   return{
     orderId:orderId.trim(),customerId:raw['id']||'',center:raw['centro']||'',
     buildingRoom:raw['edificio y sala']||'',building:raw['centro']||'',floor,room,
