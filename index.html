@@ -962,10 +962,18 @@ async function saveOrder(order) {
   await setDoc(doc(db,'catering_orders',safeId),{...order,orderId:safeId,updatedAt:Timestamp.now()},{merge:true});
 }
 async function getOrders({from,to}={}) {
-  const col = collection(db,'catering_orders');
-  const q=query(col,orderBy('updatedAt','asc'));
-  const snap=await getDocs(q);
+  // Sin orderBy: en Firestore, ordenar por un campo EXCLUYE los documentos que no lo tienen,
+  // así que cualquier pedido sin 'updatedAt' desaparecía de todos los listados y de los totales.
+  const snap=await getDocs(collection(db,'catering_orders'));
   const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+  all.sort((a,b)=>{
+    const da=toDate(a.deliveryAt),dbb=toDate(b.deliveryAt);
+    if(!da&&!dbb)return 0;
+    if(!da)return 1;
+    if(!dbb)return -1;
+    return da-dbb;
+  });
+  window.__ordersDiag={total:all.length,sinFecha:all.filter(o=>!toDate(o.deliveryAt)).length};
   if(!from||!to)return all;
   return all.filter(o=>{
     const d=toDate(o.deliveryAt);
@@ -2154,7 +2162,17 @@ async function renderCumulative(container){
   const scopeOnly=`<span class="scope-label">Solo período actual: ${currentPeriodText} · sin comparación</span>`;
   const scopeCompare=hasMonthComparison?`<span class="scope-label comparing">Comparando: ${currentPeriodText} ${compareRangeLabel}</span>`:`<span class="scope-label">Solo período actual: ${currentPeriodText} · sin comparación</span>`;
 
-  container.innerHTML=controlsHtml+(compareRangeLabel?`<p style="font-size:11px;color:var(--text-tertiary);margin:-4px 0 10px">Comparando con: ${compareRangeLabel}</p>`:'')+`<div class="kpi-grid">
+  // Diagnóstico de datos: ayuda a detectar pedidos invisibles por falta de fecha o importe
+  const diag=window.__ordersDiag||{};
+  const sinImporte=active.filter(o=>!(o.priceTotal>0)).length;
+  const diagHtml=`<div class="data-freshness">
+    <span><strong>${diag.total||0}</strong> pedidos en base de datos</span>
+    <span><strong>${active.length}</strong> en el período seleccionado</span>
+    ${diag.sinFecha?`<span style="color:var(--alert-red-fg)"><strong>${diag.sinFecha}</strong> sin fecha de entrega (no cuentan en ningún período)</span>`:''}
+    ${sinImporte?`<span style="color:var(--alert-amber-fg)"><strong>${sinImporte}</strong> sin importe en este período</span>`:''}
+  </div>`;
+
+  container.innerHTML=controlsHtml+(compareRangeLabel?`<p style="font-size:11px;color:var(--text-tertiary);margin:-4px 0 10px">Comparando con: ${compareRangeLabel}</p>`:'')+diagHtml+`<div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total servicios</div><div class="kpi-value">${active.length}</div><div class="kpi-sub">${compareCount}</div></div>
     <div class="kpi-card"><div class="kpi-label">Total pax</div><div class="kpi-value">${totalPax}</div><div class="kpi-sub">${comparePax}</div></div>
     <div class="kpi-card"><div class="kpi-label">Importe total sin IVA</div><div class="kpi-value">${fmtMoney(totalPrice)}</div><div class="kpi-sub">${comparePrice}</div></div>
