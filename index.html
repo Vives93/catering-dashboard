@@ -651,6 +651,8 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text-primary)
 
     </div>
 
+    <div id="hubQuickOcc"></div>
+
   </main>
 </div>
 
@@ -6513,11 +6515,111 @@ function canAccess(mod){
   return false;
 }
 
+
+// ══ CONTROL RÁPIDO DE OCUPACIÓN EN EL HUB ═════════════════════════
+let hubOccDay=localISODate(new Date());
+
+async function renderHubQuickOcc(){
+  const box=document.getElementById('hubQuickOcc');
+  if(!box)return;
+  // Solo tiene sentido si la persona tiene acceso a Forecast
+  if(!userModules.includes('forecast')){box.innerHTML='';return;}
+  box.innerHTML=`<div class="quick-entry"><span class="hub-loading">Cargando ocupación…</span></div>`;
+  try{
+    const mk=hubOccDay.slice(0,7);
+    const [fcSnap,orders]=await Promise.all([
+      getDoc(doc(db,'forecast_config',mk)),
+      getOrders()
+    ]);
+    const occ=fcSnap.exists()?(fcSnap.data().occupancy||{}):{};
+    const dia=occ[hubOccDay]||{};
+    // Catering: solo los de tipo comida
+    const lunch=orders.filter(o=>o.orderStatus!=='CANCELADO'&&o.cateringCategory==='lunch'
+      &&toDate(o.deliveryAt)&&localISODate(toDate(o.deliveryAt))===hubOccDay)
+      .reduce((s,o)=>s+(o.pax||0),0);
+    const comen=(dia.cantinaReal||0)+lunch;
+    const esHoy=hubOccDay===localISODate(new Date());
+    const dLabel=new Date(hubOccDay+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+    const yaRegistrado=dia.campusReal||dia.cantinaReal;
+
+    box.innerHTML=`<div class="quick-entry">
+      <div class="quick-head">
+        <span class="quick-title">Ocupación ${esHoy?'de hoy':'del día'}</span>
+        <input type="date" class="month-picker" id="hqDay" value="${hubOccDay}">
+        ${!esHoy?`<button class="btn-action" id="hqToday" style="padding:4px 10px;font-size:11.5px">Hoy</button>`:''}
+        <span class="quick-date">${dLabel}</span>
+        ${yaRegistrado?`<span class="pill pill-ok" style="margin-left:auto">Registrado</span>`:`<span class="pill pill-pax-amber" style="margin-left:auto">Pendiente de registrar</span>`}
+      </div>
+      <div class="quick-fields">
+        <div class="quick-field">
+          <label>Ocupación del edificio</label>
+          <input type="number" id="hqCampus" value="${dia.campusReal||''}" min="0" placeholder="personas">
+          <span class="quick-hint">personas en el campus</span>
+        </div>
+        <div class="quick-field">
+          <label>Han comido en cantina</label>
+          <input type="number" id="hqCantina" value="${dia.cantinaReal||''}" min="0" placeholder="comensales">
+          <span class="quick-hint">lo introduces tú</span>
+        </div>
+        <div class="quick-field">
+          <label>Catering <span class="quick-auto">solo lunch</span></label>
+          <div class="quick-readonly">${lunch}</div>
+          <span class="quick-hint">automático de los pedidos</span>
+        </div>
+        <div class="quick-field">
+          <label>Total que han comido</label>
+          <div class="quick-readonly strong">${comen}</div>
+          <span class="quick-hint">cantina + catering lunch</span>
+        </div>
+      </div>
+      <div class="quick-foot">
+        <button class="btn-primary" id="hqSave" style="max-width:160px">Guardar</button>
+        <span id="hqMsg" class="quick-msg"></span>
+      </div>
+    </div>`;
+
+    const dp=box.querySelector('#hqDay');
+    if(dp)dp.addEventListener('change',()=>{
+      if(!dp.value)return;
+      hubOccDay=dp.value;
+      renderHubQuickOcc();
+    });
+    const bt=box.querySelector('#hqToday');
+    if(bt)bt.addEventListener('click',()=>{hubOccDay=localISODate(new Date());renderHubQuickOcc();});
+    const sv=box.querySelector('#hqSave');
+    if(sv)sv.addEventListener('click',async()=>{
+      const msg=box.querySelector('#hqMsg');
+      const campus=parseFloat(box.querySelector('#hqCampus').value);
+      const cantina=parseFloat(box.querySelector('#hqCantina').value);
+      sv.disabled=true;sv.textContent='Guardando…';
+      try{
+        const ref=doc(db,'forecast_config',hubOccDay.slice(0,7));
+        const snap=await getDoc(ref);
+        const data=snap.exists()?snap.data():{};
+        const oc=data.occupancy||{};
+        if(!oc[hubOccDay])oc[hubOccDay]={};
+        if(isNaN(campus))delete oc[hubOccDay].campusReal;else oc[hubOccDay].campusReal=campus;
+        if(isNaN(cantina))delete oc[hubOccDay].cantinaReal;else oc[hubOccDay].cantinaReal=cantina;
+        if(Object.keys(oc[hubOccDay]).length===0)delete oc[hubOccDay];
+        await setDoc(ref,{...data,occupancy:oc,updatedAt:Timestamp.now()});
+        msg.textContent='✓ Guardado';msg.style.color='var(--ok-fg)';
+        setTimeout(renderHubQuickOcc,700);
+      }catch(e){
+        msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';
+        sv.disabled=false;sv.textContent='Guardar';
+      }
+    });
+  }catch(e){
+    box.innerHTML=`<div class="quick-entry"><span class="hub-empty">No se pudo cargar la ocupación: ${escapeHtml(e.message)}</span></div>`;
+  }
+}
+
 // ══ DATOS EN VIVO DEL HUB ═════════════════════════════════════════
 const st=(num,lbl,cls)=>`<div class="hub-st"><span class="hub-num ${cls||''}">${num}</span><span class="hub-lbl">${lbl}</span></div>`;
 const pct=v=>`${v>=0?'+':''}${v.toFixed(1)} %`;
 
 async function loadHubStats(){
+  renderHubQuickOcc();
   const set=(id,html)=>{const el=document.getElementById(id);if(el)el.innerHTML=html;};
   const fail=id=>set(id,'<span class="hub-empty">Sin datos</span>');
 
