@@ -2231,6 +2231,7 @@ async function renderCumulative(container){
     ${diag.sinFecha?`<span style="color:var(--alert-red-fg)"><strong>${diag.sinFecha}</strong> sin fecha de entrega (no cuentan en ningún período)</span>`:''}
     ${sinImporte?`<span style="color:var(--alert-amber-fg)"><strong>${sinImporte}</strong> sin importe en este período</span>`:''}
     ${futuros?`<span style="color:var(--break-fg)"><strong>${futuros.n}</strong> con entrega posterior · ${fmtMoney(futuros.importe)} fuera de este total</span>`:''}
+    ${cur.extrasPendienteImporte>0?`<span style="color:var(--alert-amber-fg)"><strong>${cur.extrasNoCobradosN}</strong> facturación extra sin cobrar · ${fmtMoney(cur.extrasPendienteImporte)} no suman</span>`:''}
     ${importePendiente>0?`<span style="color:var(--alert-amber-fg)"><strong>${pendientes.length}</strong> sin confirmar · ${fmtMoney(importePendiente)} incluidos en el total</span>`:''}
   </div>`;
 
@@ -3100,7 +3101,7 @@ let currentStaffView='roster';
 
 // Plantilla inicial · se carga en Firestore la primera vez y desde ahí es editable
 const STAFF_SEED=[
-  {name:'Sol',cardNumber:'46469',position:'Responsable',jornadaType:'Completa',level:1,dni:'',contractType:'Indefinido',contractedHours:40,contractDate:'2025-07-24',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
+  {name:'Sol Vives Herrerías',cardNumber:'46469',position:'Responsable',jornadaType:'Completa',level:1,dni:'',contractType:'Indefinido',contractedHours:40,contractDate:'2025-07-24',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
   {name:'Javier Ojeda Álvarez',cardNumber:'46830',position:'Jefe de cocina',jornadaType:'Completa',level:1,dni:'43157272A',contractType:'Indefinido',contractedHours:40,contractDate:'2025-04-28',monthlySalary:0,birthDate:'1988-03-21',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
   {name:'Ana Campos Peñalver',cardNumber:'44342',position:'Segunda de cocina',jornadaType:'Completa',level:3,dni:'48066437W',contractType:'Indefinido',contractedHours:40,contractDate:'2024-09-16',monthlySalary:0,birthDate:'2000-03-17',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
   {name:'Elizabeth Sánchez Rodríguez',cardNumber:'',position:'Ayudante de cocina',jornadaType:'',level:4,dni:'46099649J',contractType:'Indefinido',contractedHours:40,contractDate:'2024-10-22',monthlySalary:0,birthDate:'1998-02-23',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Falta nº de tarjeta'},
@@ -3109,7 +3110,8 @@ const STAFF_SEED=[
   {name:'Mónica Colera Martínez',cardNumber:'44478',position:'Camarera',jornadaType:'Completa',level:3,dni:'44184307L',contractType:'Indefinido',contractedHours:40,contractDate:'2024-09-01',monthlySalary:0,birthDate:'1974-05-18',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
   {name:'Adrianna DeLorenzo',cardNumber:'46840',position:'Barista',jornadaType:'Media jornada',level:3,dni:'Y6470461T',contractType:'Indefinido',contractedHours:25,contractDate:'2025-11-18',monthlySalary:0,birthDate:'2000-07-20',status:'activo',weeklyHours:25,vacationDays:30,extraHolidays:0,note:''},
   {name:'Carolina Ávalos Domínguez',cardNumber:'45866',position:'Marmitona',jornadaType:'Completa',level:5,dni:'Z0479143N',contractType:'Indefinido',contractedHours:40,contractDate:'2024-11-19',monthlySalary:998.90,birthDate:'1982-10-08',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Nivel V, salario acordado (no figura en la tabla del convenio)'},
-  {name:'Cinthia Valeria Rotela Ruiz',cardNumber:'45937',position:'Ayudante de camarero',jornadaType:'Completa',level:4,dni:'Y2125429J',contractType:'Indefinido',contractedHours:40,contractDate:'2025-02-24',monthlySalary:0,birthDate:'1994-12-22',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
+  {name:'Cinthia Valeria Rotela',cardNumber:'45937',position:'Ayudante de camarero',jornadaType:'Completa',level:4,dni:'Y2125429J',contractType:'Indefinido',contractedHours:40,contractDate:'2025-02-24',monthlySalary:0,birthDate:'1994-12-22',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
+  {name:'David Rivera Gómez',cardNumber:'',position:'',jornadaType:'',level:4,dni:'',contractType:'',contractedHours:0,contractDate:'2026-07-01',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:0,vacationDays:30,extraHolidays:0,note:'Alta detectada en el Excel de costes (desde julio 2026). Pendiente: puesto, jornada, DNI y fecha exacta'},
   {name:'Alejandro Gardó Moreno',cardNumber:'',position:'',jornadaType:'Completa',level:4,dni:'47325099T',contractType:'Indefinido',contractedHours:40,contractDate:'2026-06-15',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Alta deducida: devengará 16,25 días a 31/12. Pendiente: puesto'},
 ];
 
@@ -3243,7 +3245,12 @@ async function renderStaffRoster(container){
         </div>
         <div class="order-meta">
           <span class="meta-item">${hours}h contratadas</span>
-          <span class="meta-item ${(!levelHasTable(level)&&salary===0)?'salary-missing':''}">${salary>0?fmtMoney(salary)+'/mes':'Salario pendiente'}${salary>0&&isConvenio?' <span style="color:var(--text-tertiary);font-size:10px">(convenio)</span>':''}${(!levelHasTable(level)&&salary===0)?' <span style="font-size:10px">— Nivel V sin tabla</span>':''}</span>
+          ${(()=>{
+            const rc=costeReal[normNombre(p.name)];
+            if(rc)return`<span class="meta-item" style="color:var(--ok-fg);font-weight:500">${fmtMoney(rc.coste)}/mes <span style="font-size:10px;font-weight:400">coste real ${ultimoRC}</span></span>`;
+            if(ultimoRC&&status!=='inactivo')return`<span class="meta-item" style="color:var(--alert-amber-fg)">${salary>0?fmtMoney(salary)+'/mes':'Sin salario'} <span style="font-size:10px">sin coste real en ${ultimoRC}</span></span>`;
+            return`<span class="meta-item ${(!levelHasTable(level)&&salary===0)?'salary-missing':''}">${salary>0?fmtMoney(salary)+'/mes':'Salario pendiente'}${salary>0&&isConvenio?' <span style="color:var(--text-tertiary);font-size:10px">(convenio)</span>':''}${(!levelHasTable(level)&&salary===0)?' <span style="font-size:10px">— Nivel V sin tabla</span>':''}</span>`;
+          })()}
           ${p.dni?`<span class="meta-item" style="color:var(--text-tertiary)">${escapeHtml(p.dni)}</span>`:''}
           ${p.contractDate?`<span class="meta-item" style="color:var(--text-tertiary)">Alta: ${new Date(p.contractDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</span>`:''}
           ${bdLabel?`<span class="meta-item" style="color:var(--text-tertiary)">🎂 ${bdLabel}</span>`:''}
@@ -3841,46 +3848,133 @@ async function renderStaffEtt(container){
 }
 
 // ── PESTAÑA: COSTES ───────────────────────────────────────────────
+// ── COSTES REALES DE EMPRESA (importados del Excel de nóminas) ────
+const MESES_CORTOS={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,set:8,oct:9,nov:10,dic:11};
+// Convierte "ene 26" en "2026-01"
+function cabeceraAMes(txt){
+  const m=String(txt||'').trim().toLowerCase().match(/^([a-záéíóú]{3,4})\.?\s*(\d{2,4})$/);
+  if(!m)return null;
+  const mes=MESES_CORTOS[m[1].slice(0,3)];
+  if(mes===undefined)return null;
+  let y=parseInt(m[2],10);
+  if(y<100)y+=2000;
+  return `${y}-${String(mes+1).padStart(2,'0')}`;
+}
+// Normaliza el nombre para cruzarlo con la plantilla
+function normNombre(n){
+  return String(n||'').toLowerCase()
+    .replace(/\bn\/a\b/g,'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z\s]/g,'').replace(/\s+/g,' ').trim();
+}
+
+function parseCostesXLSX(buffer){
+  const wb=XLSX.read(buffer,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  // La primera fila con cabeceras de mes marca el inicio
+  let hIdx=-1,meses=[];
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const posibles=rows[i].map(cabeceraAMes);
+    if(posibles.filter(Boolean).length>=3){hIdx=i;meses=posibles;break;}
+  }
+  if(hIdx===-1)throw new Error('No se encontró la fila de meses (se esperaba "ene 26", "feb 26"…)');
+  const porMes={};   // { 'YYYY-MM': { nombreNormalizado: {nombre, coste} } }
+  let filas=0;
+  for(let i=hIdx+1;i<rows.length;i++){
+    const r=rows[i];
+    const nombre=String(r[0]||'').trim();
+    if(!nombre)continue;
+    if(/coste total|empleado/i.test(nombre))continue;   // fila de encabezado secundario
+    let tieneDato=false;
+    meses.forEach((mes,col)=>{
+      if(!mes)return;
+      const v=toNum(r[col]);
+      if(!v)return;
+      tieneDato=true;
+      if(!porMes[mes])porMes[mes]={};
+      const key=normNombre(nombre);
+      // Una persona puede tener dos contratos el mismo mes: se suman
+      if(!porMes[mes][key])porMes[mes][key]={nombre:nombre.replace(/\s*n\/a\s*/gi,'').trim(),coste:0};
+      porMes[mes][key].coste+=v;
+    });
+    if(tieneDato)filas++;
+  }
+  if(!filas)throw new Error('No se encontró ningún coste en el archivo');
+  return{porMes,meses:meses.filter(Boolean),filas};
+}
+
 async function renderStaffCosts(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando…</span></div>`;
   try{
     const {staff,costs,ettList}=await loadStaffData();
+    const realSnap=await getDoc(doc(db,'staff_config','realCosts'));
+    const real=realSnap.exists()?(realSnap.data().porMes||{}):{};
+    const mesesReales=Object.keys(real).sort();
     const cb=computeStaffCost(staff,costs,ettList);
+
+    // Resumen de los meses con coste real importado
+    const filasMes=mesesReales.slice().reverse().map(mk=>{
+      const emp=real[mk]||{};
+      const total=Object.values(emp).reduce((s2,e)=>s2+(e.coste||0),0);
+      const [y,m]=mk.split('-');
+      const lbl=new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+      return`<div class="order-card">
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${lbl}</span>
+            <span class="order-loc">${Object.keys(emp).length} personas con coste</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill pill-ok" style="font-family:var(--font-mono);font-weight:600">${fmtMoney(total)}</span>
+            <button class="btn-del-staff" data-del-mes="${mk}" title="Eliminar este mes">✕</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Personas del Excel que no están en la plantilla y al revés
+    const ultimoMes=mesesReales[mesesReales.length-1];
+    const enExcel=ultimoMes?Object.values(real[ultimoMes]).map(e=>e.nombre):[];
+    const normPlantilla=staff.map(p=>normNombre(p.name));
+    const sinFicha=ultimoMes?Object.entries(real[ultimoMes])
+      .filter(([k])=>!normPlantilla.includes(k)).map(([,e])=>e.nombre):[];
+    const sinCoste=ultimoMes?staff.filter(p=>(p.status||'activo')!=='inactivo'
+      &&!real[ultimoMes][normNombre(p.name)]).map(p=>p.name):[];
+
     const mx=Math.max(cb.payrollMonthly,cb.onLeaveMonthly,cb.ettMonthly,1);
     const row=(l,v,color)=>`<div class="bar-row"><span class="bar-label">${l}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v/mx*100).toFixed(0)}%;background:${color}"></div></div><span class="bar-val">${fmtMoney(v)}</span></div>`;
     const jornadas=Object.keys(CONVENIO_2025).map(Number).sort((a,b)=>b-a);
-    const rateRows=`<div class="sched-wrap" style="padding:0;border:none">
-      <table class="sched-table" style="font-size:12px">
-        <thead><tr><th class="sched-name">Jornada</th>${CONVENIO_LEVELS.map(l=>`<th style="text-align:right">${l.lbl}</th>`).join('')}</tr></thead>
-        <tbody>${jornadas.map(h=>`<tr>
-          <td class="sched-name">${h}h</td>
-          ${CONVENIO_2025[h].map(v=>`<td style="text-align:right;font-family:var(--font-mono);font-size:11.5px">${v.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</td>`).join('')}
-        </tr>`).join('')}</tbody>
-      </table>
-    </div>
-    <div style="margin-top:12px;font-size:12px;color:var(--text-secondary);line-height:1.6">
-      ${CONVENIO_LEVELS.map(l=>`<div><strong>${l.lbl}:</strong> ${l.roles}</div>`).join('')}
-    </div>
-    <div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);font-size:12px">
-      <strong>Complementos mensuales:</strong>
-      Manutención ${CONVENIO_COMPLEMENTS.manutencion.toFixed(2)} € ·
-      Lavado de ropa ${CONVENIO_COMPLEMENTS.lavadoRopa.toFixed(2)} € ·
-      Responsable de centro ${CONVENIO_COMPLEMENTS.respCentro.toFixed(2)} €
-    </div>`;
 
     container.innerHTML=moduleHeader('Personal','Costes')+`
+    <div class="audit-section">
+      <h3>Coste real de empresa</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Importa el Excel de nóminas con una fila por empleado y una columna por mes. Estos importes <strong>sustituyen a la estimación de convenio</strong> en la Cuenta de explotación para los meses que tengan datos.</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn-primary" id="btnImportCostes" style="max-width:230px">Importar Excel de costes</button>
+        <span id="costesMsg" style="font-size:12px"></span>
+      </div>
+      ${mesesReales.length?`
+        <p class="section-label" style="margin:16px 0 8px">Meses importados</p>
+        <div class="orders">${filasMes}</div>
+      `:'<p style="font-size:12px;color:var(--text-tertiary);margin-top:12px">Aún no hay costes reales importados. Mientras tanto se usa la tabla de convenio.</p>'}
+      ${sinFicha.length?`<div class="alert alert-amber" style="margin-top:12px"><span>⚠️ ${sinFicha.length} persona${sinFicha.length>1?'s':''} del Excel sin ficha en la plantilla: ${sinFicha.map(escapeHtml).join(', ')}. Su coste cuenta igual en la Cuenta de explotación.</span></div>`:''}
+      ${sinCoste.length?`<div class="alert alert-amber" style="margin-top:12px"><span>⚠️ ${sinCoste.length} persona${sinCoste.length>1?'s':''} activa${sinCoste.length>1?'s':''} en plantilla sin coste en el último mes importado: ${sinCoste.map(escapeHtml).join(', ')}. Revisa si siguen en la empresa.</span></div>`:''}
+    </div>
+
     <div class="stats-grid" style="grid-template-columns:1fr">
       <div class="stat-card">
-        <h3>Desglose del coste mensual de personal</h3>
-        <span class="scope-label">Plantilla actual + ETT activas hoy</span>
+        <h3>Estimación por convenio</h3>
+        <span class="scope-label">Se usa solo en los meses sin coste real importado</span>
         <div class="bar-chart">
           ${row('Plantilla activa',cb.payrollMonthly,'var(--text-primary)')}
           ${row(`Bajas (${cb.leavePct}% del coste)`,cb.onLeaveMonthly,'var(--alert-amber-border)')}
           ${row('ETT (suma, no sustituye)',cb.ettMonthly,'var(--break-fg)')}
         </div>
-        <p style="font-size:13px;font-weight:600;margin-top:12px">Total: ${fmtMoney(cb.totalMonthly)}/mes</p>
+        <p style="font-size:13px;font-weight:600;margin-top:12px">Total estimado: ${fmtMoney(cb.totalMonthly)}/mes</p>
       </div>
     </div>
+
     <div class="audit-section">
       <h3>Parámetros de coste</h3>
       <div class="form-grid">
@@ -3892,14 +3986,57 @@ async function renderStaffCosts(container){
       <button class="btn-primary" id="btnSaveStaffCosts" style="max-width:220px">Guardar</button>
       <p id="staffCostMsg" style="font-size:12px;margin-top:10px"></p>
     </div>
+
     <div class="audit-section">
       <h3>Tabla salarial del convenio · Restauración Colectiva · Barcelona 2025</h3>
-      ${rateRows}
-      <p style="font-size:12px;color:var(--alert-amber-fg);margin-top:12px;line-height:1.5">
-        ⚠️ La columna del <strong>Nivel IV</strong> de la hoja original presentaba valores inconsistentes por debajo de 35h (no proporcionales). Se han recalculado proporcionalmente desde la jornada de 40h. Los niveles I, II y III son los de la tabla oficial.
-      </p>
-    </div>`;
+      <div class="sched-wrap" style="padding:0;border:none">
+        <table class="sched-table" style="font-size:12px">
+          <thead><tr><th class="sched-name">Jornada</th>${CONVENIO_LEVELS.filter(l=>l.n<=4).map(l=>`<th style="text-align:right">${l.lbl}</th>`).join('')}</tr></thead>
+          <tbody>${jornadas.map(h=>`<tr>
+            <td class="sched-name">${h}h</td>
+            ${CONVENIO_2025[h].map(v=>`<td style="text-align:right;font-family:var(--font-mono);font-size:11.5px">${v.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €</td>`).join('')}
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--text-secondary);line-height:1.6">
+        ${CONVENIO_LEVELS.map(l=>`<div><strong>${l.lbl}:</strong> ${l.roles}</div>`).join('')}
+      </div>
+      <div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);font-size:12px">
+        <strong>Complementos mensuales:</strong>
+        Manutención ${CONVENIO_COMPLEMENTS.manutencion.toFixed(2)} € ·
+        Lavado de ropa ${CONVENIO_COMPLEMENTS.lavadoRopa.toFixed(2)} € ·
+        Responsable de centro ${CONVENIO_COMPLEMENTS.respCentro.toFixed(2)} €
+      </div>
+    </div>
+    <input type="file" id="costesFileInput" accept=".xlsx,.xls" hidden>`;
 
+    const fileInput=container.querySelector('#costesFileInput');
+    const btnImp=container.querySelector('#btnImportCostes');
+    if(btnImp)btnImp.addEventListener('click',()=>fileInput.click());
+    if(fileInput)fileInput.addEventListener('change',async e=>{
+      const file=e.target.files[0];
+      if(!file)return;
+      const msg=container.querySelector('#costesMsg');
+      msg.textContent='Procesando…';msg.style.color='var(--text-secondary)';
+      try{
+        const buf=await file.arrayBuffer();
+        const {porMes,meses,filas}=parseCostesXLSX(buf);
+        const prev=realSnap.exists()?(realSnap.data().porMes||{}):{};
+        await setDoc(doc(db,'staff_config','realCosts'),{porMes:{...prev,...porMes},updatedAt:Timestamp.now()});
+        msg.textContent=`✓ ${filas} empleados en ${meses.length} meses`;msg.style.color='var(--ok-fg)';
+        setTimeout(()=>renderStaffCosts(container),900);
+      }catch(err){msg.textContent='Error: '+err.message;msg.style.color='var(--alert-red-fg)';}
+      fileInput.value='';
+    });
+    container.querySelectorAll('[data-del-mes]').forEach(b=>{
+      b.addEventListener('click',async()=>{
+        const mk=b.dataset.delMes;
+        if(!confirm(`¿Eliminar los costes reales de ${mk}?\n\nLa Cuenta de explotación volverá a estimar ese mes por convenio.`))return;
+        const copia={...real};delete copia[mk];
+        await setDoc(doc(db,'staff_config','realCosts'),{porMes:copia,updatedAt:Timestamp.now()});
+        renderStaffCosts(container);
+      });
+    });
     const btn=container.querySelector('#btnSaveStaffCosts');
     if(btn)btn.addEventListener('click',async()=>{
       const msg=container.querySelector('#staffCostMsg');
@@ -4373,7 +4510,7 @@ function pnlLine(label,value,revenue,opts={}){
   </div>`;
 }
 
-function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchases){
+function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchases,realCosts){
   const inRange=d=>!from||!to||(d&&d>=from&&d<=to);
   const cateringActive=cateringOrders.filter(o=>o.orderStatus!=='CANCELADO'&&inRange(toDate(o.deliveryAt)));
   const cateringRevenue=cateringActive.reduce((s,o)=>s+(o.priceTotal||0),0);
@@ -4387,7 +4524,13 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   });
   const comedor=byCh['comedor']||{billed:0,tickets:0};
   const cafeteria=byCh['cafeteria']||{billed:0,tickets:0};
-  const extrasAll=(extras||[]).filter(e=>inRange(new Date(e.date+'T12:00:00')));
+  // Solo cuentan en la cuenta de explotación los registros cobrados
+  const extrasPeriodo=(extras||[]).filter(e=>inRange(new Date(e.date+'T12:00:00')));
+  const extrasAll=extrasPeriodo.filter(e=>(e.state||'Pendiente')==='Cobrado');
+  const extrasNoCobrados=extrasPeriodo.filter(e=>(e.state||'Pendiente')!=='Cobrado');
+  const extrasPendienteImporte=extrasNoCobrados
+    .filter(e=>(e.category||'Otros')!==TRANSFER_CATEGORY)
+    .reduce((s2,e)=>s2+(e.amount||0),0);
   // Los traspasos entre centros se registran en Facturación pero no son ingreso: van a su línea de coste
   const extrasInRange=extrasAll.filter(e=>(e.category||'Otros')!==TRANSFER_CATEGORY);
   const transferRecs=extrasAll.filter(e=>(e.category||'Otros')===TRANSFER_CATEGORY);
@@ -4425,10 +4568,22 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const revenue=cateringRevenue+comedor.billed+cafeteria.billed+extrasRevenue+transfersOut+refunds;
 
   const sc=computeStaffCost(staff,costs,ettList);
-  const labourCost=-(sc.totalMonthly*months);
-  const labourPayroll=-(sc.payrollMonthly*months);
-  const labourLeave=-(sc.onLeaveMonthly*months);
-  const labourEtt=-(sc.ettMonthly*months);
+  // Coste real de nóminas por mes: sustituye a la estimación de convenio donde exista
+  const real=realCosts||{};
+  let realTotal=0,mesesConReal=0;
+  monthKeysInRange.forEach(k=>{
+    if(real[k]){
+      realTotal+=Object.values(real[k]).reduce((s2,e)=>s2+(e.coste||0),0);
+      mesesConReal++;
+    }
+  });
+  const mesesSinReal=Math.max(0,months-mesesConReal);
+  const labourSource=mesesConReal===0?'convenio':(mesesSinReal===0?'real':'mixto');
+  const labourCost=-(realTotal+sc.totalMonthly*mesesSinReal);
+  const labourPayroll=-(sc.payrollMonthly*mesesSinReal);
+  const labourLeave=-(sc.onLeaveMonthly*mesesSinReal);
+  const labourEtt=-(sc.ettMonthly*mesesSinReal);
+  const labourReal=-realTotal;
 
   // MMPP: importe real. Prioridad: importe manual de esta pantalla → compras reales del Forecast.
   // No se estima por porcentaje: si no hay dato real, la línea queda a cero y se avisa.
@@ -4448,7 +4603,7 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const transfers=-transfersIn;
 
   const unitProfit=grossProfit+labourCost+iuo+transfers;
-  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn,unitProfit,months,
+  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,extrasPendienteImporte,extrasNoCobradosN:extrasNoCobrados.length,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,labourReal,labourSource,mesesConReal,mesesSinReal,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn,unitProfit,months,
     hasManualMmpp,hasManualIuo,monthKeysInRange,mmppSource,forecastPurchases,refunds,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
@@ -4470,6 +4625,8 @@ async function renderPnl(container){
     const ettList=ettSnapP.exists()?(ettSnapP.data().list||[]):[];
     const extras=extrasSnapP.exists()?(extrasSnapP.data().list||[]):[];
     const pnlEvents=await loadEvents();
+    const realCostSnap=await getDoc(doc(db,'staff_config','realCosts'));
+    const realCosts=realCostSnap.exists()?(realCostSnap.data().porMes||{}):{};
     const [impSnap,revMetaSnap]=await Promise.all([
       getDoc(doc(db,'catering_config','importInfo')),
       getDoc(doc(db,'pnl_config','revenue'))
@@ -4523,8 +4680,8 @@ async function renderPnl(container){
       (r.compare&&cFrom&&cTo)?sumForecastPurchases(cFrom,cTo):Promise.resolve(0)
     ]);
 
-    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchCur);
-    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList,extras,fcPurchCmp):null;
+    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchCur,realCosts);
+    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList,extras,fcPurchCmp,realCosts):null;
 
     const varOf=(a,b)=>b?((a-b)/Math.abs(b)*100):0;
     const varTxt=(a,b)=>{if(!b)return'';const v=varOf(a,b);return`${v>=0?'+':''}${v.toFixed(1)}%`;};
@@ -4641,7 +4798,7 @@ async function renderPnl(container){
       ${L('Catering',cur.cateringRevenue,cmp?cmp.cateringRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.catering:undefined})}
       ${L('Comedor',cur.comedor.billed,cmp?cmp.comedor.billed:0,{indent:true,fcVal:fcAgg?fcAgg.comedor:undefined})}
       ${L('Cafetería',cur.cafeteria.billed,cmp?cmp.cafeteria.billed:0,{indent:true,fcVal:fcAgg?fcAgg.cafeteria:undefined})}
-      ${cur.extrasRevenue!==0||(cmp&&cmp.extrasRevenue!==0)?L('Facturación extra',cur.extrasRevenue,cmp?cmp.extrasRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.extra:undefined}):''}
+      ${cur.extrasRevenue!==0||(cmp&&cmp.extrasRevenue!==0)?L('Facturación extra · solo cobrada',cur.extrasRevenue,cmp?cmp.extrasRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.extra:undefined}):''}
       ${(()=>{
         const cats=new Set([...Object.keys(cur.extrasByCategory||{}),...(cmp?Object.keys(cmp.extrasByCategory||{}):[])]);
         return [...cats].sort().map(c=>L(c,cur.extrasByCategory[c]||0,cmp?(cmp.extrasByCategory[c]||0):0,{indent2:true})).join('');
@@ -4651,8 +4808,9 @@ async function renderPnl(container){
       <div class="pnl-section-head cost">Costes</div>
       ${L('MMPP (Materias primas)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · compras reales de Forecast':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
       ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
-      ${L('Labour Cost (Personal)',cur.labourCost,cmp?cmp.labourCost:0,{fcVal:fcAgg?fcAgg.labourCost:undefined})}
-      ${L('Plantilla activa',cur.labourPayroll,cmp?cmp.labourPayroll:0,{indent:true})}
+      ${L('Labour Cost (Personal)'+(cur.labourSource==='real'?' · nóminas reales':cur.labourSource==='mixto'?` · ${cur.mesesConReal} mes${cur.mesesConReal>1?'es':''} real, ${cur.mesesSinReal} estimado`:' · estimado por convenio'),cur.labourCost,cmp?cmp.labourCost:0,{fcVal:fcAgg?fcAgg.labourCost:undefined})}
+      ${cur.labourReal!==0?L('Nóminas reales',cur.labourReal,cmp?cmp.labourReal:0,{indent:true}):''}
+      ${cur.labourPayroll!==0?L('Plantilla activa (estimada)',cur.labourPayroll,cmp?cmp.labourPayroll:0,{indent:true}):''}
       ${cur.labourLeave!==0||(cmp&&cmp.labourLeave!==0)?L('Bajas',cur.labourLeave,cmp?cmp.labourLeave:0,{indent:true}):''}
       ${cur.labourEtt!==0||(cmp&&cmp.labourEtt!==0)?L('ETT (adicional)',cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true}):''}
       ${L(cur.hasManualIuo?'IUO (Gastos indirectos) · importe real':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{fcVal:fcAgg?fcAgg.iuo:undefined})}
@@ -4667,9 +4825,9 @@ async function renderPnl(container){
       <h3>Origen de cada dato</h3>
       <div class="audit-row"><span class="audit-req"><strong>Catering</strong> — importe sin IVA de pedidos no cancelados, del módulo Catering (importación CSV/Holded)</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Comedor / Cafetería</strong> — facturado de los CSV importados con los botones de la barra superior</span></div>
-      <div class="audit-row"><span class="audit-req"><strong>Facturación extra</strong> — registros introducidos manualmente en la pestaña "Facturación extra", desglosados por categoría</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Facturación extra</strong> — solo los registros marcados como <strong>Cobrado</strong> en el módulo Facturación. Los pendientes y facturados no suman hasta que se cobran</span></div>
       <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — importe real: primero el introducido en la tabla de costes por mes; si no hay, la suma del gasto real registrado en Forecast → Compras. Nunca se estima por porcentaje</span></div>
-      <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — salario mensual real o de convenio (Restauración Colectiva Barcelona 2025) según nivel y jornada, del módulo Personal. Las bajas al ${costs.leaveCostPct!==undefined?costs.leaveCostPct:100}% y las ETT según registros vigentes</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — coste real de nóminas importado en Personal → Costes para los meses que lo tengan; en el resto, estimación por la tabla de convenio. Las bajas al ${costs.leaveCostPct!==undefined?costs.leaveCostPct:100}% y las ETT según registros vigentes</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Abonos por errores de TPV (Proppos)</strong> — importe introducido a mano por mes. Suma a los ingresos porque es un importe que nos devuelven. En el futuro se podrá importar</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — de los registros de Facturación con esa categoría: los <strong>emitidos</strong> son facturación real y entran en Ingresos; los <strong>recibidos</strong> son compra y entran en Costes</span></div>
       <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — parte variable como % de ingresos más una parte fija mensual, ambas configurables abajo</span></div>
