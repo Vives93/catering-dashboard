@@ -3139,6 +3139,12 @@ async function renderStaffRoster(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando plantilla…</span></div>`;
   try{
     let {staff,absences,costs,ettList}=await loadStaffData();
+    // Coste real de nóminas del último mes importado, para mostrarlo en cada ficha
+    const rcSnap=await getDoc(doc(db,'staff_config','realCosts'));
+    const realPorMes=rcSnap.exists()?(rcSnap.data().porMes||{}):{};
+    const mesesRC=Object.keys(realPorMes).sort();
+    const ultimoRC=mesesRC.length?mesesRC[mesesRC.length-1]:null;
+    const costeReal=ultimoRC?realPorMes[ultimoRC]:{};
     if(!staff.length){
       container.innerHTML=moduleHeader('Personal','Plantilla')+`<div class="empty-state">
         <p>Aún no hay plantilla cargada</p>
