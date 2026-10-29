@@ -4770,10 +4770,14 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const iuo=iuoReal?(iuoEmb+iuoManual):(iuoFromPct+iuoFixed);
 
   // Traspasos: los emitidos son ingreso (ya sumados a Revenue); los recibidos son coste
-  const transfers=-transfersIn;
+  // Pedidos a otros centros de la empresa (lista de traspasos en Forecast → Compras)
+  const trImp=(costs.transferImport||{});
+  const transfersInPedidos=fracs.reduce((s2,{key,frac})=>s2+(trImp[key]?(trImp[key].total||0)*frac:0),0);
+  const transfersInTotal=transfersIn+transfersInPedidos;
+  const transfers=-transfersInTotal;
 
   const unitProfit=grossProfit+labourCost+iuo+transfers;
-  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,extrasPendienteImporte,extrasNoCobradosN:extrasNoCobrados.length,mmpp,costOfSales,grossProfit,labourCost,labourEtt,ettSource,mesesEttProforma,labourReal,labourSource,mesesConReal,mesesSinReal,mesesSinNomina,labourRefMonthly,fracSinNomina,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn,unitProfit,months,
+  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,extrasPendienteImporte,extrasNoCobradosN:extrasNoCobrados.length,mmpp,costOfSales,grossProfit,labourCost,labourEtt,ettSource,mesesEttProforma,labourReal,labourSource,mesesConReal,mesesSinReal,mesesSinNomina,labourRefMonthly,fracSinNomina,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn:transfersInTotal,transfersInBilling:transfersIn,transfersInPedidos,unitProfit,months,
     hasManualMmpp,hasManualIuo,iuoReal,iuoEmb,iuoManual,monthKeysInRange,mmppSource,forecastPurchases,refunds,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
@@ -4794,6 +4798,8 @@ async function renderPnl(container){
     const costs=costSnap.exists()?costSnap.data():{mmppPct:35,iuoPct:0,iuoMonthly:0};
     const iuoImpSnap=await getDoc(doc(db,'pnl_config','iuoImport'));
     costs.iuoImport=iuoImpSnap.exists()?(iuoImpSnap.data().porMes||{}):{};
+    const trImpSnap=await getDoc(doc(db,'pnl_config','transferImport'));
+    costs.transferImport=trImpSnap.exists()?(trImpSnap.data().porMes||{}):{};
     const ettList=ettSnapP.exists()?(ettSnapP.data().list||[]):[];
     const extras=extrasSnapP.exists()?(extrasSnapP.data().list||[]):[];
     const pnlEvents=await loadEvents();
@@ -5004,7 +5010,9 @@ async function renderPnl(container){
       ${(cur.iuoManual||(cmp&&cmp.iuoManual))?L('Otros IUO · importe manual',cur.iuoManual||0,cmp?(cmp.iuoManual||0):0,{indent:true}):''}
       ${!cur.iuoReal&&(cur.iuoFromPct!==0||(cmp&&cmp.iuoFromPct!==0))?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
       ${!cur.iuoReal&&(cur.iuoFixed!==0||(cmp&&cmp.iuoFixed!==0))?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
-      ${(cur.transfersIn!==0||(cmp&&cmp.transfersIn!==0))?L('Traspasos recibidos · desde Facturación',cur.transfers,cmp?cmp.transfers:0,{group:true}):''}
+      ${(cur.transfersIn!==0||(cmp&&cmp.transfersIn!==0))?L('Traspasos recibidos',cur.transfers,cmp?cmp.transfers:0,{group:true})
+        +((cur.transfersInBilling||(cmp&&cmp.transfersInBilling))?L('Desde Facturación',-cur.transfersInBilling,cmp?-cmp.transfersInBilling:0,{indent:true}):'')
+        +((cur.transfersInPedidos||(cmp&&cmp.transfersInPedidos))?L('Pedidos a otros centros · importados',-cur.transfersInPedidos,cmp?-cmp.transfersInPedidos:0,{indent:true}):''):''}
 
       ${L('Resultado (Unit Profit)',cur.unitProfit,cmp?cmp.unitProfit:0,{section:'result',fcVal:fcAgg?fcAgg.unitProfit:undefined})}
       ${L('Gross Profit (Ingresos − MMPP)',cur.grossProfit,cmp?cmp.grossProfit:0,{indent:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
@@ -5019,7 +5027,7 @@ async function renderPnl(container){
       <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — importe real: primero el introducido en la tabla de costes por mes; si no hay, el gasto real de Forecast → Compras, que se rellena al importar los pedidos (todos los proveedores que no están en la lista de IUO). Nunca se estima por porcentaje</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — solo coste real de nóminas importado en Personal → Costes. Los meses sin nóminas importadas quedan a cero. Las ETT se suman aparte: importe de las proformas importadas en Personal → ETT y, en los meses sin proforma, prorrateo por días de los contratos de la pestaña ETT</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Abonos por errores de TPV (Proppos)</strong> — importe introducido a mano por mes. Suma a los ingresos porque es un importe que nos devuelven. En el futuro se podrá importar</span></div>
-      <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — de los registros de Facturación con esa categoría: los <strong>emitidos</strong> son facturación real y entran en Ingresos; los <strong>recibidos</strong> son compra y entran en Costes</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — de los registros de Facturación con esa categoría: los <strong>emitidos</strong> son facturación real y entran en Ingresos; los <strong>recibidos</strong> son compra y entran en Costes, junto con los pedidos a otros centros de la empresa importados en Forecast → Compras (lista de traspasos)</span></div>
       ${fcAgg?`<div class="audit-row"><span class="audit-req"><strong>Forecast · Personal</strong> — ${cur.fracSinNomina>0&&cur.labourRefMonthly>0?`nóminas reales donde existen y, para la parte del período sin nóminas, <strong>media de los 3 últimos meses importados</strong> (${fmtMoney(cur.labourRefMonthly)}/mes)`:cur.fracSinNomina>0?'sin nóminas importadas todavía: no hay base para estimarlo':'nóminas reales del período'}. Más las ETT (proformas o contratos)</span></div>`:''}
       <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — importe real: pedidos de los <strong>proveedores de IUO</strong> (lista editable en Forecast → Compras) más los otros IUO introducidos a mano por mes. Solo si un período no tiene ninguno de los dos, se estima con el % de ingresos y la parte fija configurables abajo</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Prorrateo</strong> — los importes mensuales (nóminas, IUO fijo, importes manuales) se aplican en proporción a los días de cada mes que cubre el período: ${cur.months.toLocaleString('es-ES',{maximumFractionDigits:2})} mes${cur.months===1?'':'es'} equivalentes</span></div>
@@ -6537,9 +6545,12 @@ async function renderFcSales(container){
 // ── COMPRAS ───────────────────────────────────────────────────────
 // ── IMPORTACIÓN DE PEDIDOS A PROVEEDORES ─────────────────────────
 // "Informe multicentro de pedidos de proveedores detallados" (Seguimiento de pedidos), con TODO junto.
-// Se separa por proveedor: los de la lista de IUO (embalaje, limpieza, menaje…) van a IUO; el resto es MMPP.
+// Se separa por proveedor: los de la lista de traspasos van a "Traspasos recibidos", los de la lista de IUO
+// (embalaje, limpieza, menaje…) van a IUO, y el resto es MMPP.
 // Se guarda el detalle por día y proveedor, así que al cambiar la lista se recalcula sin volver a subir el archivo.
 const DEFAULT_IUO_SUPPLIERS=['Pack Away','Netya Prop','Massegur','Codensa','Blancafort','Garcia de Pou'];
+// Pedidos a otros centros de la empresa: no son compra a proveedor, van a "Traspasos recibidos"
+const DEFAULT_TRANSFER_SUPPLIERS=['Nora Real Food'];
 const normProv=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
 function esProveedorIuo(prov,lista){const p=normProv(prov);return lista.some(k=>{const n=normProv(k);return n&&p.includes(n);});}
 
@@ -6588,30 +6599,37 @@ function parsePedidosXLS(arrayBuffer){
 }
 
 async function loadPurchaseRules(){
-  try{const sn=await getDoc(doc(db,'pnl_config','purchaseRules'));if(sn.exists()&&Array.isArray(sn.data().iuoSuppliers))return sn.data().iuoSuppliers;}catch(e){}
-  return DEFAULT_IUO_SUPPLIERS.slice();
+  let iuo=DEFAULT_IUO_SUPPLIERS.slice(),transfer=DEFAULT_TRANSFER_SUPPLIERS.slice();
+  try{
+    const sn=await getDoc(doc(db,'pnl_config','purchaseRules'));
+    if(sn.exists()){
+      if(Array.isArray(sn.data().iuoSuppliers))iuo=sn.data().iuoSuppliers;
+      if(Array.isArray(sn.data().transferSuppliers))transfer=sn.data().transferSuppliers;
+    }
+  }catch(e){}
+  return{iuo,transfer};
 }
 async function loadPurchaseImports(){
-  const [f,e,raw]=await Promise.all([getDoc(doc(db,'pnl_config','mmppImport')),getDoc(doc(db,'pnl_config','iuoImport')),getDoc(doc(db,'pnl_config','purchasesRaw'))]);
-  return{fresco:f.exists()?f.data():{porMes:{}},embalaje:e.exists()?e.data():{porMes:{}},raw:raw.exists()?raw.data():{porDia:{}}};
+  const [f,e,t,raw]=await Promise.all([getDoc(doc(db,'pnl_config','mmppImport')),getDoc(doc(db,'pnl_config','iuoImport')),getDoc(doc(db,'pnl_config','transferImport')),getDoc(doc(db,'pnl_config','purchasesRaw'))]);
+  return{fresco:f.exists()?f.data():{porMes:{}},embalaje:e.exists()?e.data():{porMes:{}},traspasos:t.exists()?t.data():{porMes:{}},raw:raw.exists()?raw.data():{porDia:{}}};
 }
-// Reparte el detalle guardado en MMPP (gasto real diario de Forecast) e IUO (total mensual) para los meses indicados
-async function rebuildPurchases(porDiaAll,lista,meses){
+// Reparte el detalle guardado en MMPP (gasto real diario de Forecast), IUO y traspasos (totales mensuales)
+async function rebuildPurchases(porDiaAll,rules,meses){
   const r2=n=>Math.round(n*100)/100;
   const imports=await loadPurchaseImports();
-  const mmppMes={...(imports.fresco.porMes||{})},iuoMes={...(imports.embalaje.porMes||{})};
-  const coincidencias={};lista.forEach(k=>coincidencias[k]={});
+  const mmppMes={...(imports.fresco.porMes||{})},iuoMes={...(imports.embalaje.porMes||{})},trMes={...(imports.traspasos.porMes||{})};
+  const coincidencias={};[...rules.transfer,...rules.iuo].forEach(k=>coincidencias[k]={});
+  const clase=p=>esProveedorIuo(p,rules.transfer)?'traspaso':esProveedorIuo(p,rules.iuo)?'iuo':'mmpp';
   for(const k of meses){
     const diasMmpp={};
-    const acc={mmpp:{total:0,prov:{}},iuo:{total:0,prov:{}}};
+    const acc={mmpp:{total:0,prov:{}},iuo:{total:0,prov:{}},traspaso:{total:0,prov:{}}};
     Object.entries(porDiaAll).forEach(([d,items])=>{
       if(!d.startsWith(k))return;
       items.forEach(({p,v})=>{
-        const esIuo=esProveedorIuo(p,lista);
-        const a=esIuo?acc.iuo:acc.mmpp;
-        a.total+=v;a.prov[p]=(a.prov[p]||0)+v;
-        if(esIuo)lista.forEach(kw=>{if(esProveedorIuo(p,[kw]))coincidencias[kw][p]=1;});
-        else diasMmpp[d]=(diasMmpp[d]||0)+v;
+        const c=clase(p);
+        acc[c].total+=v;acc[c].prov[p]=(acc[c].prov[p]||0)+v;
+        if(c==='mmpp')diasMmpp[d]=(diasMmpp[d]||0)+v;
+        else (c==='traspaso'?rules.transfer:rules.iuo).forEach(kw=>{if(esProveedorIuo(p,[kw]))coincidencias[kw][p]=1;});
       });
     });
     Object.keys(diasMmpp).forEach(d=>diasMmpp[d]=r2(diasMmpp[d]));
@@ -6619,9 +6637,11 @@ async function rebuildPurchases(porDiaAll,lista,meses){
     const pack=a=>({total:r2(a.total),proveedores:Object.entries(a.prov).map(([p,v])=>({p,v:r2(v)})).sort((x,y)=>y.v-x.v)});
     mmppMes[k]=pack(acc.mmpp);
     iuoMes[k]=pack(acc.iuo);
+    trMes[k]=pack(acc.traspaso);
   }
   await setDoc(doc(db,'pnl_config','mmppImport'),{porMes:mmppMes,updatedAt:Timestamp.now()});
   await setDoc(doc(db,'pnl_config','iuoImport'),{porMes:iuoMes,updatedAt:Timestamp.now()});
+  await setDoc(doc(db,'pnl_config','transferImport'),{porMes:trMes,updatedAt:Timestamp.now()});
   return coincidencias;
 }
 async function importPedidos(file){
@@ -6633,18 +6653,19 @@ async function importPedidos(file){
   Object.entries(imports.raw.porDia||{}).forEach(([d,v])=>{if(!meses.includes(d.slice(0,7)))porDiaAll[d]=v;});
   Object.assign(porDiaAll,res.porDia);
   await setDoc(doc(db,'pnl_config','purchasesRaw'),{porDia:porDiaAll,archivo:file.name,periodo:res.periodo,centros:res.centros,excluidos:res.excl,updatedAt:Timestamp.now()});
-  const lista=await loadPurchaseRules();
-  const coincidencias=await rebuildPurchases(porDiaAll,lista,meses);
+  const rules=await loadPurchaseRules();
+  const coincidencias=await rebuildPurchases(porDiaAll,rules,meses);
   await recordUpload('compras',{archivo:file.name,registros:res.lineas,meses:meses.length});
-  return{...res,meses,coincidencias,lista};
+  return{...res,meses,coincidencias};
 }
 
 async function renderFcPurchases(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando compras…</span></div>`;
   try{
     const {monthKey,fc,costs,events}=await loadForecastData();
-    const [pImports,uploadsC,iuoLista]=await Promise.all([loadPurchaseImports(),getUploads(),loadPurchaseRules()]);
-    const mMes=(pImports.fresco.porMes||{})[monthKey],iMes=(pImports.embalaje.porMes||{})[monthKey];
+    const [pImports,uploadsC,rules]=await Promise.all([loadPurchaseImports(),getUploads(),loadPurchaseRules()]);
+    const mMes=(pImports.fresco.porMes||{})[monthKey],iMes=(pImports.embalaje.porMes||{})[monthKey],tMes=(pImports.traspasos.porMes||{})[monthKey];
+    const hayImportacion=Object.keys(pImports.raw.porDia||{}).length>0;
     const provList=m=>(m&&m.proveedores||[]).map(x=>`${escapeHtml(x.p)} ${fmtMoney(x.v)}`).join(' · ');
     const importPanel=`<div class="audit-section">
       <h3>Importar pedidos a proveedores</h3>
@@ -6655,21 +6676,26 @@ async function renderFcPurchases(container){
           <li>Pon el período (lo más cómodo: del 1 de enero al 31 de diciembre) y descarga el informe detallado en Excel, con todos los proveedores.</li>
           <li>Aquí, pulsa <strong>Importar pedidos</strong> y elige el archivo.</li>
         </ol>
-        <p style="margin-top:8px;font-size:11.5px;color:var(--text-tertiary)">La app separa por proveedor: los de la lista de abajo van a <strong>IUO</strong> en la Cuenta de explotación; el resto es <strong>materia prima</strong>, rellena el gasto real diario de esta tabla y pasa como <strong>MMPP</strong>. Se usa la fecha de entrega y el importe sin IVA; los pedidos fallidos no cuentan. Al reimportar se sustituyen los meses que vengan en el archivo (también los importes tecleados a mano en esos meses).</p>
+        <p style="margin-top:8px;font-size:11.5px;color:var(--text-tertiary)">La app separa por proveedor según las listas de abajo: los de <strong>traspasos</strong> van a "Traspasos recibidos" y los de <strong>IUO</strong> a IUO, en la Cuenta de explotación. El resto es <strong>materia prima</strong>: rellena la columna <strong>Gasto real</strong> de la tabla de abajo y pasa como <strong>MMPP</strong>. Se usa la fecha de entrega y el importe sin IVA; los pedidos fallidos no cuentan. Al reimportar se sustituyen los meses que vengan en el archivo (también los importes tecleados a mano en esos meses).</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="btn-primary" id="btnImportPur" style="max-width:200px">Importar pedidos</button>
         <span id="purMsg" style="font-size:12px"></span>
       </div>
       ${uploadLine(uploadsC.compras)}
+      ${!hayImportacion?`<div class="alert alert-amber" style="margin-top:10px"><span>⚠️ Todavía no se ha importado ningún archivo de pedidos: la columna Gasto real solo tiene lo tecleado a mano.</span></div>`:''}
       <div style="margin-top:12px;font-size:12px;color:var(--text-secondary);line-height:1.7">
         <div><strong>Materia prima (MMPP)</strong> este mes: ${mMes?fmtMoney(mMes.total):'sin datos importados'}</div>
         <div><strong>IUO</strong> este mes: ${iMes?fmtMoney(iMes.total):'sin datos importados'}${iMes&&iMes.proveedores&&iMes.proveedores.length?` <span style="color:var(--text-tertiary)">(${provList(iMes)})</span>`:''}</div>
+        <div><strong>Traspasos recibidos</strong> este mes: ${tMes?fmtMoney(tMes.total):'sin datos importados'}${tMes&&tMes.proveedores&&tMes.proveedores.length?` <span style="color:var(--text-tertiary)">(${provList(tMes)})</span>`:''}</div>
       </div>
       <details style="margin-top:12px">
-        <summary style="font-size:12.5px;cursor:pointer;color:var(--text-primary)">Proveedores que van a IUO (${iuoLista.length})</summary>
-        <p style="font-size:11.5px;color:var(--text-tertiary);margin:8px 0">Uno por línea. Basta con una parte del nombre tal como aparece en el informe (sin distinguir mayúsculas ni acentos). Al guardar se recalculan todos los meses importados, sin volver a subir el archivo.</p>
-        <textarea id="iuoSuppliers" class="prompt-box" rows="7">${escapeHtml(iuoLista.join('\n'))}</textarea>
+        <summary style="font-size:12.5px;cursor:pointer;color:var(--text-primary)">Reparto por proveedor · IUO (${rules.iuo.length}) y traspasos (${rules.transfer.length})</summary>
+        <p style="font-size:11.5px;color:var(--text-tertiary);margin:8px 0">Uno por línea. Basta con una parte del nombre tal como aparece en el informe (sin distinguir mayúsculas ni acentos). Los que no estén en ninguna lista son materia prima. Al guardar se recalculan todos los meses importados, sin volver a subir el archivo.</p>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Proveedores que van a IUO</label>
+        <textarea id="iuoSuppliers" class="prompt-box" rows="6">${escapeHtml(rules.iuo.join('\n'))}</textarea>
+        <label style="font-size:12px;font-weight:600;display:block;margin:10px 0 4px">Proveedores que son traspasos entre centros</label>
+        <textarea id="transferSuppliers" class="prompt-box" rows="3">${escapeHtml(rules.transfer.join('\n'))}</textarea>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
           <button class="btn-action" id="btnSaveIuoSuppliers">Guardar y recalcular</button>
           <span id="iuoSupMsg" style="font-size:12px"></span>
@@ -6731,7 +6757,7 @@ async function renderFcPurchases(container){
       <table class="sched-table fc-table">
         <thead><tr>
           <th class="fc-day">Día</th><th>Venta prev.</th><th class="fc-sep">Objetivo ${targetPct}%</th>
-          <th>Gasto real (€)</th><th>Desv. día</th><th>% real</th><th class="fc-acc">Desv. acum.</th>
+          <th>${hayImportacion?'Gasto real · pedidos (€)':'Gasto real (€)'}</th><th>Desv. día</th><th>% real</th><th class="fc-acc">Desv. acum.</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -6761,20 +6787,20 @@ async function renderFcPurchases(container){
         msg.textContent=`✓ ${r.lineas} líneas · ${fmtMoney(r.total)} en ${r.meses.length} meses${avisos.length?' · '+avisos.join(' · '):''}${resumenIuo(r.coincidencias)}`;
         msg.style.color=avisos.length?'var(--alert-amber-fg)':'var(--ok-fg)';
         setTimeout(()=>renderForecast(container),2500);
-      }catch(err){msg.textContent='Error: '+err.message;msg.style.color='var(--alert-red-fg)';}
+      }catch(err){msg.textContent='Error: '+err.message;msg.style.color='var(--alert-red-fg)';alert('No se ha podido importar el archivo de pedidos:\n\n'+err.message);}
       purInput.value='';
     });
     const btnSup=container.querySelector('#btnSaveIuoSuppliers');
     if(btnSup)btnSup.addEventListener('click',async()=>{
-      const m=container.querySelector('#iuoSuppliers');
       const msg=container.querySelector('#iuoSupMsg');
-      const lista=[...new Set(m.value.split('\n').map(x=>x.trim()).filter(Boolean))];
+      const leer=id=>[...new Set(container.querySelector(id).value.split('\n').map(x=>x.trim()).filter(Boolean))];
+      const rulesNew={iuo:leer('#iuoSuppliers'),transfer:leer('#transferSuppliers')};
       btnSup.disabled=true;msg.textContent='Recalculando…';msg.style.color='var(--text-secondary)';
       try{
-        await setDoc(doc(db,'pnl_config','purchaseRules'),{iuoSuppliers:lista,updatedAt:Timestamp.now()});
+        await setDoc(doc(db,'pnl_config','purchaseRules'),{iuoSuppliers:rulesNew.iuo,transferSuppliers:rulesNew.transfer,updatedAt:Timestamp.now()});
         const raw=(await loadPurchaseImports()).raw.porDia||{};
         const meses=[...new Set(Object.keys(raw).map(d=>d.slice(0,7)))].sort();
-        const coinc=meses.length?await rebuildPurchases(raw,lista,meses):{};
+        const coinc=meses.length?await rebuildPurchases(raw,rulesNew,meses):{};
         msg.textContent=`✓ Guardado${meses.length?` · ${meses.length} meses recalculados`:''}${resumenIuo(coinc)}`;
         msg.style.color='var(--ok-fg)';
         setTimeout(()=>renderForecast(container),2000);
@@ -7221,6 +7247,8 @@ async function loadHubStats(){
       const costs=costSnap.exists()?costSnap.data():{mmppPct:35};
       const iuoImpSnap=await getDoc(doc(db,'pnl_config','iuoImport'));
       costs.iuoImport=iuoImpSnap.exists()?(iuoImpSnap.data().porMes||{}):{};
+      const trImpSnap=await getDoc(doc(db,'pnl_config','transferImport'));
+      costs.transferImport=trImpSnap.exists()?(trImpSnap.data().porMes||{}):{};
       const ett=ettSnap.exists()?(ettSnap.data().list||[]):[];
       const extras=extrasSnap.exists()?(extrasSnap.data().list||[]):[];
       const prevM=new Date(now);prevM.setMonth(prevM.getMonth()-1);
