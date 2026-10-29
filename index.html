@@ -4951,15 +4951,16 @@ async function renderPnl(container){
       });
       const fcRevenue=fcCatering+fcComedor+fcCafeteria+fcExtra;
       // Las columnas de forecast se muestran siempre, aunque aún no haya previsión introducida
-      // Previsión de MMPP: el gasto previsto si existe, si no el objetivo sobre la venta prevista
-      const fcMmpp=fcPurchases>0?-fcPurchases:-(fcRevenue*((costs.mmppPct!==undefined?costs.mmppPct:35)/100));
+      // Previsión de MMPP: objetivo % sobre la venta prevista. (Las "compras" de Forecast son gasto REAL,
+      // ahora importado de los pedidos, así que no pueden usarse como previsión.)
+      const fcMmpp=-(fcRevenue*((costs.mmppPct!==undefined?costs.mmppPct:35)/100));
       const fcGross=fcRevenue+fcMmpp;
       // Personal previsto: nóminas reales del período y, en la parte sin nóminas, la media de los 3 últimos meses importados
       const fcLabour=cur.labourCost-(cur.labourRefMonthly*cur.fracSinNomina);
       const fcIuo=cur.iuo;
       fcAgg={revenue:fcRevenue,catering:fcCatering,comedor:fcComedor,cafeteria:fcCafeteria,extra:fcExtra,
         mmpp:fcMmpp,grossProfit:fcGross,labourCost:fcLabour,iuo:fcIuo,unitProfit:fcGross+fcLabour+fcIuo,
-        hasData:fcRevenue>0||fcPurchases>0};
+        hasData:fcRevenue>0};
     }
 
     const header=`<div class="pnl-row header">
@@ -5000,13 +5001,16 @@ async function renderPnl(container){
       ${(cur.transfersOut!==0||(cmp&&cmp.transfersOut!==0))?L('Traspasos emitidos · desde Facturación',cur.transfersOut,cmp?cmp.transfersOut:0,{indent:true}):''}
       ${(cur.refunds!==0||(cmp&&cmp.refunds!==0))?L('Abonos por errores de TPV (Proppos)',cur.refunds,cmp?cmp.refunds:0,{indent:true}):''}
 
-      ${L('Costes',pnlCostsTotal(cur),cmp?pnlCostsTotal(cmp):0,{section:'cost',fcVal:fcAgg?(fcAgg.mmpp+fcAgg.labourCost+fcAgg.iuo):undefined})}
-      ${L('MMPP (Materias primas)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · compras reales de Forecast':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{group:true,fcVal:fcAgg?fcAgg.mmpp:undefined})}
-      ${L('Labour Cost (Personal)'+(fcAgg&&cur.fracSinNomina>0&&cur.labourRefMonthly>0?' · forecast con media de 3 meses':''),cur.labourCost,cmp?cmp.labourCost:0,{group:true,fcVal:fcAgg?fcAgg.labourCost:undefined})}
+      ${L('Materias primas (MMPP)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · pedidos a proveedores':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{section:'cost',fcVal:fcAgg?fcAgg.mmpp:undefined})}
+
+      ${L('Margen bruto (Ingresos − MMPP)',cur.grossProfit,cmp?cmp.grossProfit:0,{section:'result',fcVal:fcAgg?fcAgg.grossProfit:undefined})}
+
+      ${L('Gastos de explotación',cur.labourCost+cur.iuo+cur.transfers,cmp?cmp.labourCost+cmp.iuo+cmp.transfers:0,{section:'cost',fcVal:fcAgg?(fcAgg.labourCost+fcAgg.iuo):undefined})}
+      ${L('Personal'+(fcAgg&&fcAgg.hasData&&cur.fracSinNomina>0&&cur.labourRefMonthly>0?' · forecast con media de 3 meses':''),cur.labourCost,cmp?cmp.labourCost:0,{group:true,fcVal:fcAgg?fcAgg.labourCost:undefined})}
       ${L('Nóminas'+(cur.labourSource==='parcial'?` · ${cur.mesesSinReal} mes${cur.mesesSinReal>1?'es':''} sin importar`:cur.labourSource==='none'?' · sin importar':''),cur.labourReal,cmp?cmp.labourReal:0,{indent:true})}
       ${L('ETT'+(cur.ettSource==='proforma'?' · proformas':cur.ettSource==='mixto'?` · ${cur.mesesEttProforma} mes${cur.mesesEttProforma>1?'es':''} con proforma, resto por contratos`:' · por días de contrato'),cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true})}
-      ${L(cur.iuoReal?'IUO (Gastos indirectos) · importe real':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{group:true,fcVal:fcAgg?fcAgg.iuo:undefined})}
-      ${cur.iuoReal||(cmp&&cmp.iuoReal)?L('Proveedores de IUO · pedidos importados',cur.iuoEmb||0,cmp?(cmp.iuoEmb||0):0,{indent:true}):''}
+      ${L(cur.iuoReal?'IUO (Gastos indirectos)':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{group:true,fcVal:fcAgg?fcAgg.iuo:undefined})}
+      ${cur.iuoReal||(cmp&&cmp.iuoReal)?L('Pedidos a proveedores de IUO',cur.iuoEmb||0,cmp?(cmp.iuoEmb||0):0,{indent:true}):''}
       ${(cur.iuoManual||(cmp&&cmp.iuoManual))?L('Otros IUO · importe manual',cur.iuoManual||0,cmp?(cmp.iuoManual||0):0,{indent:true}):''}
       ${!cur.iuoReal&&(cur.iuoFromPct!==0||(cmp&&cmp.iuoFromPct!==0))?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
       ${!cur.iuoReal&&(cur.iuoFixed!==0||(cmp&&cmp.iuoFixed!==0))?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
@@ -5015,8 +5019,6 @@ async function renderPnl(container){
         +((cur.transfersInPedidos||(cmp&&cmp.transfersInPedidos))?L('Pedidos a otros centros · importados',-cur.transfersInPedidos,cmp?-cmp.transfersInPedidos:0,{indent:true}):''):''}
 
       ${L('Resultado (Unit Profit)',cur.unitProfit,cmp?cmp.unitProfit:0,{section:'result',fcVal:fcAgg?fcAgg.unitProfit:undefined})}
-      ${L('Gross Profit (Ingresos − MMPP)',cur.grossProfit,cmp?cmp.grossProfit:0,{indent:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
-      ${L('Personal + IUO + traspasos recibidos',cur.labourCost+cur.iuo+cur.transfers,cmp?cmp.labourCost+cmp.iuo+cmp.transfers:0,{indent:true,fcVal:fcAgg?(fcAgg.labourCost+fcAgg.iuo):undefined})}
     </div>
 
     <div class="audit-section" style="margin-top:14px">
