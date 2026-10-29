@@ -1047,6 +1047,32 @@ function escapeHtml(str){
   if(str==null)return'';
   return String(str).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
+// ── REGISTRO DE SUBIDAS ─────────────────────────────────────────
+// Cada importación de archivo guarda aquí su fecha, el nombre del archivo y un resumen.
+// Es independiente del 'updatedAt' de cada documento, que también cambia al editar o borrar a mano.
+const UPLOAD_KINDS={catering:'Pedidos de catering',comedor:'Comedor',cafeteria:'Cafetería',plantilla:'Plantilla (Excel)',nominas:'Nóminas',ett:'Proformas ETT'};
+async function recordUpload(kind,info={}){
+  try{await setDoc(doc(db,'uploads_log','latest'),{[kind]:{at:Timestamp.now(),...info}},{merge:true});}
+  catch(e){console.warn('No se pudo registrar la subida:',e.message);}
+}
+async function getUploads(){
+  try{const snap=await getDoc(doc(db,'uploads_log','latest'));return snap.exists()?snap.data():{};}
+  catch(e){return{};}
+}
+// "29 oct 2026 a las 10:15 · archivo.xlsx" (o "sin subidas registradas")
+function uploadStamp(u,{withFile=true}={}){
+  const d=u&&u.at?toDate(u.at):null;
+  if(!d)return'sin subidas registradas';
+  const f=`${d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})} a las ${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`;
+  return withFile&&u.archivo?`${f} · ${u.archivo}`:f;
+}
+function uploadLine(u,label='Última subida'){
+  const d=u&&u.at?toDate(u.at):null;
+  const dias=d?Math.floor((startOfDay(new Date())-startOfDay(d))/86400000):null;
+  const color=d===null?'var(--alert-amber-fg)':dias>35?'var(--alert-amber-fg)':'var(--text-tertiary)';
+  return`<p style="font-size:11.5px;color:${color};margin-top:8px">${label}: ${escapeHtml(uploadStamp(u))}${dias!==null&&dias>0?` (hace ${dias} día${dias>1?'s':''})`:''}</p>`;
+}
+
 function moduleHeader(title,sub){
   return`<div class="module-header">
     <h1 class="module-title">${escapeHtml(title)}</h1>
@@ -2240,7 +2266,6 @@ async function renderCumulative(container){
     ${diag.sinFecha?`<span style="color:var(--alert-red-fg)"><strong>${diag.sinFecha}</strong> sin fecha de entrega (no cuentan en ningún período)</span>`:''}
     ${sinImporte?`<span style="color:var(--alert-amber-fg)"><strong>${sinImporte}</strong> sin importe en este período</span>`:''}
     ${futuros?`<span style="color:var(--break-fg)"><strong>${futuros.n}</strong> con entrega posterior · ${fmtMoney(futuros.importe)} fuera de este total</span>`:''}
-    ${cur.extrasPendienteImporte>0?`<span style="color:var(--alert-amber-fg)"><strong>${cur.extrasNoCobradosN}</strong> facturación extra sin cobrar · ${fmtMoney(cur.extrasPendienteImporte)} no suman</span>`:''}
     ${importePendiente>0?`<span style="color:var(--alert-amber-fg)"><strong>${pendientes.length}</strong> sin confirmar · ${fmtMoney(importePendiente)} incluidos en el total</span>`:''}
   </div>`;
 
@@ -2625,7 +2650,8 @@ async function updateLastImportLabel(){
     const snap=await getDoc(doc(db,'catering_config','importInfo'));
     if(snap.exists()&&snap.data().lastImportAt){
       const d=toDate(snap.data().lastImportAt);
-      label.textContent=`· Datos importados: ${d.toLocaleDateString('es-ES',{day:'numeric',month:'short'})} a las ${fmtTime(snap.data().lastImportAt)}`;
+      const f=snap.data().lastImportFile;
+      label.textContent=`· Última subida: ${d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})} a las ${fmtTime(snap.data().lastImportAt)}${f?` · ${f}`:''}`;
     } else {
       label.textContent='· Sin importaciones registradas todavía';
     }
@@ -3123,6 +3149,7 @@ async function renderStaffRoster(container){
     const mesesRC=Object.keys(realPorMes).sort();
     const ultimoRC=mesesRC.length?mesesRC[mesesRC.length-1]:null;
     const costeReal=ultimoRC?realPorMes[ultimoRC]:{};
+    const uploadsStaff=await getUploads();
     if(!staff.length){
       container.innerHTML=moduleHeader('Personal','Plantilla')+`<div class="empty-state">
         <p>Aún no hay plantilla cargada</p>
@@ -3256,7 +3283,13 @@ async function renderStaffRoster(container){
       </div>`;
     }).join('');
 
-    container.innerHTML=moduleHeader('Personal','Plantilla')+`<div class="kpi-grid">
+    container.innerHTML=moduleHeader('Personal','Plantilla')+`<div class="data-freshness">
+      <span><strong>Última actualización de datos</strong></span>
+      <span>Plantilla (Excel): ${escapeHtml(uploadStamp(uploadsStaff.plantilla))}</span>
+      <span>Nóminas: ${escapeHtml(uploadStamp(uploadsStaff.nominas))}</span>
+      <span>Proformas ETT: ${escapeHtml(uploadStamp(uploadsStaff.ett))}</span>
+    </div>
+    <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Plantilla activa</div><div class="kpi-value">${activeList.length}</div><div class="kpi-sub">${counts.inactivo} desactivadas${activeEtt.length?` · +${activeEtt.length} ETT hoy`:''}</div></div>
       <div class="kpi-card"><div class="kpi-label">Horas contratadas</div><div class="kpi-value">${totalHours}</div><div class="kpi-sub">${(totalHours/40).toFixed(1)} FTE</div></div>
       <div class="kpi-card"><div class="kpi-label">Coste mensual real</div><div class="kpi-value">${ultimoRC?fmtMoney(nominaUltimoMes+ettHoy):'—'}</div><div class="kpi-sub">${ultimoRC?`nóminas de ${lblUltimoRC}${ettHoy?' + ETT vigentes':''}`:'sin nóminas importadas'}</div></div>
@@ -3693,6 +3726,28 @@ async function renderStaffEtt(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando ETT…</span></div>`;
   try{
     const {staff,ettList}=await loadStaffData();
+    const uploads=await getUploads();
+    const ettSnap=await getDoc(doc(db,'staff_config','ettReal'));
+    const ettReal=ettSnap.exists()?(ettSnap.data().porMes||{}):{};
+    const ettAvisos=ettSnap.exists()?(ettSnap.data().avisos||[]):[];
+    const mesesEtt=Object.keys(ettReal).sort();
+    const lblMes=mk=>{const [y,m]=mk.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});};
+    const filasEtt=mesesEtt.slice().reverse().map(mk=>{
+      const e=ettReal[mk];
+      const nPers=Object.keys(e.personas||{}).length;
+      return`<div class="order-card">
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${lblMes(mk)}</span>
+            <span class="order-loc">${(e.semanas||[]).length} hoja${(e.semanas||[]).length!==1?'s':''} · ${String(e.horas).replace('.',',')} h · ${nPers} persona${nPers!==1?'s':''}</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill pill-break" style="font-family:var(--font-mono);font-weight:600">${fmtMoney(e.total)}</span>
+            <button class="btn-del-staff" data-del-ettmes="${mk}" title="Eliminar este mes">✕</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
     const today=startOfDay(new Date());
     const active=ettList.filter(e=>{
       const s=new Date(e.start+'T12:00:00'),en=new Date(e.end+'T12:00:00');
@@ -3737,8 +3792,24 @@ async function renderStaffEtt(container){
       <div class="kpi-card"><div class="kpi-label">Registros totales</div><div class="kpi-value">${ettList.length}</div></div>
     </div>
     <div class="alert alert-blue" style="margin-bottom:14px;background:var(--break-bg);border-color:var(--break-fg);color:var(--break-fg)">
-      <span>ℹ️ El coste de ETT se <strong>suma</strong> al de la plantilla: la persona sustituida sigue generando coste según el % configurado en la pestaña Costes.</span>
+      <span>ℹ️ El coste de ETT se <strong>suma</strong> al de las nóminas. En la Cuenta de explotación, los meses con proforma importada usan su importe real; los que no tienen, el coste de los contratos de abajo prorrateado por días.</span>
     </div>
+    <div class="audit-section">
+      <h3>Coste real de ETT · proformas</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Importa el Excel de proformas de la agencia (una hoja por semana). Se suma el total de cada línea y se asigna al mes que indica el nombre de la hoja; el año se toma del nombre del archivo. Al reimportar se sustituyen los meses que vengan en el archivo. </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn-primary" id="btnImportEtt" style="max-width:230px">Importar Excel de ETT</button>
+        <span id="ettMsg" style="font-size:12px"></span>
+      </div>
+      ${uploadLine(uploads.ett)}
+      ${ettAvisos.length?`<div class="alert alert-amber" style="margin-top:12px"><span>⚠️ Avisos de la última importación:<br>${ettAvisos.map(escapeHtml).join('<br>')}</span></div>`:''}
+      ${mesesEtt.length?`
+        <p class="section-label" style="margin:16px 0 8px">Meses importados</p>
+        <div class="orders">${filasEtt}</div>
+      `:'<p style="font-size:12px;color:var(--text-tertiary);margin-top:12px">Aún no hay proformas importadas.</p>'}
+    </div>
+
+    <input type="file" id="ettFileInput" accept=".xlsx,.xls" hidden>
     <div class="audit-section">
       <h3>Registrar ETT</h3>
       <div class="form-grid">
@@ -3753,6 +3824,37 @@ async function renderStaffEtt(container){
       <p id="ettMsg" style="font-size:12px;margin-top:10px"></p>
     </div>
     ${ettList.length?`<p class="section-label">ETT registradas</p><div class="orders">${rows}</div>`:''}`;
+
+    const ettInput=container.querySelector('#ettFileInput');
+    const btnImpEtt=container.querySelector('#btnImportEtt');
+    if(btnImpEtt)btnImpEtt.addEventListener('click',()=>ettInput.click());
+    if(ettInput)ettInput.addEventListener('change',async e=>{
+      const file=e.target.files[0];
+      if(!file)return;
+      const msg=container.querySelector('#ettMsg');
+      msg.textContent='Procesando…';msg.style.color='var(--text-secondary)';
+      try{
+        const buf=await file.arrayBuffer();
+        const {porMes,avisos,hojas,year}=parseEttXLSX(buf,file.name);
+        const meses=Object.keys(porMes);
+        await setDoc(doc(db,'staff_config','ettReal'),{porMes:{...ettReal,...porMes},avisos,archivo:file.name,updatedAt:Timestamp.now()});
+        await recordUpload('ett',{archivo:file.name,registros:hojas,meses:meses.length});
+        msg.textContent=`✓ ${hojas} hojas en ${meses.length} meses de ${year}${avisos.length?` · ${avisos.length} aviso${avisos.length>1?'s':''}`:''}`;
+        msg.style.color=avisos.length?'var(--alert-amber-fg)':'var(--ok-fg)';
+        setTimeout(()=>renderStaffEtt(container),1200);
+      }catch(err){msg.textContent='Error: '+err.message;msg.style.color='var(--alert-red-fg)';}
+      ettInput.value='';
+    });
+    container.querySelectorAll('[data-del-ettmes]').forEach(b=>{
+      b.addEventListener('click',async()=>{
+        const mk=b.dataset.delEttmes;
+        if(!confirm(`¿Eliminar la proforma de ETT de ${lblMes(mk)}?\n\nLa Cuenta de explotación volverá a calcular la ETT de ese mes por contratos.`))return;
+        const copia={...ettReal};delete copia[mk];
+        await setDoc(doc(db,'staff_config','ettReal'),{porMes:copia,updatedAt:Timestamp.now()},{merge:true});
+        renderStaffEtt(container);
+      });
+    });
+
 
     const btnEtt=container.querySelector('#btnSaveEtt');
     if(btnEtt)btnEtt.addEventListener('click',async()=>{
@@ -3948,27 +4050,7 @@ async function renderStaffCosts(container){
     const realSnap=await getDoc(doc(db,'staff_config','realCosts'));
     const real=realSnap.exists()?(realSnap.data().porMes||{}):{};
     const mesesReales=Object.keys(real).sort();
-    const ettSnap=await getDoc(doc(db,'staff_config','ettReal'));
-    const ettReal=ettSnap.exists()?(ettSnap.data().porMes||{}):{};
-    const ettAvisos=ettSnap.exists()?(ettSnap.data().avisos||[]):[];
-    const mesesEtt=Object.keys(ettReal).sort();
-    const lblMes=mk=>{const [y,m]=mk.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});};
-    const filasEtt=mesesEtt.slice().reverse().map(mk=>{
-      const e=ettReal[mk];
-      const nPers=Object.keys(e.personas||{}).length;
-      return`<div class="order-card">
-        <div class="order-top">
-          <div class="order-who">
-            <span class="order-name">${lblMes(mk)}</span>
-            <span class="order-loc">${(e.semanas||[]).length} hoja${(e.semanas||[]).length!==1?'s':''} · ${String(e.horas).replace('.',',')} h · ${nPers} persona${nPers!==1?'s':''}</span>
-          </div>
-          <div class="order-pills">
-            <span class="pill pill-break" style="font-family:var(--font-mono);font-weight:600">${fmtMoney(e.total)}</span>
-            <button class="btn-del-staff" data-del-ett="${mk}" title="Eliminar este mes">✕</button>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    const uploads=await getUploads();
     // Resumen de los meses con coste real importado
     const filasMes=mesesReales.slice().reverse().map(mk=>{
       const emp=real[mk]||{};
@@ -4008,6 +4090,7 @@ async function renderStaffCosts(container){
         <button class="btn-primary" id="btnImportCostes" style="max-width:230px">Importar Excel de costes</button>
         <span id="costesMsg" style="font-size:12px"></span>
       </div>
+      ${uploadLine(uploads.nominas)}
       ${mesesReales.length?`
         <p class="section-label" style="margin:16px 0 8px">Meses importados</p>
         <div class="orders">${filasMes}</div>
@@ -4016,20 +4099,7 @@ async function renderStaffCosts(container){
       ${sinCoste.length?`<div class="alert alert-amber" style="margin-top:12px"><span>⚠️ ${sinCoste.length} persona${sinCoste.length>1?'s':''} activa${sinCoste.length>1?'s':''} en plantilla sin coste en el último mes importado: ${sinCoste.map(escapeHtml).join(', ')}. Revisa si siguen en la empresa.</span></div>`:''}
     </div>
 
-    <div class="audit-section">
-      <h3>Coste real de ETT · proformas</h3>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Importa el Excel de proformas de la agencia (una hoja por semana). Se suma el total de cada línea y se asigna al mes que indica el nombre de la hoja; el año se toma del nombre del archivo. Al reimportar se sustituyen los meses que vengan en el archivo. En la Cuenta de explotación, los meses con proforma usan este importe; los que no tienen, el cálculo por contratos de la pestaña ETT.</p>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button class="btn-primary" id="btnImportEtt" style="max-width:230px">Importar Excel de ETT</button>
-        <span id="ettMsg" style="font-size:12px"></span>
-      </div>
-      ${ettAvisos.length?`<div class="alert alert-amber" style="margin-top:12px"><span>⚠️ Avisos de la última importación:<br>${ettAvisos.map(escapeHtml).join('<br>')}</span></div>`:''}
-      ${mesesEtt.length?`
-        <p class="section-label" style="margin:16px 0 8px">Meses importados</p>
-        <div class="orders">${filasEtt}</div>
-      `:'<p style="font-size:12px;color:var(--text-tertiary);margin-top:12px">Aún no hay proformas importadas.</p>'}
-    </div>
-
+    <p style="font-size:12px;color:var(--text-tertiary);margin:-4px 0 14px">Las proformas de ETT se suben en la pestaña <strong>ETT</strong>.</p>
     <div class="audit-section">
       <h3>Tabla salarial del convenio · Restauración Colectiva · Barcelona ${CONVENIO_TABLA_YEAR}</h3>
       <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Solo informativa: no interviene en ningún cálculo de costes.${CONVENIO_TABLA_YEAR<new Date().getFullYear()?` <span style="color:var(--alert-amber-fg)">Pendiente de actualizar a ${new Date().getFullYear()}.</span>`:''}</p>
@@ -4052,37 +4122,7 @@ async function renderStaffCosts(container){
         Responsable de centro ${CONVENIO_COMPLEMENTS.respCentro.toFixed(2)} €
       </div>
     </div>
-    <input type="file" id="costesFileInput" accept=".xlsx,.xls" hidden>
-    <input type="file" id="ettFileInput" accept=".xlsx,.xls" hidden>`;
-
-    const ettInput=container.querySelector('#ettFileInput');
-    const btnEtt=container.querySelector('#btnImportEtt');
-    if(btnEtt)btnEtt.addEventListener('click',()=>ettInput.click());
-    if(ettInput)ettInput.addEventListener('change',async e=>{
-      const file=e.target.files[0];
-      if(!file)return;
-      const msg=container.querySelector('#ettMsg');
-      msg.textContent='Procesando…';msg.style.color='var(--text-secondary)';
-      try{
-        const buf=await file.arrayBuffer();
-        const {porMes,avisos,hojas,year}=parseEttXLSX(buf,file.name);
-        const meses=Object.keys(porMes);
-        await setDoc(doc(db,'staff_config','ettReal'),{porMes:{...ettReal,...porMes},avisos,archivo:file.name,updatedAt:Timestamp.now()});
-        msg.textContent=`✓ ${hojas} hojas en ${meses.length} meses de ${year}${avisos.length?` · ${avisos.length} aviso${avisos.length>1?'s':''}`:''}`;
-        msg.style.color=avisos.length?'var(--alert-amber-fg)':'var(--ok-fg)';
-        setTimeout(()=>renderStaffCosts(container),1200);
-      }catch(err){msg.textContent='Error: '+err.message;msg.style.color='var(--alert-red-fg)';}
-      ettInput.value='';
-    });
-    container.querySelectorAll('[data-del-ett]').forEach(b=>{
-      b.addEventListener('click',async()=>{
-        const mk=b.dataset.delEtt;
-        if(!confirm(`¿Eliminar la proforma de ETT de ${lblMes(mk)}?\n\nLa Cuenta de explotación volverá a calcular la ETT de ese mes por contratos.`))return;
-        const copia={...ettReal};delete copia[mk];
-        await setDoc(doc(db,'staff_config','ettReal'),{porMes:copia,updatedAt:Timestamp.now()},{merge:true});
-        renderStaffCosts(container);
-      });
-    });
+    <input type="file" id="costesFileInput" accept=".xlsx,.xls" hidden>`;
 
     const fileInput=container.querySelector('#costesFileInput');
     const btnImp=container.querySelector('#btnImportCostes');
@@ -4097,6 +4137,7 @@ async function renderStaffCosts(container){
         const {porMes,meses,filas}=parseCostesXLSX(buf);
         const prev=realSnap.exists()?(realSnap.data().porMes||{}):{};
         await setDoc(doc(db,'staff_config','realCosts'),{porMes:{...prev,...porMes},updatedAt:Timestamp.now()});
+        await recordUpload('nominas',{archivo:file.name,registros:filas,meses:meses.length});
         msg.textContent=`✓ ${filas} empleados en ${meses.length} meses`;msg.style.color='var(--ok-fg)';
         setTimeout(()=>renderStaffCosts(container),900);
       }catch(err){msg.textContent='Error: '+err.message;msg.style.color='var(--alert-red-fg)';}
@@ -4566,9 +4607,9 @@ function pnlLine(label,value,revenue,opts={}){
     <span class="pnl-val">${display}</span>
     <span class="pnl-pct">${pctDisplay}</span>
     ${opts.cmp!==undefined?`<span class="pnl-val">${fmtCell(opts.cmp)}</span>
-    <span class="pnl-pct">${fmtPctCell(opts.cmp,opts.cmpRevenue||0)}</span>`:''}
+    <span class="pnl-pct">${fmtPctCell(opts.cmp,opts.cmpRevenue||0)}</span>`:(opts.showCmp?`<span class="pnl-val"></span><span class="pnl-pct"></span>`:'')}
     ${opts.fc!==undefined?`<span class="pnl-val pnl-fc">${opts.fc?fmtCell(opts.fc):'—'}</span>
-    <span class="pnl-pct pnl-fc">${opts.fc?fmtPctCell(opts.fc,opts.fcRevenue||0):'—'}</span>`:''}
+    <span class="pnl-pct pnl-fc">${opts.fc&&opts.fcRevenue?fmtPctCell(opts.fc,opts.fcRevenue):'—'}</span>`:(opts.showFc?`<span class="pnl-val pnl-fc"></span><span class="pnl-pct pnl-fc"></span>`:'')}
   </div>`;
 }
 
@@ -4736,10 +4777,16 @@ async function renderPnl(container){
     const lastCatering=impSnap.exists()&&impSnap.data().lastImportAt?toDate(impSnap.data().lastImportAt):null;
     const lastRevenue=revMetaSnap.exists()&&revMetaSnap.data().updatedAt?toDate(revMetaSnap.data().updatedAt):null;
     const fmtStamp=d=>d?`${d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})} a las ${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`:'nunca';
+    const uploads=await getUploads();
+    // Si aún no hay registro de subida (archivos subidos antes de esta versión), se usa la última fecha conocida
+    const stampOf=(kind,fallback)=>uploads[kind]&&uploads[kind].at?uploadStamp(uploads[kind]):(fallback?fmtStamp(fallback):'nunca');
     const freshness=`<div class="data-freshness">
       <span><strong>Última actualización de datos</strong></span>
-      <span>Catering: ${fmtStamp(lastCatering)}</span>
-      <span>Comedor y cafetería: ${fmtStamp(lastRevenue)}</span>
+      <span>Catering: ${escapeHtml(stampOf('catering',lastCatering))}</span>
+      <span>Comedor: ${escapeHtml(stampOf('comedor',lastRevenue))}</span>
+      <span>Cafetería: ${escapeHtml(stampOf('cafeteria',lastRevenue))}</span>
+      <span>Nóminas: ${escapeHtml(stampOf('nominas',realCostSnap.exists()&&realCostSnap.data().updatedAt?toDate(realCostSnap.data().updatedAt):null))}</span>
+      <span>ETT: ${escapeHtml(stampOf('ett',ettRealSnap.exists()&&ettRealSnap.data().updatedAt?toDate(ettRealSnap.data().updatedAt):null))}</span>
     </div>`;
 
     const r=pnlRange;
@@ -4801,6 +4848,7 @@ async function renderPnl(container){
     const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchCur,realCosts,ettReal);
     const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList,extras,fcPurchCmp,realCosts,ettReal):null;
 
+    const mismoPeriodo=cmp&&from&&to&&cFrom&&cTo&&localISODate(from)===localISODate(cFrom)&&localISODate(to)===localISODate(cTo);
     const varOf=(a,b)=>b?((a-b)/Math.abs(b)*100):0;
     const varTxt=(a,b)=>{if(!b)return'';const v=varOf(a,b);return`${v>=0?'+':''}${v.toFixed(1)}%`;};
 
@@ -4898,10 +4946,13 @@ async function renderPnl(container){
       ${fcAgg?`<span class="pnl-val pnl-fc">Forecast</span><span class="pnl-pct pnl-fc">% Rev</span>`:''}
     </div>`;
 
+    // Las filas sin dato de comparación o de forecast dejan sus celdas vacías para que las cifras no se desplacen de columna.
+    // Si no hay previsión introducida para el período, toda la columna Forecast muestra "—".
     const L=(label,curVal,cmpVal,opts={})=>pnlLine(label,curVal,cur.revenue,{
       ...opts,
+      showCmp:!!cmp,showFc:!!fcAgg,
       ...(cmp?{cmp:cmpVal,cmpRevenue:cmp.revenue}:{}),
-      ...(fcAgg&&opts.fcVal!==undefined?{fc:opts.fcVal,fcRevenue:fcAgg.revenue}:{})
+      ...(fcAgg&&opts.fcVal!==undefined?{fc:fcAgg.hasData?opts.fcVal:0,fcRevenue:fcAgg.revenue}:{})
     });
 
     container.innerHTML=`
@@ -4909,7 +4960,7 @@ async function renderPnl(container){
       <h1 class="module-title">Cuenta de explotación</h1>
       <p class="module-sub">${periodLabel}${cmp?` · comparado con ${cLabel}`:''}</p>
     </div>
-    `+controls+freshness+eventsBanner(pnlEvents,from,to)+`
+    `+controls+(mismoPeriodo?`<div class="alert alert-amber" style="margin-bottom:12px"><span>⚠️ El período de comparación es el mismo que el actual: las dos columnas mostrarán las mismas cifras. Cambia el período en "contra:".</span></div>`:'')+freshness+eventsBanner(pnlEvents,from,to)+`
     <div class="pnl-table">
       ${header}
       <div class="pnl-section-head">Ingresos</div>
@@ -4917,10 +4968,13 @@ async function renderPnl(container){
       ${L('Catering',cur.cateringRevenue,cmp?cmp.cateringRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.catering:undefined})}
       ${L('Comedor',cur.comedor.billed,cmp?cmp.comedor.billed:0,{indent:true,fcVal:fcAgg?fcAgg.comedor:undefined})}
       ${L('Cafetería',cur.cafeteria.billed,cmp?cmp.cafeteria.billed:0,{indent:true,fcVal:fcAgg?fcAgg.cafeteria:undefined})}
-      ${cur.extrasRevenue!==0||(cmp&&cmp.extrasRevenue!==0)?L('Facturación extra · solo cobrada',cur.extrasRevenue,cmp?cmp.extrasRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.extra:undefined}):''}
       ${(()=>{
-        const cats=new Set([...Object.keys(cur.extrasByCategory||{}),...(cmp?Object.keys(cmp.extrasByCategory||{}):[])]);
-        return [...cats].sort().map(c=>L(c,cur.extrasByCategory[c]||0,cmp?(cmp.extrasByCategory[c]||0):0,{indent2:true})).join('');
+        if(!(cur.extrasRevenue!==0||(cmp&&cmp.extrasRevenue!==0)))return'';
+        const cats=[...new Set([...Object.keys(cur.extrasByCategory||{}),...(cmp?Object.keys(cmp.extrasByCategory||{}):[])])].sort();
+        // Con una sola categoría, se indica en la propia línea en vez de repetir el importe debajo
+        const titulo='Facturación extra · solo cobrada'+(cats.length===1?` · ${cats[0]}`:'');
+        return L(titulo,cur.extrasRevenue,cmp?cmp.extrasRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.extra:undefined})
+          +(cats.length>1?cats.map(c=>L(c,cur.extrasByCategory[c]||0,cmp?(cmp.extrasByCategory[c]||0):0,{indent2:true})).join(''):'');
       })()}
       ${(cur.transfersOut!==0||(cmp&&cmp.transfersOut!==0))?L('Traspasos emitidos · desde Facturación',cur.transfersOut,cmp?cmp.transfersOut:0,{indent:true}):''}
       ${(cur.refunds!==0||(cmp&&cmp.refunds!==0))?L('Abonos por errores de TPV (Proppos)',cur.refunds,cmp?cmp.refunds:0,{indent:true}):''}
@@ -4928,7 +4982,6 @@ async function renderPnl(container){
       ${L('MMPP (Materias primas)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · compras reales de Forecast':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
       ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
       ${L('Labour Cost (Personal)'+(cur.labourSource==='real'?' · nóminas reales':cur.labourSource==='parcial'?` · ${cur.mesesSinReal} mes${cur.mesesSinReal>1?'es':''} sin nóminas`:' · sin nóminas importadas')+(fcAgg&&cur.fracSinNomina>0&&cur.labourRefMonthly>0?' · forecast con media de 3 meses':''),cur.labourCost,cmp?cmp.labourCost:0,{fcVal:fcAgg?fcAgg.labourCost:undefined})}
-      ${cur.labourReal!==0||(cmp&&cmp.labourReal!==0)?L('Nóminas reales',cur.labourReal,cmp?cmp.labourReal:0,{indent:true}):''}
       ${cur.labourEtt!==0||(cmp&&cmp.labourEtt!==0)?L('ETT'+(cur.ettSource==='proforma'?' · proformas':cur.ettSource==='mixto'?` · ${cur.mesesEttProforma} mes${cur.mesesEttProforma>1?'es':''} con proforma, resto por contratos`:' · por días de contrato'),cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true}):''}
       ${L(cur.hasManualIuo?'IUO (Gastos indirectos) · importe real':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{fcVal:fcAgg?fcAgg.iuo:undefined})}
       ${cur.iuoFromPct!==0?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
@@ -5086,10 +5139,14 @@ function bindPnlControls(container){
   if(cs)cs.addEventListener('change',()=>{
     pnlRange.compareManual=true;
     pnlRange.compareType=cs.value;
+    const haceUnAno=d=>{const x=new Date(d);x.setFullYear(x.getFullYear()-1);return x;};
     if(cs.value==='custom'){
-      if(!pnlRange.compareFrom)pnlRange.compareFrom=startOfMonth(new Date());
-      if(!pnlRange.compareTo)pnlRange.compareTo=endOfMonth(new Date());
-    } else if(!pnlRange.compareRefDate)pnlRange.compareRefDate=new Date();
+      // Antes se rellenaba con el mes en curso y la comparación repetía las cifras del período actual
+      let base=pnlRange.type==='custom'?{from:pnlRange.from,to:pnlRange.to}:getRangeForType(pnlRange.type==='all'?'month':pnlRange.type,pnlRange.refDate||new Date());
+      if(!base.from||!base.to)base={from:startOfMonth(new Date()),to:endOfMonth(new Date())};
+      pnlRange.compareFrom=haceUnAno(base.from);
+      pnlRange.compareTo=haceUnAno(base.to);
+    } else if(!pnlRange.compareRefDate)pnlRange.compareRefDate=haceUnAno(pnlRange.refDate||new Date());
     renderPnl(container);
   });
   const cp=container.querySelector('#pnlCmpPrev'),cn=container.querySelector('#pnlCmpNext');
@@ -7231,6 +7288,7 @@ staffFileInput.addEventListener('change',async e=>{
     const staff=parseStaffXLSX(buffer);
     if(!staff.length)throw new Error('No se encontró personal en el archivo');
     await setDoc(doc(db,'staff_config','roster'),{staff,updatedAt:Timestamp.now()});
+    await recordUpload('plantilla',{archivo:file.name,registros:staff.length});
     alert(`✓ ${staff.length} personas importadas correctamente`);
     renderStaff(container);
   }catch(err){alert('Error al importar el horario: '+err.message);}
@@ -7262,6 +7320,7 @@ revenueFileInput.addEventListener('change',async e=>{
     const kept=existing.filter(r=>r.channel!==channel);
     const merged=[...kept,...newRows.map(r=>({date:localISODate(r.date),tickets:r.tickets,billed:r.billed,channel:r.channel}))];
     await setDoc(doc(db,'pnl_config','revenue'),{rows:merged,updatedAt:Timestamp.now()});
+    await recordUpload(channel,{archivo:file.name,registros:newRows.length});
     alert(`✓ ${newRows.length} días importados en "${channel}"`);
     renderPnl(container);
   }catch(err){alert('Error al importar: '+err.message);}
@@ -7425,7 +7484,7 @@ async function handleFile(file){
     const existingIds=await getExistingOrderIds();
     const newOrders=orders.filter(o=>!existingIds.has(o.orderId));
     const updatedOrders=orders.filter(o=>existingIds.has(o.orderId));
-    pendingImport={orders,newOrders,updatedOrders};
+    pendingImport={orders,newOrders,updatedOrders,fileName:file.name};
     const omitidos=window.__holdedSkipped||{};
     window.__holdedSkipped=null;
     const avisoOmitidos=Object.keys(omitidos).length
@@ -7475,7 +7534,8 @@ btnConfirm.addEventListener('click',async()=>{
     progressFill.style.width=pct+'%';
     progressText.textContent=`Guardando… ${done} de ${pendingImport.orders.length}`;
   }
-  await setDoc(doc(db,'catering_config','importInfo'),{lastImportAt:Timestamp.now(),lastImportCount:pendingImport.orders.length},{merge:true});
+  await setDoc(doc(db,'catering_config','importInfo'),{lastImportAt:Timestamp.now(),lastImportCount:pendingImport.orders.length,lastImportFile:pendingImport.fileName||''},{merge:true});
+  await recordUpload('catering',{archivo:pendingImport.fileName||'',registros:pendingImport.orders.length});
   await updateLastImportLabel();
   progressText.textContent='✓ Importación completada';
   setTimeout(()=>{importModal.hidden=true;resetImport();renderView(currentView,mainContent,selectedDate);},1200);
