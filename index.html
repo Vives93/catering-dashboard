@@ -137,6 +137,11 @@ tr.occ-row-sel{outline:2px solid var(--text-primary);outline-offset:-2px}
 .pnl-section-head{padding:8px 16px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;color:var(--text-tertiary);background:var(--bg);border-top:1px solid var(--border)}
 .pnl-section-head.cost{color:var(--alert-red-fg)}
 .pnl-section-head.result{color:var(--ok-fg)}
+.pnl-row.section{background:var(--bg);border-top:1px solid var(--border);font-weight:600}
+.pnl-row.section .pnl-label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-secondary)}
+.pnl-row.section.sec-cost .pnl-label{color:var(--alert-red-fg)}
+.pnl-row.section.sec-result .pnl-label{color:var(--ok-fg)}
+.pnl-row.group{font-weight:600}
 @media(max-width:768px){
   .module-title{font-size:19px}
   .module-header{padding:4px 0 14px}
@@ -1050,7 +1055,7 @@ function escapeHtml(str){
 // ── REGISTRO DE SUBIDAS ─────────────────────────────────────────
 // Cada importación de archivo guarda aquí su fecha, el nombre del archivo y un resumen.
 // Es independiente del 'updatedAt' de cada documento, que también cambia al editar o borrar a mano.
-const UPLOAD_KINDS={catering:'Pedidos de catering',comedor:'Comedor',cafeteria:'Cafetería',plantilla:'Plantilla (Excel)',nominas:'Nóminas',ett:'Proformas ETT'};
+const UPLOAD_KINDS={catering:'Pedidos de catering',comedor:'Comedor',cafeteria:'Cafetería',plantilla:'Plantilla (Excel)',nominas:'Nóminas',ett:'Proformas ETT',compras:'Pedidos a proveedores (MMPP + IUO)'};
 async function recordUpload(kind,info={}){
   try{await setDoc(doc(db,'uploads_log','latest'),{[kind]:{at:Timestamp.now(),...info}},{merge:true});}
   catch(e){console.warn('No se pudo registrar la subida:',e.message);}
@@ -4598,7 +4603,7 @@ function pnlLine(label,value,revenue,opts={}){
   const isNeg=value<0;
   const display=isNeg?`(${fmtMoney(Math.abs(value))})`:fmtMoney(value);
   const pctDisplay=`${isNeg?'(':''}${Math.abs(pct).toFixed(1)}%${isNeg?')':''}`;
-  const cls=opts.bold?'pnl-row bold':'pnl-row';
+  const cls=opts.section?`pnl-row section sec-${opts.section}`:opts.group?'pnl-row group':opts.bold?'pnl-row bold':'pnl-row';
   const indent=opts.indent2?'style="padding-left:36px;font-size:12px;color:var(--text-secondary)"':(opts.indent?'style="padding-left:18px"':'');
   const fmtCell=v=>v<0?`(${fmtMoney(Math.abs(v))})`:fmtMoney(v);
   const fmtPctCell=(v,base)=>{const p=base?(v/base*100):0;return`${v<0?'(':''}${Math.abs(p).toFixed(1)}%${v<0?')':''}`;};
@@ -4643,6 +4648,26 @@ function ettCostInRange(ettList,from,to){
   });
   return total;
 }
+
+// Gasto real de compras registrado en Forecast → Compras entre dos fechas
+async function sumForecastPurchases(f,t){
+  if(!f||!t)return 0;
+  const keys=[];
+  const c=new Date(f.getFullYear(),f.getMonth(),1);
+  while(c<=t){keys.push(`${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,'0')}`);c.setMonth(c.getMonth()+1);}
+  const docs=await Promise.all(keys.map(k=>getDoc(doc(db,'forecast_config',k))));
+  let total=0;
+  docs.forEach(sn=>{
+    if(!sn.exists())return;
+    Object.entries(sn.data().purchases||{}).forEach(([day,v])=>{
+      const dd=new Date(day+'T12:00:00');
+      if(dd>=f&&dd<=t)total+=+v||0;
+    });
+  });
+  return total;
+}
+// Total de costes (importes negativos): MMPP + personal + IUO + traspasos recibidos
+function pnlCostsTotal(p){return p.mmpp+p.labourCost+p.iuo+p.transfers;}
 
 function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchases,realCosts,ettReal){
   const inRange=d=>!from||!to||(d&&d>=from&&d<=to);
@@ -4736,16 +4761,20 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
 
   // IUO: importe real a mano si existe; si no, % sobre ingresos más la parte fija mensual
   const iuoPct=costs.iuoPct!==undefined?costs.iuoPct:0;
-  const iuoFromPct=hasManualIuo?0:-(revenue*(iuoPct/100));
-  const iuoFixed=hasManualIuo?0:-((costs.iuoMonthly||costs.otherMonthly||0)*months);
-  const iuo=hasManualIuo?-manualIuo:(iuoFromPct+iuoFixed);
+  const embImp=(costs.iuoImport||{});
+  const iuoEmbalaje=fracs.reduce((s2,{key,frac})=>s2+(embImp[key]?(embImp[key].total||0)*frac:0),0);
+  const iuoReal=hasManualIuo||iuoEmbalaje>0;
+  const iuoFromPct=iuoReal?0:-(revenue*(iuoPct/100));
+  const iuoFixed=iuoReal?0:-((costs.iuoMonthly||costs.otherMonthly||0)*months);
+  const iuoEmb=-iuoEmbalaje,iuoManual=-manualIuo;
+  const iuo=iuoReal?(iuoEmb+iuoManual):(iuoFromPct+iuoFixed);
 
   // Traspasos: los emitidos son ingreso (ya sumados a Revenue); los recibidos son coste
   const transfers=-transfersIn;
 
   const unitProfit=grossProfit+labourCost+iuo+transfers;
   return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,extrasPendienteImporte,extrasNoCobradosN:extrasNoCobrados.length,mmpp,costOfSales,grossProfit,labourCost,labourEtt,ettSource,mesesEttProforma,labourReal,labourSource,mesesConReal,mesesSinReal,mesesSinNomina,labourRefMonthly,fracSinNomina,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn,unitProfit,months,
-    hasManualMmpp,hasManualIuo,monthKeysInRange,mmppSource,forecastPurchases,refunds,
+    hasManualMmpp,hasManualIuo,iuoReal,iuoEmb,iuoManual,monthKeysInRange,mmppSource,forecastPurchases,refunds,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
 
@@ -4763,6 +4792,8 @@ async function renderPnl(container){
     const revenueRows=revSnap.exists()?(revSnap.data().rows||[]):[];
     const staff=staffSnap.exists()?(staffSnap.data().staff||[]):[];
     const costs=costSnap.exists()?costSnap.data():{mmppPct:35,iuoPct:0,iuoMonthly:0};
+    const iuoImpSnap=await getDoc(doc(db,'pnl_config','iuoImport'));
+    costs.iuoImport=iuoImpSnap.exists()?(iuoImpSnap.data().porMes||{}):{};
     const ettList=ettSnapP.exists()?(ettSnapP.data().list||[]):[];
     const extras=extrasSnapP.exists()?(extrasSnapP.data().list||[]):[];
     const pnlEvents=await loadEvents();
@@ -4786,6 +4817,7 @@ async function renderPnl(container){
       <span>Comedor: ${escapeHtml(stampOf('comedor',lastRevenue))}</span>
       <span>Cafetería: ${escapeHtml(stampOf('cafeteria',lastRevenue))}</span>
       <span>Nóminas: ${escapeHtml(stampOf('nominas',realCostSnap.exists()&&realCostSnap.data().updatedAt?toDate(realCostSnap.data().updatedAt):null))}</span>
+      <span>Pedidos a proveedores: ${escapeHtml(stampOf('compras',null))}</span>
       <span>ETT: ${escapeHtml(stampOf('ett',ettRealSnap.exists()&&ettRealSnap.data().updatedAt?toDate(ettRealSnap.data().updatedAt):null))}</span>
     </div>`;
 
@@ -4824,22 +4856,6 @@ async function renderPnl(container){
     }
 
     // Compras reales introducidas en Forecast, sumadas para el período
-    const sumForecastPurchases=async(f,t)=>{
-      if(!f||!t)return 0;
-      const keys=[];
-      const cur2=new Date(f.getFullYear(),f.getMonth(),1);
-      while(cur2<=t){keys.push(`${cur2.getFullYear()}-${String(cur2.getMonth()+1).padStart(2,'0')}`);cur2.setMonth(cur2.getMonth()+1);}
-      const docs=await Promise.all(keys.map(k=>getDoc(doc(db,'forecast_config',k))));
-      let total=0;
-      docs.forEach(sn=>{
-        if(!sn.exists())return;
-        Object.entries(sn.data().purchases||{}).forEach(([day,v])=>{
-          const dd=new Date(day+'T12:00:00');
-          if(dd>=f&&dd<=t)total+=+v||0;
-        });
-      });
-      return total;
-    };
     const [fcPurchCur,fcPurchCmp]=await Promise.all([
       sumForecastPurchases(from,to),
       (r.compare&&cFrom&&cTo)?sumForecastPurchases(cFrom,cTo):Promise.resolve(0)
@@ -4963,8 +4979,7 @@ async function renderPnl(container){
     `+controls+(mismoPeriodo?`<div class="alert alert-amber" style="margin-bottom:12px"><span>⚠️ El período de comparación es el mismo que el actual: las dos columnas mostrarán las mismas cifras. Cambia el período en "contra:".</span></div>`:'')+freshness+eventsBanner(pnlEvents,from,to)+`
     <div class="pnl-table">
       ${header}
-      <div class="pnl-section-head">Ingresos</div>
-      ${L('Revenue (Ingresos)',cur.revenue,cmp?cmp.revenue:0,{bold:true,fcVal:fcAgg?fcAgg.revenue:undefined})}
+      ${L('Ingresos',cur.revenue,cmp?cmp.revenue:0,{section:'income',fcVal:fcAgg?fcAgg.revenue:undefined})}
       ${L('Catering',cur.cateringRevenue,cmp?cmp.cateringRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.catering:undefined})}
       ${L('Comedor',cur.comedor.billed,cmp?cmp.comedor.billed:0,{indent:true,fcVal:fcAgg?fcAgg.comedor:undefined})}
       ${L('Cafetería',cur.cafeteria.billed,cmp?cmp.cafeteria.billed:0,{indent:true,fcVal:fcAgg?fcAgg.cafeteria:undefined})}
@@ -4978,17 +4993,22 @@ async function renderPnl(container){
       })()}
       ${(cur.transfersOut!==0||(cmp&&cmp.transfersOut!==0))?L('Traspasos emitidos · desde Facturación',cur.transfersOut,cmp?cmp.transfersOut:0,{indent:true}):''}
       ${(cur.refunds!==0||(cmp&&cmp.refunds!==0))?L('Abonos por errores de TPV (Proppos)',cur.refunds,cmp?cmp.refunds:0,{indent:true}):''}
-      <div class="pnl-section-head cost">Costes</div>
-      ${L('MMPP (Materias primas)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · compras reales de Forecast':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
-      ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
-      ${L('Labour Cost (Personal)'+(cur.labourSource==='real'?' · nóminas reales':cur.labourSource==='parcial'?` · ${cur.mesesSinReal} mes${cur.mesesSinReal>1?'es':''} sin nóminas`:' · sin nóminas importadas')+(fcAgg&&cur.fracSinNomina>0&&cur.labourRefMonthly>0?' · forecast con media de 3 meses':''),cur.labourCost,cmp?cmp.labourCost:0,{fcVal:fcAgg?fcAgg.labourCost:undefined})}
-      ${cur.labourEtt!==0||(cmp&&cmp.labourEtt!==0)?L('ETT'+(cur.ettSource==='proforma'?' · proformas':cur.ettSource==='mixto'?` · ${cur.mesesEttProforma} mes${cur.mesesEttProforma>1?'es':''} con proforma, resto por contratos`:' · por días de contrato'),cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true}):''}
-      ${L(cur.hasManualIuo?'IUO (Gastos indirectos) · importe real':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{fcVal:fcAgg?fcAgg.iuo:undefined})}
-      ${cur.iuoFromPct!==0?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
-      ${cur.iuoFixed!==0?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
-      ${(cur.transfersIn!==0||(cmp&&cmp.transfersIn!==0))?L('Traspasos recibidos · desde Facturación',cur.transfers,cmp?cmp.transfers:0):''}
-      <div class="pnl-section-head result">Resultado</div>
-      ${L('Unit Profit (Resultado)',cur.unitProfit,cmp?cmp.unitProfit:0,{bold:true,fcVal:fcAgg?fcAgg.unitProfit:undefined})}
+
+      ${L('Costes',pnlCostsTotal(cur),cmp?pnlCostsTotal(cmp):0,{section:'cost',fcVal:fcAgg?(fcAgg.mmpp+fcAgg.labourCost+fcAgg.iuo):undefined})}
+      ${L('MMPP (Materias primas)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · compras reales de Forecast':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{group:true,fcVal:fcAgg?fcAgg.mmpp:undefined})}
+      ${L('Labour Cost (Personal)'+(fcAgg&&cur.fracSinNomina>0&&cur.labourRefMonthly>0?' · forecast con media de 3 meses':''),cur.labourCost,cmp?cmp.labourCost:0,{group:true,fcVal:fcAgg?fcAgg.labourCost:undefined})}
+      ${L('Nóminas'+(cur.labourSource==='parcial'?` · ${cur.mesesSinReal} mes${cur.mesesSinReal>1?'es':''} sin importar`:cur.labourSource==='none'?' · sin importar':''),cur.labourReal,cmp?cmp.labourReal:0,{indent:true})}
+      ${L('ETT'+(cur.ettSource==='proforma'?' · proformas':cur.ettSource==='mixto'?` · ${cur.mesesEttProforma} mes${cur.mesesEttProforma>1?'es':''} con proforma, resto por contratos`:' · por días de contrato'),cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true})}
+      ${L(cur.iuoReal?'IUO (Gastos indirectos) · importe real':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{group:true,fcVal:fcAgg?fcAgg.iuo:undefined})}
+      ${cur.iuoReal||(cmp&&cmp.iuoReal)?L('Proveedores de IUO · pedidos importados',cur.iuoEmb||0,cmp?(cmp.iuoEmb||0):0,{indent:true}):''}
+      ${(cur.iuoManual||(cmp&&cmp.iuoManual))?L('Otros IUO · importe manual',cur.iuoManual||0,cmp?(cmp.iuoManual||0):0,{indent:true}):''}
+      ${!cur.iuoReal&&(cur.iuoFromPct!==0||(cmp&&cmp.iuoFromPct!==0))?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
+      ${!cur.iuoReal&&(cur.iuoFixed!==0||(cmp&&cmp.iuoFixed!==0))?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
+      ${(cur.transfersIn!==0||(cmp&&cmp.transfersIn!==0))?L('Traspasos recibidos · desde Facturación',cur.transfers,cmp?cmp.transfers:0,{group:true}):''}
+
+      ${L('Resultado (Unit Profit)',cur.unitProfit,cmp?cmp.unitProfit:0,{section:'result',fcVal:fcAgg?fcAgg.unitProfit:undefined})}
+      ${L('Gross Profit (Ingresos − MMPP)',cur.grossProfit,cmp?cmp.grossProfit:0,{indent:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
+      ${L('Personal + IUO + traspasos recibidos',cur.labourCost+cur.iuo+cur.transfers,cmp?cmp.labourCost+cmp.iuo+cmp.transfers:0,{indent:true,fcVal:fcAgg?(fcAgg.labourCost+fcAgg.iuo):undefined})}
     </div>
 
     <div class="audit-section" style="margin-top:14px">
@@ -4996,12 +5016,12 @@ async function renderPnl(container){
       <div class="audit-row"><span class="audit-req"><strong>Catering</strong> — importe sin IVA de pedidos no cancelados, del módulo Catering (importación CSV/Holded).</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Comedor / Cafetería</strong> — facturado de los CSV importados con los botones de la barra superior</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Facturación extra</strong> — solo los registros marcados como <strong>Cobrado</strong> en el módulo Facturación. Los pendientes y facturados no suman hasta que se cobran</span></div>
-      <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — importe real: primero el introducido en la tabla de costes por mes; si no hay, la suma del gasto real registrado en Forecast → Compras. Nunca se estima por porcentaje</span></div>
-      <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — solo coste real de nóminas importado en Personal → Costes. Los meses sin nóminas importadas quedan a cero. Las ETT se suman aparte: importe de las proformas importadas en Personal → Costes y, en los meses sin proforma, prorrateo por días de los contratos de la pestaña ETT</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — importe real: primero el introducido en la tabla de costes por mes; si no hay, el gasto real de Forecast → Compras, que se rellena al importar los pedidos (todos los proveedores que no están en la lista de IUO). Nunca se estima por porcentaje</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — solo coste real de nóminas importado en Personal → Costes. Los meses sin nóminas importadas quedan a cero. Las ETT se suman aparte: importe de las proformas importadas en Personal → ETT y, en los meses sin proforma, prorrateo por días de los contratos de la pestaña ETT</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Abonos por errores de TPV (Proppos)</strong> — importe introducido a mano por mes. Suma a los ingresos porque es un importe que nos devuelven. En el futuro se podrá importar</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — de los registros de Facturación con esa categoría: los <strong>emitidos</strong> son facturación real y entran en Ingresos; los <strong>recibidos</strong> son compra y entran en Costes</span></div>
       ${fcAgg?`<div class="audit-row"><span class="audit-req"><strong>Forecast · Personal</strong> — ${cur.fracSinNomina>0&&cur.labourRefMonthly>0?`nóminas reales donde existen y, para la parte del período sin nóminas, <strong>media de los 3 últimos meses importados</strong> (${fmtMoney(cur.labourRefMonthly)}/mes)`:cur.fracSinNomina>0?'sin nóminas importadas todavía: no hay base para estimarlo':'nóminas reales del período'}. Más las ETT (proformas o contratos)</span></div>`:''}
-      <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — parte variable como % de ingresos más una parte fija mensual, ambas configurables abajo</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — importe real: pedidos de los <strong>proveedores de IUO</strong> (lista editable en Forecast → Compras) más los otros IUO introducidos a mano por mes. Solo si un período no tiene ninguno de los dos, se estima con el % de ingresos y la parte fija configurables abajo</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Prorrateo</strong> — los importes mensuales (nóminas, IUO fijo, importes manuales) se aplican en proporción a los días de cada mes que cubre el período: ${cur.months.toLocaleString('es-ES',{maximumFractionDigits:2})} mes${cur.months===1?'':'es'} equivalentes</span></div>
     </div>
 
@@ -5024,7 +5044,7 @@ async function renderPnl(container){
           <thead><tr>
             <th class="sched-name">Mes</th>
             <th style="text-align:right">MMPP (€)</th>
-            <th style="text-align:right">IUO (€)</th>
+            <th style="text-align:right" title="Se suma a los pedidos de proveedores de IUO importados">Otros IUO (€)</th>
             <th style="text-align:right">Abonos TPV (€)</th>
           </tr></thead>
           <tbody>
@@ -5035,7 +5055,7 @@ async function renderPnl(container){
               return`<tr>
                 <td class="sched-name">${lbl}</td>
                 <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="mmpp" value="${m.mmpp||''}" placeholder="Forecast" step="0.01" min="0"></td>
-                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="iuo" value="${m.iuo||''}" placeholder="est." step="0.01" min="0"></td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="iuo" value="${m.iuo||''}" placeholder="0" step="0.01" min="0"></td>
                 <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="refunds" value="${m.refunds||''}" placeholder="0" step="0.01" min="0"></td>
               </tr>`;
             }).join('')||'<tr><td colspan="4" style="padding:10px;font-size:12px;color:var(--text-tertiary)">Selecciona un período concreto (mes, trimestre o año) para introducir importes.</td></tr>'}
@@ -6515,10 +6535,148 @@ async function renderFcSales(container){
 
 
 // ── COMPRAS ───────────────────────────────────────────────────────
+// ── IMPORTACIÓN DE PEDIDOS A PROVEEDORES ─────────────────────────
+// "Informe multicentro de pedidos de proveedores detallados" (Seguimiento de pedidos), con TODO junto.
+// Se separa por proveedor: los de la lista de IUO (embalaje, limpieza, menaje…) van a IUO; el resto es MMPP.
+// Se guarda el detalle por día y proveedor, así que al cambiar la lista se recalcula sin volver a subir el archivo.
+const DEFAULT_IUO_SUPPLIERS=['Pack Away','Netya Prop','Massegur','Codensa','Blancafort','Garcia de Pou'];
+const normProv=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+function esProveedorIuo(prov,lista){const p=normProv(prov);return lista.some(k=>{const n=normProv(k);return n&&p.includes(n);});}
+
+function parsePedidosXLS(arrayBuffer){
+  const wb=XLSX.read(arrayBuffer,{type:'array',cellDates:true});
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''});
+  const norm=c=>String(c||'').toLowerCase().replace(/\s+/g,' ').trim();
+  let h=-1;
+  for(let i=0;i<Math.min(rows.length,30);i++){
+    const t=rows[i].map(norm);
+    if(t.includes('proveedor')&&t.some(x=>x.startsWith('importe total'))){h=i;break;}
+  }
+  if(h<0)throw new Error('No es un informe de pedidos a proveedores: no se encuentran las columnas "Proveedor" e "Importe Total".');
+  const t=rows[h].map(norm);
+  const col=pred=>t.findIndex(pred);
+  const c={centro:col(x=>x==='centro'),prov:col(x=>x==='proveedor'),
+    entrega:col(x=>x.startsWith('fecha de entrega')),fpedido:col(x=>x.startsWith('fecha del pedido')),estado:col(x=>x==='estado'),
+    importe:col(x=>x.startsWith('importe total'))};
+  if(c.entrega<0&&c.fpedido<0)throw new Error('Falta la columna "Fecha de entrega".');
+  const toISO=v=>{
+    if(v instanceof Date&&!isNaN(v))return localISODate(v);
+    const m=String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:null;
+  };
+  const r2=n=>Math.round(n*100)/100;
+  const dias={},centros=new Set();
+  let lineas=0,total=0;const excl={n:0,importe:0},sinFecha={n:0,importe:0};
+  for(let i=h+1;i<rows.length;i++){
+    const r=rows[i];
+    const imp=typeof r[c.importe]==='number'?r[c.importe]:toNum(r[c.importe]);
+    const prov=String(r[c.prov]||'').trim();
+    if(!prov&&!imp)continue;
+    const estado=String(c.estado>=0?r[c.estado]:'').trim();
+    if(/fallid|cancel|anulad|rechaz/i.test(estado)){excl.n++;excl.importe+=imp;continue;}
+    const iso=toISO(c.entrega>=0?r[c.entrega]:'')||toISO(c.fpedido>=0?r[c.fpedido]:'');
+    if(!iso){sinFecha.n++;sinFecha.importe+=imp;continue;}
+    (dias[iso]=dias[iso]||{})[prov||'Sin proveedor']=((dias[iso]||{})[prov||'Sin proveedor']||0)+imp;
+    if(c.centro>=0&&String(r[c.centro]).trim())centros.add(String(r[c.centro]).trim());
+    lineas++;total+=imp;
+  }
+  if(!lineas)throw new Error('El archivo no contiene líneas de pedido válidas.');
+  // Formato apto para Firestore: por día, lista de {p: proveedor, v: importe}
+  const porDia={};
+  Object.entries(dias).forEach(([d,m])=>{porDia[d]=Object.entries(m).map(([p,v])=>({p,v:r2(v)}));});
+  return{porDia,lineas,total:r2(total),excl,sinFecha,centros:[...centros],periodo:String((rows[1]||[])[0]||'').trim()};
+}
+
+async function loadPurchaseRules(){
+  try{const sn=await getDoc(doc(db,'pnl_config','purchaseRules'));if(sn.exists()&&Array.isArray(sn.data().iuoSuppliers))return sn.data().iuoSuppliers;}catch(e){}
+  return DEFAULT_IUO_SUPPLIERS.slice();
+}
+async function loadPurchaseImports(){
+  const [f,e,raw]=await Promise.all([getDoc(doc(db,'pnl_config','mmppImport')),getDoc(doc(db,'pnl_config','iuoImport')),getDoc(doc(db,'pnl_config','purchasesRaw'))]);
+  return{fresco:f.exists()?f.data():{porMes:{}},embalaje:e.exists()?e.data():{porMes:{}},raw:raw.exists()?raw.data():{porDia:{}}};
+}
+// Reparte el detalle guardado en MMPP (gasto real diario de Forecast) e IUO (total mensual) para los meses indicados
+async function rebuildPurchases(porDiaAll,lista,meses){
+  const r2=n=>Math.round(n*100)/100;
+  const imports=await loadPurchaseImports();
+  const mmppMes={...(imports.fresco.porMes||{})},iuoMes={...(imports.embalaje.porMes||{})};
+  const coincidencias={};lista.forEach(k=>coincidencias[k]={});
+  for(const k of meses){
+    const diasMmpp={};
+    const acc={mmpp:{total:0,prov:{}},iuo:{total:0,prov:{}}};
+    Object.entries(porDiaAll).forEach(([d,items])=>{
+      if(!d.startsWith(k))return;
+      items.forEach(({p,v})=>{
+        const esIuo=esProveedorIuo(p,lista);
+        const a=esIuo?acc.iuo:acc.mmpp;
+        a.total+=v;a.prov[p]=(a.prov[p]||0)+v;
+        if(esIuo)lista.forEach(kw=>{if(esProveedorIuo(p,[kw]))coincidencias[kw][p]=1;});
+        else diasMmpp[d]=(diasMmpp[d]||0)+v;
+      });
+    });
+    Object.keys(diasMmpp).forEach(d=>diasMmpp[d]=r2(diasMmpp[d]));
+    await saveForecast(k,'purchases',diasMmpp);
+    const pack=a=>({total:r2(a.total),proveedores:Object.entries(a.prov).map(([p,v])=>({p,v:r2(v)})).sort((x,y)=>y.v-x.v)});
+    mmppMes[k]=pack(acc.mmpp);
+    iuoMes[k]=pack(acc.iuo);
+  }
+  await setDoc(doc(db,'pnl_config','mmppImport'),{porMes:mmppMes,updatedAt:Timestamp.now()});
+  await setDoc(doc(db,'pnl_config','iuoImport'),{porMes:iuoMes,updatedAt:Timestamp.now()});
+  return coincidencias;
+}
+async function importPedidos(file){
+  const res=parsePedidosXLS(await file.arrayBuffer());
+  const imports=await loadPurchaseImports();
+  const meses=[...new Set(Object.keys(res.porDia).map(d=>d.slice(0,7)))].sort();
+  // Se sustituyen los meses que trae el archivo y se conservan los demás
+  const porDiaAll={};
+  Object.entries(imports.raw.porDia||{}).forEach(([d,v])=>{if(!meses.includes(d.slice(0,7)))porDiaAll[d]=v;});
+  Object.assign(porDiaAll,res.porDia);
+  await setDoc(doc(db,'pnl_config','purchasesRaw'),{porDia:porDiaAll,archivo:file.name,periodo:res.periodo,centros:res.centros,excluidos:res.excl,updatedAt:Timestamp.now()});
+  const lista=await loadPurchaseRules();
+  const coincidencias=await rebuildPurchases(porDiaAll,lista,meses);
+  await recordUpload('compras',{archivo:file.name,registros:res.lineas,meses:meses.length});
+  return{...res,meses,coincidencias,lista};
+}
+
 async function renderFcPurchases(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando compras…</span></div>`;
   try{
     const {monthKey,fc,costs,events}=await loadForecastData();
+    const [pImports,uploadsC,iuoLista]=await Promise.all([loadPurchaseImports(),getUploads(),loadPurchaseRules()]);
+    const mMes=(pImports.fresco.porMes||{})[monthKey],iMes=(pImports.embalaje.porMes||{})[monthKey];
+    const provList=m=>(m&&m.proveedores||[]).map(x=>`${escapeHtml(x.p)} ${fmtMoney(x.v)}`).join(' · ');
+    const importPanel=`<div class="audit-section">
+      <h3>Importar pedidos a proveedores</h3>
+      <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.65;margin-bottom:12px">
+        <strong>Cómo descargar el archivo</strong>
+        <ol style="margin:4px 0 0 18px;padding:0">
+          <li>En la plataforma de pedidos, entra en <strong>Seguimiento de pedidos</strong>.</li>
+          <li>Pon el período (lo más cómodo: del 1 de enero al 31 de diciembre) y descarga el informe detallado en Excel, con todos los proveedores.</li>
+          <li>Aquí, pulsa <strong>Importar pedidos</strong> y elige el archivo.</li>
+        </ol>
+        <p style="margin-top:8px;font-size:11.5px;color:var(--text-tertiary)">La app separa por proveedor: los de la lista de abajo van a <strong>IUO</strong> en la Cuenta de explotación; el resto es <strong>materia prima</strong>, rellena el gasto real diario de esta tabla y pasa como <strong>MMPP</strong>. Se usa la fecha de entrega y el importe sin IVA; los pedidos fallidos no cuentan. Al reimportar se sustituyen los meses que vengan en el archivo (también los importes tecleados a mano en esos meses).</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn-primary" id="btnImportPur" style="max-width:200px">Importar pedidos</button>
+        <span id="purMsg" style="font-size:12px"></span>
+      </div>
+      ${uploadLine(uploadsC.compras)}
+      <div style="margin-top:12px;font-size:12px;color:var(--text-secondary);line-height:1.7">
+        <div><strong>Materia prima (MMPP)</strong> este mes: ${mMes?fmtMoney(mMes.total):'sin datos importados'}</div>
+        <div><strong>IUO</strong> este mes: ${iMes?fmtMoney(iMes.total):'sin datos importados'}${iMes&&iMes.proveedores&&iMes.proveedores.length?` <span style="color:var(--text-tertiary)">(${provList(iMes)})</span>`:''}</div>
+      </div>
+      <details style="margin-top:12px">
+        <summary style="font-size:12.5px;cursor:pointer;color:var(--text-primary)">Proveedores que van a IUO (${iuoLista.length})</summary>
+        <p style="font-size:11.5px;color:var(--text-tertiary);margin:8px 0">Uno por línea. Basta con una parte del nombre tal como aparece en el informe (sin distinguir mayúsculas ni acentos). Al guardar se recalculan todos los meses importados, sin volver a subir el archivo.</p>
+        <textarea id="iuoSuppliers" class="prompt-box" rows="7">${escapeHtml(iuoLista.join('\n'))}</textarea>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+          <button class="btn-action" id="btnSaveIuoSuppliers">Guardar y recalcular</button>
+          <span id="iuoSupMsg" style="font-size:12px"></span>
+        </div>
+      </details>
+      <input type="file" id="purFileInput" accept=".xls,.xlsx" hidden>
+    </div>`;
     const sales=fc.sales||{};
     const salesMonthly=fc.salesMonthly||{};
     const purchases=fc.purchases||{};
@@ -6558,7 +6716,7 @@ async function renderFcPurchases(container){
       return totalSalesFc?(accReal/totalSalesFc*100):0;
     })();
 
-    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Compras')+`
+    container.innerHTML=fcNav(fcRefDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'}),'Compras')+importPanel+`
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Objetivo del mes</div><div class="kpi-value">${fmtMoney(accTarget)}</div><div class="kpi-sub">${targetPct}% de la venta prevista</div></div>
       <div class="kpi-card"><div class="kpi-label">Gasto real</div><div class="kpi-value">${fmtMoney(accReal)}</div></div>
@@ -6581,6 +6739,48 @@ async function renderFcPurchases(container){
     <p id="fcMsg" style="font-size:12px;margin-top:10px"></p>`;
 
     bindFcNav(container);
+    const purInput=container.querySelector('#purFileInput');
+    const purBtn=container.querySelector('#btnImportPur');
+    if(purBtn)purBtn.addEventListener('click',()=>purInput.click());
+    // Resumen de qué proveedores han caído en IUO y qué nombres de la lista no han coincidido con ninguno
+    const resumenIuo=coinc=>{
+      const sinCoincidencia=Object.entries(coinc).filter(([,m])=>!Object.keys(m).length).map(([k])=>k);
+      return sinCoincidencia.length?` · sin coincidencia en el archivo: ${sinCoincidencia.join(', ')}`:'';
+    };
+    if(purInput)purInput.addEventListener('change',async e=>{
+      const file=e.target.files[0];
+      if(!file)return;
+      const msg=container.querySelector('#purMsg');
+      msg.textContent='Procesando…';msg.style.color='var(--text-secondary)';
+      try{
+        const r=await importPedidos(file);
+        const avisos=[];
+        if(r.excl.n)avisos.push(`${r.excl.n} líneas fallidas omitidas (${fmtMoney(r.excl.importe)})`);
+        if(r.sinFecha.n)avisos.push(`${r.sinFecha.n} sin fecha omitidas`);
+        if(r.centros.length>1)avisos.push(`el archivo incluye ${r.centros.length} centros y se han sumado todos`);
+        msg.textContent=`✓ ${r.lineas} líneas · ${fmtMoney(r.total)} en ${r.meses.length} meses${avisos.length?' · '+avisos.join(' · '):''}${resumenIuo(r.coincidencias)}`;
+        msg.style.color=avisos.length?'var(--alert-amber-fg)':'var(--ok-fg)';
+        setTimeout(()=>renderForecast(container),2500);
+      }catch(err){msg.textContent='Error: '+err.message;msg.style.color='var(--alert-red-fg)';}
+      purInput.value='';
+    });
+    const btnSup=container.querySelector('#btnSaveIuoSuppliers');
+    if(btnSup)btnSup.addEventListener('click',async()=>{
+      const m=container.querySelector('#iuoSuppliers');
+      const msg=container.querySelector('#iuoSupMsg');
+      const lista=[...new Set(m.value.split('\n').map(x=>x.trim()).filter(Boolean))];
+      btnSup.disabled=true;msg.textContent='Recalculando…';msg.style.color='var(--text-secondary)';
+      try{
+        await setDoc(doc(db,'pnl_config','purchaseRules'),{iuoSuppliers:lista,updatedAt:Timestamp.now()});
+        const raw=(await loadPurchaseImports()).raw.porDia||{};
+        const meses=[...new Set(Object.keys(raw).map(d=>d.slice(0,7)))].sort();
+        const coinc=meses.length?await rebuildPurchases(raw,lista,meses):{};
+        msg.textContent=`✓ Guardado${meses.length?` · ${meses.length} meses recalculados`:''}${resumenIuo(coinc)}`;
+        msg.style.color='var(--ok-fg)';
+        setTimeout(()=>renderForecast(container),2000);
+      }catch(err){msg.textContent='Error: '+err.message;msg.style.color='var(--alert-red-fg)';}
+      btnSup.disabled=false;
+    });
     container.querySelectorAll('[data-fc-pur]').forEach(inp=>{
       inp.addEventListener('change',async()=>{
         const day=inp.dataset.fcPur;
@@ -7004,30 +7204,48 @@ async function loadHubStats(){
   (async()=>{
     try{
       const now=new Date();
-      const [revSnap,staffSnap,costSnap,ettSnap,extrasSnap,orders]=await Promise.all([
+      const [revSnap,staffSnap,costSnap,ettSnap,extrasSnap,orders,realSnap,ettRealSnap]=await Promise.all([
         getDoc(doc(db,'pnl_config','revenue')),
         getDoc(doc(db,'staff_config','roster')),
         getDoc(doc(db,'pnl_config','costs')),
         getDoc(doc(db,'staff_config','ett')),
         getDoc(doc(db,'pnl_config','extras')),
-        getOrders()
+        getOrders(),
+        getDoc(doc(db,'staff_config','realCosts')),
+        getDoc(doc(db,'staff_config','ettReal'))
       ]);
+      const realCosts=realSnap.exists()?(realSnap.data().porMes||{}):{};
+      const ettReal=ettRealSnap.exists()?(ettRealSnap.data().porMes||{}):{};
       const rev=revSnap.exists()?(revSnap.data().rows||[]):[];
       const staff=staffSnap.exists()?(staffSnap.data().staff||[]):[];
       const costs=costSnap.exists()?costSnap.data():{mmppPct:35};
+      const iuoImpSnap=await getDoc(doc(db,'pnl_config','iuoImport'));
+      costs.iuoImport=iuoImpSnap.exists()?(iuoImpSnap.data().porMes||{}):{};
       const ett=ettSnap.exists()?(ettSnap.data().list||[]):[];
       const extras=extrasSnap.exists()?(extrasSnap.data().list||[]):[];
-      const cur=computePnl(orders,rev,staff,costs,startOfMonth(now),endOfMonth(now),ett,extras);
       const prevM=new Date(now);prevM.setMonth(prevM.getMonth()-1);
-      const prev=computePnl(orders,rev,staff,costs,startOfMonth(prevM),endOfMonth(prevM),ett,extras);
+      const [fcCur,fcPrev]=await Promise.all([
+        sumForecastPurchases(startOfMonth(now),endOfMonth(now)),
+        sumForecastPurchases(startOfMonth(prevM),endOfMonth(prevM))
+      ]);
+      // Mismos datos que la Cuenta de explotación: nóminas, proformas de ETT y compras reales
+      const cur=computePnl(orders,rev,staff,costs,startOfMonth(now),endOfMonth(now),ett,extras,fcCur,realCosts,ettReal);
+      const prev=computePnl(orders,rev,staff,costs,startOfMonth(prevM),endOfMonth(prevM),ett,extras,fcPrev,realCosts,ettReal);
       if(!cur.revenue){set('hubPnlStats','<span class="hub-empty">Sin ingresos este mes</span>');return;}
-      const margin=cur.unitProfit/cur.revenue*100;
-      const prevMargin=prev.revenue?prev.unitProfit/prev.revenue*100:null;
-      let html=st(fmtMoney(cur.revenue),'ingresos mes')+
-        st(`${margin.toFixed(1).replace('.',',')} %`,'margen',margin>=0?'pos':'neg');
-      if(prevMargin!==null){
-        const d=margin-prevMargin;
-        html+=st(pct(d).replace('.',','),'vs mes ant.',d>=0?'pos':'neg');
+      // Qué falta para que el margen sea fiable
+      const faltan=p=>[p.mesesSinReal?'nóminas':'',p.mmppSource==='none'?'compras':''].filter(Boolean);
+      const fCur=faltan(cur),fPrev=faltan(prev);
+      let html=st(fmtMoney(cur.revenue),'ingresos mes');
+      if(fCur.length){
+        // Sin todos los costes, el margen saldría inflado (antes llegaba a mostrar un 100 %)
+        html+=st('—',`margen · faltan ${fCur.join(' y ')}`,'');
+      } else {
+        const margin=cur.unitProfit/cur.revenue*100;
+        html+=st(`${margin.toFixed(1).replace('.',',')} %`,'margen',margin>=0?'pos':'neg');
+        if(prev.revenue&&!fPrev.length){
+          const d=margin-prev.unitProfit/prev.revenue*100;
+          html+=st(pct(d).replace('.',','),'vs mes ant.',d>=0?'pos':'neg');
+        }
       }
       set('hubPnlStats',html);
     }catch(e){fail('hubPnlStats');}
