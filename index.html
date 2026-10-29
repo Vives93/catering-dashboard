@@ -4776,8 +4776,15 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const transfersInTotal=transfersIn+transfersInPedidos;
   const transfers=-transfersInTotal;
 
-  const unitProfit=grossProfit+labourCost+iuo+transfers;
-  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,extrasPendienteImporte,extrasNoCobradosN:extrasNoCobrados.length,mmpp,costOfSales,grossProfit,labourCost,labourEtt,ettSource,mesesEttProforma,labourReal,labourSource,mesesConReal,mesesSinReal,mesesSinNomina,labourRefMonthly,fracSinNomina,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn:transfersInTotal,transfersInBilling:transfersIn,transfersInPedidos,unitProfit,months,
+  // Estructura de la CE: los traspasos recibidos (compras a otros centros) forman parte del coste de ventas
+  const costOfSalesTotal=mmpp+transfers;
+  const grossProfitTotal=revenue+costOfSalesTotal;
+  const ebitda=grossProfitTotal+labourCost+iuo;           // 6. Resultado operativo
+  const amort=-sumManual('amort');                         // 7. Amortizaciones (manual por mes)
+  const fin=-sumManual('fin');                             // 8. Costes financieros (manual por mes)
+  const bai=ebitda+amort+fin;                              // 9. Beneficio antes de impuestos
+  const unitProfit=ebitda;
+  return{costOfSalesTotal,ebitda,amort,fin,bai,revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,extrasPendienteImporte,extrasNoCobradosN:extrasNoCobrados.length,mmpp,costOfSales,grossProfit:grossProfitTotal,labourCost,labourEtt,ettSource,mesesEttProforma,labourReal,labourSource,mesesConReal,mesesSinReal,mesesSinNomina,labourRefMonthly,fracSinNomina,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn:transfersInTotal,transfersInBilling:transfersIn,transfersInPedidos,unitProfit,months,
     hasManualMmpp,hasManualIuo,iuoReal,iuoEmb,iuoManual,monthKeysInRange,mmppSource,forecastPurchases,refunds,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
@@ -4960,6 +4967,7 @@ async function renderPnl(container){
       const fcIuo=cur.iuo;
       fcAgg={revenue:fcRevenue,catering:fcCatering,comedor:fcComedor,cafeteria:fcCafeteria,extra:fcExtra,
         mmpp:fcMmpp,grossProfit:fcGross,labourCost:fcLabour,iuo:fcIuo,unitProfit:fcGross+fcLabour+fcIuo,
+        ebitda:fcGross+fcLabour+fcIuo,bai:fcGross+fcLabour+fcIuo+cur.amort+cur.fin,amort:cur.amort,fin:cur.fin,
         hasData:fcRevenue>0};
     }
 
@@ -4986,14 +4994,13 @@ async function renderPnl(container){
     `+controls+(mismoPeriodo?`<div class="alert alert-amber" style="margin-bottom:12px"><span>⚠️ El período de comparación es el mismo que el actual: las dos columnas mostrarán las mismas cifras. Cambia el período en "contra:".</span></div>`:'')+freshness+eventsBanner(pnlEvents,from,to)+`
     <div class="pnl-table">
       ${header}
-      ${L('Ingresos',cur.revenue,cmp?cmp.revenue:0,{section:'income',fcVal:fcAgg?fcAgg.revenue:undefined})}
+      ${L('1. Ventas netas (sin IVA)',cur.revenue,cmp?cmp.revenue:0,{section:'income',fcVal:fcAgg?fcAgg.revenue:undefined})}
       ${L('Catering',cur.cateringRevenue,cmp?cmp.cateringRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.catering:undefined})}
       ${L('Comedor',cur.comedor.billed,cmp?cmp.comedor.billed:0,{indent:true,fcVal:fcAgg?fcAgg.comedor:undefined})}
       ${L('Cafetería',cur.cafeteria.billed,cmp?cmp.cafeteria.billed:0,{indent:true,fcVal:fcAgg?fcAgg.cafeteria:undefined})}
       ${(()=>{
         if(!(cur.extrasRevenue!==0||(cmp&&cmp.extrasRevenue!==0)))return'';
         const cats=[...new Set([...Object.keys(cur.extrasByCategory||{}),...(cmp?Object.keys(cmp.extrasByCategory||{}):[])])].sort();
-        // Con una sola categoría, se indica en la propia línea en vez de repetir el importe debajo
         const titulo='Facturación extra · solo cobrada'+(cats.length===1?` · ${cats[0]}`:'');
         return L(titulo,cur.extrasRevenue,cmp?cmp.extrasRevenue:0,{indent:true,fcVal:fcAgg?fcAgg.extra:undefined})
           +(cats.length>1?cats.map(c=>L(c,cur.extrasByCategory[c]||0,cmp?(cmp.extrasByCategory[c]||0):0,{indent2:true})).join(''):'');
@@ -5001,24 +5008,27 @@ async function renderPnl(container){
       ${(cur.transfersOut!==0||(cmp&&cmp.transfersOut!==0))?L('Traspasos emitidos · desde Facturación',cur.transfersOut,cmp?cmp.transfersOut:0,{indent:true}):''}
       ${(cur.refunds!==0||(cmp&&cmp.refunds!==0))?L('Abonos por errores de TPV (Proppos)',cur.refunds,cmp?cmp.refunds:0,{indent:true}):''}
 
-      ${L('Materias primas (MMPP)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · pedidos a proveedores':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{section:'cost',fcVal:fcAgg?fcAgg.mmpp:undefined})}
+      ${L('2. Coste de ventas (materia prima)',cur.costOfSalesTotal,cmp?cmp.costOfSalesTotal:0,{section:'cost',fcVal:fcAgg?fcAgg.mmpp:undefined})}
+      ${L('Pedidos a proveedores'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='none'?' · sin datos':''),cur.mmpp,cmp?cmp.mmpp:0,{indent:true})}
+      ${(cur.transfersInBilling||(cmp&&cmp.transfersInBilling))?L('Traspasos recibidos · desde Facturación',-cur.transfersInBilling,cmp?-cmp.transfersInBilling:0,{indent:true}):''}
+      ${(cur.transfersInPedidos||(cmp&&cmp.transfersInPedidos))?L('Traspasos recibidos · pedidos a otros centros',-cur.transfersInPedidos,cmp?-cmp.transfersInPedidos:0,{indent:true}):''}
 
-      ${L('Margen bruto (Ingresos − MMPP)',cur.grossProfit,cmp?cmp.grossProfit:0,{section:'result',fcVal:fcAgg?fcAgg.grossProfit:undefined})}
+      ${L('3. Margen bruto (Ventas − Coste de ventas)',cur.grossProfit,cmp?cmp.grossProfit:0,{section:'result',fcVal:fcAgg?fcAgg.grossProfit:undefined})}
 
-      ${L('Gastos de explotación',cur.labourCost+cur.iuo+cur.transfers,cmp?cmp.labourCost+cmp.iuo+cmp.transfers:0,{section:'cost',fcVal:fcAgg?(fcAgg.labourCost+fcAgg.iuo):undefined})}
-      ${L('Personal'+(fcAgg&&fcAgg.hasData&&cur.fracSinNomina>0&&cur.labourRefMonthly>0?' · forecast con media de 3 meses':''),cur.labourCost,cmp?cmp.labourCost:0,{group:true,fcVal:fcAgg?fcAgg.labourCost:undefined})}
+      ${L('4. Gastos de personal'+(fcAgg&&fcAgg.hasData&&cur.fracSinNomina>0&&cur.labourRefMonthly>0?' · forecast con media de 3 meses':''),cur.labourCost,cmp?cmp.labourCost:0,{section:'cost',fcVal:fcAgg?fcAgg.labourCost:undefined})}
       ${L('Nóminas'+(cur.labourSource==='parcial'?` · ${cur.mesesSinReal} mes${cur.mesesSinReal>1?'es':''} sin importar`:cur.labourSource==='none'?' · sin importar':''),cur.labourReal,cmp?cmp.labourReal:0,{indent:true})}
       ${L('ETT'+(cur.ettSource==='proforma'?' · proformas':cur.ettSource==='mixto'?` · ${cur.mesesEttProforma} mes${cur.mesesEttProforma>1?'es':''} con proforma, resto por contratos`:' · por días de contrato'),cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true})}
-      ${L(cur.iuoReal?'IUO (Gastos indirectos)':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{group:true,fcVal:fcAgg?fcAgg.iuo:undefined})}
-      ${cur.iuoReal||(cmp&&cmp.iuoReal)?L('Pedidos a proveedores de IUO',cur.iuoEmb||0,cmp?(cmp.iuoEmb||0):0,{indent:true}):''}
-      ${(cur.iuoManual||(cmp&&cmp.iuoManual))?L('Otros IUO · importe manual',cur.iuoManual||0,cmp?(cmp.iuoManual||0):0,{indent:true}):''}
+
+      ${L('5. Gastos de explotación / generales (IUO)'+(cur.iuoReal?'':' · estimado'),cur.iuo,cmp?cmp.iuo:0,{section:'cost',fcVal:fcAgg?fcAgg.iuo:undefined})}
+      ${cur.iuoReal||(cmp&&cmp.iuoReal)?L('Pedidos a proveedores de IUO (embalaje, menaje…)',cur.iuoEmb||0,cmp?(cmp.iuoEmb||0):0,{indent:true}):''}
+      ${(cur.iuoManual||(cmp&&cmp.iuoManual))?L('Otros gastos generales · importe manual',cur.iuoManual||0,cmp?(cmp.iuoManual||0):0,{indent:true}):''}
       ${!cur.iuoReal&&(cur.iuoFromPct!==0||(cmp&&cmp.iuoFromPct!==0))?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
       ${!cur.iuoReal&&(cur.iuoFixed!==0||(cmp&&cmp.iuoFixed!==0))?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
-      ${(cur.transfersIn!==0||(cmp&&cmp.transfersIn!==0))?L('Traspasos recibidos',cur.transfers,cmp?cmp.transfers:0,{group:true})
-        +((cur.transfersInBilling||(cmp&&cmp.transfersInBilling))?L('Desde Facturación',-cur.transfersInBilling,cmp?-cmp.transfersInBilling:0,{indent:true}):'')
-        +((cur.transfersInPedidos||(cmp&&cmp.transfersInPedidos))?L('Pedidos a otros centros · importados',-cur.transfersInPedidos,cmp?-cmp.transfersInPedidos:0,{indent:true}):''):''}
 
-      ${L('Resultado (Unit Profit)',cur.unitProfit,cmp?cmp.unitProfit:0,{section:'result',fcVal:fcAgg?fcAgg.unitProfit:undefined})}
+      ${L('6. Resultado operativo (EBITDA)',cur.ebitda,cmp?cmp.ebitda:0,{section:'result',fcVal:fcAgg?fcAgg.ebitda:undefined})}
+      ${L('7. Amortizaciones',cur.amort,cmp?cmp.amort:0,{section:'cost',fcVal:fcAgg?fcAgg.amort:undefined})}
+      ${L('8. Costes financieros',cur.fin,cmp?cmp.fin:0,{section:'cost',fcVal:fcAgg?fcAgg.fin:undefined})}
+      ${L('9. Beneficio antes de impuestos',cur.bai,cmp?cmp.bai:0,{section:'result',fcVal:fcAgg?fcAgg.bai:undefined})}
     </div>
 
     <div class="audit-section" style="margin-top:14px">
@@ -5039,7 +5049,7 @@ async function renderPnl(container){
       <div class="kpi-card"><div class="kpi-label">Comensales totales</div><div class="kpi-value">${cur.pax}</div><div class="kpi-sub">${cmp?`vs ${cmp.pax}`:''}</div></div>
       <div class="kpi-card"><div class="kpi-label">Ingreso medio / comensal</div><div class="kpi-value">${cur.pax?fmtMoney(cur.revenue/cur.pax):'—'}</div></div>
       <div class="kpi-card"><div class="kpi-label">Coste personal / comensal</div><div class="kpi-value">${cur.pax?fmtMoney(Math.abs(cur.labourCost)/cur.pax):'—'}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Margen sobre ingresos</div><div class="kpi-value ${cur.unitProfit<0?'alert':''}">${cur.revenue?(cur.unitProfit/cur.revenue*100).toFixed(1):0}%</div></div>
+      <div class="kpi-card"><div class="kpi-label">EBITDA sobre ventas</div><div class="kpi-value ${cur.ebitda<0?'alert':''}">${cur.revenue?(cur.ebitda/cur.revenue*100).toFixed(1):0}%</div></div>
     </div>
 
     ${cur.mmppSource==='none'?`<div class="alert alert-red" style="margin-top:16px"><span>⚠️ <strong>Sin datos de compras</strong> para este período. Introduce el gasto real en Forecast → Compras, o el importe mensual en la tabla de abajo. La línea de MMPP está a cero, así que el margen que ves está incompleto.</span></div>`:''}
@@ -5048,14 +5058,16 @@ async function renderPnl(container){
 
     <div class="audit-section" style="margin-top:14px">
       <h3>Importes reales por mes</h3>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Introduce aquí los importes reales si prefieres el total del mes. Si dejas MMPP vacío, se usa el gasto diario registrado en Forecast → Compras. Los <strong>abonos de TPV</strong> suman a los ingresos porque Proppos nos devuelve el importe. Los traspasos entre centros no se editan aquí: se alimentan de los registros del módulo Facturación.</p>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Introduce aquí los importes reales si prefieres el total del mes. Si dejas MMPP vacío, se usan los pedidos importados en Forecast → Compras. <strong>Otros gastos generales</strong> (limpieza, mantenimiento, suministros, seguros…) se suman a los pedidos de IUO en el apartado 5. <strong>Amortizaciones</strong> y <strong>costes financieros</strong> alimentan los apartados 7 y 8. Los <strong>abonos de TPV</strong> suman a los ingresos porque Proppos nos devuelve el importe. Los traspasos entre centros no se editan aquí: salen del módulo Facturación y de los pedidos a otros centros.</p>
       <div class="sched-wrap" style="padding:0;border:none">
         <table class="sched-table">
           <thead><tr>
             <th class="sched-name">Mes</th>
             <th style="text-align:right">MMPP (€)</th>
-            <th style="text-align:right" title="Se suma a los pedidos de proveedores de IUO importados">Otros IUO (€)</th>
+            <th style="text-align:right" title="Se suma a los pedidos de proveedores de IUO importados">Otros gastos generales (€)</th>
             <th style="text-align:right">Abonos TPV (€)</th>
+            <th style="text-align:right">Amortizaciones (€)</th>
+            <th style="text-align:right">Costes financieros (€)</th>
           </tr></thead>
           <tbody>
             ${(cur.monthKeysInRange||[]).map(k=>{
@@ -5067,8 +5079,10 @@ async function renderPnl(container){
                 <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="mmpp" value="${m.mmpp||''}" placeholder="Forecast" step="0.01" min="0"></td>
                 <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="iuo" value="${m.iuo||''}" placeholder="0" step="0.01" min="0"></td>
                 <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="refunds" value="${m.refunds||''}" placeholder="0" step="0.01" min="0"></td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="amort" value="${m.amort||''}" placeholder="0" step="0.01" min="0"></td>
+                <td style="text-align:right"><input type="number" class="fc-input" data-mc-key="${k}" data-mc-f="fin" value="${m.fin||''}" placeholder="0" step="0.01" min="0"></td>
               </tr>`;
-            }).join('')||'<tr><td colspan="4" style="padding:10px;font-size:12px;color:var(--text-tertiary)">Selecciona un período concreto (mes, trimestre o año) para introducir importes.</td></tr>'}
+            }).join('')||'<tr><td colspan="6" style="padding:10px;font-size:12px;color:var(--text-tertiary)">Selecciona un período concreto (mes, trimestre o año) para introducir importes.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -7268,10 +7282,10 @@ async function loadHubStats(){
       let html=st(fmtMoney(cur.revenue),'ingresos mes');
       if(fCur.length){
         // Sin todos los costes, el margen saldría inflado (antes llegaba a mostrar un 100 %)
-        html+=st('—',`margen · faltan ${fCur.join(' y ')}`,'');
+        html+=st('—',`EBITDA · faltan ${fCur.join(' y ')}`,'');
       } else {
         const margin=cur.unitProfit/cur.revenue*100;
-        html+=st(`${margin.toFixed(1).replace('.',',')} %`,'margen',margin>=0?'pos':'neg');
+        html+=st(`${margin.toFixed(1).replace('.',',')} %`,'EBITDA',margin>=0?'pos':'neg');
         if(prev.revenue&&!fPrev.length){
           const d=margin-prev.unitProfit/prev.revenue*100;
           html+=st(pct(d).replace('.',','),'vs mes ant.',d>=0?'pos':'neg');
