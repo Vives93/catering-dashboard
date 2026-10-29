@@ -981,15 +981,29 @@ const db  = getFirestore(app);
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(()=>{});
 
+// Caché breve de la colección de pedidos: varias pantallas la piden a la vez y antes se descargaba entera cada vez
+let __ordersCache=null,__ordersCacheAt=0;
+const ORDERS_CACHE_MS=60000;
+function invalidateOrdersCache(){__ordersCache=null;__ordersCacheAt=0;}
 async function saveOrder(order) {
+  invalidateOrdersCache();
   const safeId=String(order.orderId).replace(/[\/\s]+/g,'_').slice(0,300);
   await setDoc(doc(db,'catering_orders',safeId),{...order,orderId:safeId,updatedAt:Timestamp.now()},{merge:true});
 }
 async function getOrders({from,to}={}) {
   // Sin orderBy: en Firestore, ordenar por un campo EXCLUYE los documentos que no lo tienen,
   // así que cualquier pedido sin 'updatedAt' desaparecía de todos los listados y de los totales.
-  const snap=await getDocs(collection(db,'catering_orders'));
-  const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+  if(!__ordersCache||Date.now()-__ordersCacheAt>ORDERS_CACHE_MS){
+    const snap=await getDocs(collection(db,'catering_orders'));
+    __ordersCache=snap.docs.map(d=>{
+      const o={id:d.id,...d.data()};
+      // Pedidos guardados antes de normalizar estados (p. ej. "Rechazado" de Holded)
+      if(o.source!=='holded'&&o.orderStatus&&!['CANCELADO','ENTREGADO','CONFIRMADO','PENDIENTE'].includes(o.orderStatus))o.orderStatus=normalizeStatus(o.orderStatus);
+      return o;
+    });
+    __ordersCacheAt=Date.now();
+  }
+  const all=__ordersCache.map(o=>({...o}));
   all.sort((a,b)=>{
     const da=toDate(a.deliveryAt),dbb=toDate(b.deliveryAt);
     if(!da&&!dbb)return 0;
@@ -1055,17 +1069,18 @@ function statusPill(o){const s=o.orderStatus||'';if(s==='CANCELADO')return`<span
 
 // ── IMPORTER ──────────────────────────────────────────────────────
 function parseCSV(text){
-  const lines=text.trim().split('\n').map(l=>l.trim()).filter(Boolean);
-  if(lines.length<2)throw new Error('CSV vacío');
-  const sep=lines[0].includes(';')?';':',';
-  const rawHeaders=lines[0].split(sep).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+  text=text.replace(/^\uFEFF/,'');
+  const firstLine=text.slice(0,text.indexOf('\n')>=0?text.indexOf('\n'):text.length);
+  const sep=firstLine.includes(';')?';':',';
+  const table=splitCSV(text,sep).filter(r=>r.some(c=>c.trim()));
+  if(table.length<2)throw new Error('CSV vacío');
+  const rawHeaders=table[0].map(h=>h.trim().toLowerCase());
   const isSQLFormat=rawHeaders.includes('id_order')||rawHeaders.includes('customer_name');
   const rows=[];
-  for(let i=1;i<lines.length;i++){
-    const cells=splitLine(lines[i],sep);
-    if(cells.every(c=>!c.trim()))continue;
+  for(let i=1;i<table.length;i++){
+    const cells=table[i];
     const raw={};
-    rawHeaders.forEach((h,idx)=>{raw[h]=cells[idx]?.replace(/"/g,'').trim()??'';});
+    rawHeaders.forEach((h,idx)=>{raw[h]=(cells[idx]??'').trim();});
     const order=isSQLFormat?mapRowSQL(raw):mapRow(raw);
     if(order)rows.push(order);
   }
@@ -1074,10 +1089,24 @@ function parseCSV(text){
   }
   return rows;
 }
-function splitLine(line,sep){
-  const result=[];let current='';let inQ=false;
-  for(const ch of line){if(ch==='"'){inQ=!inQ;continue;}if(ch===sep&&!inQ){result.push(current);current='';continue;}current+=ch;}
-  result.push(current);return result;
+// Lector CSV (RFC 4180): admite separadores y saltos de línea dentro de comillas, y "" como comilla escapada
+function splitCSV(text,sep){
+  const rows=[];let row=[],cur='',inQ=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(inQ){
+      if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++;}else inQ=false;}
+      else cur+=ch;
+      continue;
+    }
+    if(ch==='"'){inQ=true;continue;}
+    if(ch===sep){row.push(cur);cur='';continue;}
+    if(ch==='\r')continue;
+    if(ch==='\n'){row.push(cur);rows.push(row);row=[];cur='';continue;}
+    cur+=ch;
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows;
 }
 // ── DIRECTORIO OFICIAL DE SALAS (con aforo) ───────────────────────
 // Los datos reales viven en Firestore (catering_config/room_directory), protegidos por login.
@@ -1111,8 +1140,9 @@ function toNum(v){
   if(!t)return 0;
   const tieneComa=t.includes(','),tienePunto=t.includes('.');
   if(tieneComa&&tienePunto){
-    // 1.234,56 → el punto es separador de miles
-    t=t.replace(/\./g,'').replace(',','.');
+    // El separador que aparece en último lugar es el decimal
+    if(t.lastIndexOf(',')>t.lastIndexOf('.'))t=t.replace(/\./g,'').replace(',','.'); // 1.234,56
+    else t=t.replace(/,/g,'');                                                          // 1,234.56
   } else if(tieneComa){
     // 1234,56 → coma decimal
     t=t.replace(',','.');
@@ -1123,16 +1153,18 @@ function toNum(v){
   }
   return parseFloat(t)||0;
 }
-// Busca el importe total probando varios nombres de columna habituales
+// Importe total SIN IVA. Orden: columnas explícitas sin IVA → suma del desglose → columna de total genérica.
+// Nunca toma una columna con IVA ni una partida suelta del desglose (alimentos, bebidas…).
+const DESGLOSE_KEYS=['aliment','bebida','transporte','camarero','personal'];
 function findTotal(raw,parts){
-  const intentos=[['total','iva'],['precio','total'],['importe','total'],['total'],['importe'],['precio']];
-  for(const kws of intentos){
-    const v=findValue(raw,kws);
-    const n=toNum(v);
-    if(n>0)return n;
-  }
-  // Si no aparece ninguna columna de total, se suma el desglose
-  return parts.reduce((s2,x)=>s2+x,0);
+  const keys=Object.keys(raw);
+  const pick=test=>{for(const k of keys){if(test(k)){const n=toNum(raw[k]);if(n>0)return n;}}return 0;};
+  const sinIva=pick(k=>/sin\s*iva|base\s*imponible|subtotal/.test(k));
+  if(sinIva)return sinIva;
+  const suma=parts.reduce((s2,x)=>s2+x,0);
+  if(suma>0)return suma;
+  const esDesglose=k=>DESGLOSE_KEYS.some(w=>k.includes(w));
+  return pick(k=>/total|importe|precio/.test(k)&&!/iva/.test(k)&&!esDesglose(k));
 }
 function truthy(v){return !!(v&&v!=='--'&&v.trim());}
 
@@ -1255,10 +1287,12 @@ function parseBR(str){
 }
 function normalizeStatus(raw){
   const r=raw.toLowerCase();
-  if(r.includes('cancel'))return'CANCELADO';
+  // Rechazados y anulados no se van a servir: a todos los efectos son cancelados
+  if(r.includes('cancel')||r.includes('rechaz')||r.includes('anulad'))return'CANCELADO';
   if(r.includes('entregado')||r.includes('completado'))return'ENTREGADO';
-  if(r.includes('empresa')||r.includes('pago')||r.includes('aceptado'))return'CONFIRMADO';
+  // "Pendiente" se comprueba antes que "pago": "Pendiente de pago" no está confirmado
   if(r.includes('pendiente'))return'PENDIENTE';
+  if(r.includes('empresa')||r.includes('pago')||r.includes('pagad')||r.includes('aceptado'))return'CONFIRMADO';
   return raw||'PENDIENTE';
 }
 function categorizeCatering(type){
@@ -1319,7 +1353,8 @@ function mapRowHolded(raw){
   const estadoHolded=String(raw['estado']||'').trim();
   // Se importan todos salvo los cancelados: un presupuesto pendiente sigue siendo carga de trabajo
   if(/cancel/i.test(estadoHolded))return null;
-  const orderStatus=normalizeStatus(estadoHolded);
+  // Holded se mantiene como estaba (se retirará en breve): los rechazados/anulados conservan su estado original
+  const orderStatus=/rechaz|anulad/i.test(estadoHolded)?estadoHolded:normalizeStatus(estadoHolded);
   return{
     orderId:'HOLDED-'+num,customerId:'',center:'',
     buildingRoom:descripcion,building:'',floor:'',room:'',
@@ -1751,51 +1786,23 @@ function getRangeForType(type,refDate=new Date()){
   if(type==='week')return{from:startOfWeek(d),to:endOfWeek(d)};
   if(type==='month')return{from:startOfMonth(d),to:endOfMonth(d)};
   if(type==='quarter')return getQuarterRange(d);
-  // 'year' se corta en el día de hoy para que la comparativa interanual sea justa
+  // 'year' se corta en la fecha de hoy, también en años anteriores (mismo día y mes),
+  // para que la comparativa interanual compare períodos equivalentes
   if(type==='year'){
     const now=new Date();
-    const yearEnd=new Date(d.getFullYear(),11,31,23,59,59,999);
-    const cappedEnd=(d.getFullYear()===now.getFullYear()&&yearEnd>now)?now:yearEnd;
-    return{from:new Date(d.getFullYear(),0,1),to:cappedEnd};
+    const y=d.getFullYear();
+    const yearEnd=new Date(y,11,31,23,59,59,999);
+    if(y>now.getFullYear())return{from:new Date(y,0,1),to:yearEnd};
+    // Día equivalente (el 29-feb pasa al 28 en años no bisiestos)
+    const lastDay=new Date(y,now.getMonth()+1,0).getDate();
+    const cut=endOfDay(new Date(y,now.getMonth(),Math.min(now.getDate(),lastDay)));
+    return{from:new Date(y,0,1),to:cut};
   }
   // 'yearFull' llega al 31 de diciembre e incluye los pedidos ya confirmados a futuro
   if(type==='yearFull'){
     return{from:new Date(d.getFullYear(),0,1),to:new Date(d.getFullYear(),11,31,23,59,59,999)};
   }
   return{from:null,to:null};
-}
-
-function getPreviousPeriod(type,from,to){
-  const diff=to-from;
-  if(type==='month'){
-    const prevMonth=new Date(from);prevMonth.setMonth(prevMonth.getMonth()-1);
-    return{from:startOfMonth(prevMonth),to:endOfMonth(prevMonth)};
-  }
-  if(type==='quarter'){
-    const prevQ=new Date(from);prevQ.setMonth(prevQ.getMonth()-3);
-    return getQuarterRange(prevQ);
-  }
-  if(type==='week'){
-    const prevWeek=new Date(from);prevWeek.setDate(prevWeek.getDate()-7);
-    return{from:startOfWeek(prevWeek),to:endOfWeek(prevWeek)};
-  }
-  if(type==='year'||type==='yearFull'){
-    const prevYear=from.getFullYear()-1;
-    const equivEnd=new Date(to);equivEnd.setFullYear(prevYear);
-    return{from:new Date(prevYear,0,1),to:equivEnd};
-  }
-  // day or custom range: shift back by the same duration
-  return{from:new Date(from.getTime()-diff-86400000),to:new Date(from.getTime()-86400000)};
-}
-
-function getSamePeriodLastYear(type,from,to){
-  if(type==='year'||type==='yearFull')return getPreviousPeriod(type,from,to);
-  const shiftYear=d=>{const nd=new Date(d);nd.setFullYear(nd.getFullYear()-1);return nd;};
-  if(type==='month'){const s=shiftYear(from);return{from:startOfMonth(s),to:endOfMonth(s)};}
-  if(type==='quarter'){const s=shiftYear(from);return getQuarterRange(s);}
-  if(type==='week'){const s=shiftYear(from);return{from:startOfWeek(s),to:endOfWeek(s)};}
-  // day o rango personalizado: desplazar ambos extremos un año atrás
-  return{from:shiftYear(from),to:shiftYear(to)};
 }
 
 function computeStats(orders){
@@ -1828,8 +1835,10 @@ function buildPeriodLabel(type,refDate){
   if(type==='quarter'){const q=Math.floor(refDate.getMonth()/3)+1;return`T${q} ${refDate.getFullYear()}`;}
   if(type==='year'){
     const y=refDate.getFullYear();
-    const isCurrentYear=y===new Date().getFullYear();
-    return isCurrentYear?`${y} (hasta hoy)`:String(y);
+    const now=new Date();
+    if(y===now.getFullYear())return`${y} (hasta hoy)`;
+    if(y>now.getFullYear())return String(y);
+    return`${y} (hasta el ${now.toLocaleDateString('es-ES',{day:'numeric',month:'short'})})`;
   }
   if(type==='yearFull')return `${refDate.getFullYear()} completo`;
   return'';
@@ -2596,6 +2605,7 @@ let currentView='today';
 async function markReviewed(orderId){
   try{
     await setDoc(doc(db,'catering_orders',orderId),{reviewed:true},{merge:true});
+    invalidateOrdersCache();
     renderView(currentView,mainContent,selectedDate);
   }catch(e){alert('Error al marcar como revisado: '+e.message);}
 }
@@ -2969,6 +2979,9 @@ document.getElementById('auditTabs').addEventListener('click',e=>{
 // ══ MÓDULO PERSONAL ═══════════════════════════════════════════════
 // Tabla salarial del Convenio de Restauración Colectiva Estatal · Provincia de Barcelona
 // Subida salarial 2025 (3,8%). Importes brutos mensuales por jornada y nivel.
+// SOLO INFORMATIVA: ya no interviene en ningún coste (el personal sale de las nóminas reales importadas).
+// Actualizar CONVENIO_TABLA_YEAR y los importes cuando se disponga de la tabla oficial del año.
+const CONVENIO_TABLA_YEAR=2025;
 const CONVENIO_2025={
   40:   [1792.12,1677.26,1615.46,1495.29],
   39:   [1747.30,1635.33,1575.07,1457.91],
@@ -3015,16 +3028,8 @@ function levelFromRole(role){
   if(/ayudante|auxiliar|monitor|marmiton/.test(r))return 4;
   return 4;
 }
-// Coste mensual de una persona: salario manual si existe, si no el de convenio
-function monthlySalaryOf(p){
-  if(p.monthlySalary&&p.monthlySalary>0)return p.monthlySalary;
-  const level=p.level||levelFromRole(p.role||p.position);
-  return convenioSalary(level,p.contractedHours||p.weeklyHours||0);
-}
-function rateForRole(role){
-  // Compatibilidad: coste/hora aproximado derivado de la tabla de convenio
-  return convenioSalary(levelFromRole(role),40)/(40*4.33);
-}
+// Salario pactado introducido a mano en la ficha (informativo; el coste real sale de las nóminas)
+function monthlySalaryOf(p){return(p.monthlySalary&&p.monthlySalary>0)?p.monthlySalary:0;}
 function staffStatus(s){
   const txt=`${s.name} ${s.note}`.toLowerCase();
   if(txt.includes('ett'))return{label:'ETT',cls:'pill-break',isEtt:true};
@@ -3034,30 +3039,14 @@ function staffStatus(s){
   return{label:'Activo',cls:'pill-ok'};
 }
 
-// Calcula el coste mensual: plantilla activa + bajas (según % configurado) + ETT activas hoy (suman, no sustituyen)
-function computeStaffCost(staff,costs,ettList){
-  const leavePct=costs.leaveCostPct!==undefined?costs.leaveCostPct:100;
-  let payrollMonthly=0,onLeaveMonthly=0;
-  staff.forEach(p=>{
-    const status=p.status||'activo';
-    if(status==='inactivo')return; // desactivado: conserva los datos pero no genera coste
-    const sal=monthlySalaryOf(p);
-    if(status==='baja')onLeaveMonthly+=sal*(leavePct/100);
-    else payrollMonthly+=sal; // activo y vacaciones generan coste íntegro
-  });
-  // ETT: solo las vigentes hoy y no desactivadas
-  let ettMonthly=0;
-  if(Array.isArray(ettList)){
-    const today=startOfDay(new Date());
-    ettList.forEach(e=>{
-      if(e.status==='inactivo')return;
-      const s=new Date(e.start+'T12:00:00'),en=new Date(e.end+'T12:00:00');
-      if(s<=today&&en>=today)ettMonthly+=(e.monthlyCost||0);
-    });
-  } else {
-    ettMonthly=costs.ettMonthly||0; // compatibilidad con el importe global antiguo
-  }
-  return{payrollMonthly,onLeaveMonthly,ettMonthly,totalMonthly:payrollMonthly+onLeaveMonthly+ettMonthly,leavePct};
+// Coste de ETT vigentes en una fecha (por defecto hoy)
+function ettActiveMonthly(ettList,ref){
+  const day=startOfDay(ref||new Date());
+  return(ettList||[]).filter(e=>{
+    if(e.status==='inactivo')return false;
+    const s=new Date(e.start+'T12:00:00'),en=new Date(e.end+'T12:00:00');
+    return s<=day&&en>=day;
+  }).reduce((s2,e)=>s2+(e.monthlyCost||0),0);
 }
 
 const DEFAULT_SHIFTS=[{label:'7-15h',hours:8},{label:'8-16h',hours:8},{label:'9-17h',hours:8},{label:'12-20h',hours:8}];
@@ -3100,20 +3089,9 @@ function workDaysBetween(startStr,endStr){
 let currentStaffView='roster';
 
 // Plantilla inicial · se carga en Firestore la primera vez y desde ahí es editable
-const STAFF_SEED=[
-  {name:'Sol Vives Herrerías',cardNumber:'46469',position:'Responsable',jornadaType:'Completa',level:1,dni:'',contractType:'Indefinido',contractedHours:40,contractDate:'2025-07-24',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
-  {name:'Javier Ojeda Álvarez',cardNumber:'46830',position:'Jefe de cocina',jornadaType:'Completa',level:1,dni:'43157272A',contractType:'Indefinido',contractedHours:40,contractDate:'2025-04-28',monthlySalary:0,birthDate:'1988-03-21',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
-  {name:'Ana Campos Peñalver',cardNumber:'44342',position:'Segunda de cocina',jornadaType:'Completa',level:3,dni:'48066437W',contractType:'Indefinido',contractedHours:40,contractDate:'2024-09-16',monthlySalary:0,birthDate:'2000-03-17',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
-  {name:'Elizabeth Sánchez Rodríguez',cardNumber:'',position:'Ayudante de cocina',jornadaType:'',level:4,dni:'46099649J',contractType:'Indefinido',contractedHours:40,contractDate:'2024-10-22',monthlySalary:0,birthDate:'1998-02-23',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Falta nº de tarjeta'},
-  {name:'Thalyta Lopes Pereira',cardNumber:'46914',position:'Cocinera',jornadaType:'Completa',level:3,dni:'Z0154298L',contractType:'Indefinido',contractedHours:40,contractDate:'',monthlySalary:0,birthDate:'1987-08-24',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Falta fecha de contrato'},
-  {name:'María del Mar Fernández García',cardNumber:'44185',position:'Cocinera',jornadaType:'Completa',level:3,dni:'38109465Y',contractType:'Indefinido',contractedHours:40,contractDate:'2023-01-16',monthlySalary:0,birthDate:'1970-12-26',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
-  {name:'Mónica Colera Martínez',cardNumber:'44478',position:'Camarera',jornadaType:'Completa',level:3,dni:'44184307L',contractType:'Indefinido',contractedHours:40,contractDate:'2024-09-01',monthlySalary:0,birthDate:'1974-05-18',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
-  {name:'Adrianna DeLorenzo',cardNumber:'46840',position:'Barista',jornadaType:'Media jornada',level:3,dni:'Y6470461T',contractType:'Indefinido',contractedHours:25,contractDate:'2025-11-18',monthlySalary:0,birthDate:'2000-07-20',status:'activo',weeklyHours:25,vacationDays:30,extraHolidays:0,note:''},
-  {name:'Carolina Ávalos Domínguez',cardNumber:'45866',position:'Marmitona',jornadaType:'Completa',level:5,dni:'Z0479143N',contractType:'Indefinido',contractedHours:40,contractDate:'2024-11-19',monthlySalary:998.90,birthDate:'1982-10-08',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Nivel V, salario acordado (no figura en la tabla del convenio)'},
-  {name:'Cinthia Valeria Rotela',cardNumber:'45937',position:'Ayudante de camarero',jornadaType:'Completa',level:4,dni:'Y2125429J',contractType:'Indefinido',contractedHours:40,contractDate:'2025-02-24',monthlySalary:0,birthDate:'1994-12-22',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:''},
-  {name:'David Rivera Gómez',cardNumber:'',position:'',jornadaType:'',level:4,dni:'',contractType:'',contractedHours:0,contractDate:'2026-07-01',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:0,vacationDays:30,extraHolidays:0,note:'Alta detectada en el Excel de costes (desde julio 2026). Pendiente: puesto, jornada, DNI y fecha exacta'},
-  {name:'Alejandro Gardó Moreno',cardNumber:'',position:'',jornadaType:'Completa',level:4,dni:'47325099T',contractType:'Indefinido',contractedHours:40,contractDate:'2026-06-15',monthlySalary:0,birthDate:'',status:'activo',weeklyHours:40,vacationDays:30,extraHolidays:0,note:'Alta deducida: devengará 16,25 días a 31/12. Pendiente: puesto'},
-];
+// Los datos personales de la plantilla (DNI/NIE, fechas de nacimiento, nº de tarjeta) viven solo en Firestore,
+// protegidos por login. No deben volver a escribirse en este archivo, que cualquiera puede descargar.
+const STAFF_SEED=[];
 
 async function loadStaffData(){
   const [rosterSnap,absSnap,costSnap,schedSnap,ettSnap,shiftSnap]=await Promise.all([
@@ -3148,9 +3126,9 @@ async function renderStaffRoster(container){
     if(!staff.length){
       container.innerHTML=moduleHeader('Personal','Plantilla')+`<div class="empty-state">
         <p>Aún no hay plantilla cargada</p>
-        <p style="font-size:12px;margin-top:6px">Puedes cargar la plantilla conocida o empezar de cero</p>
+        <p style="font-size:12px;margin-top:6px">Añade a las personas una a una desde aquí</p>
         <div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap">
-          <button class="btn-primary" id="btnSeedStaff" style="max-width:240px">Cargar plantilla inicial (${STAFF_SEED.length} personas)</button>
+          ${STAFF_SEED.length?`<button class="btn-primary" id="btnSeedStaff" style="max-width:240px">Cargar plantilla inicial (${STAFF_SEED.length} personas)</button>`:''}
           <button class="btn-action" id="btnAddFirstPerson">Añadir una sola persona</button>
         </div></div>`;
       const bs=container.querySelector('#btnSeedStaff');
@@ -3168,7 +3146,9 @@ async function renderStaffRoster(container){
       const s=new Date(e.start+'T12:00:00'),en=new Date(e.end+'T12:00:00');
       return s<=today&&en>=today;
     });
-    const cb=computeStaffCost(staff,costs,ettList);
+    const nominaUltimoMes=ultimoRC?Object.values(realPorMes[ultimoRC]).reduce((s2,e)=>s2+(e.coste||0),0):0;
+    const ettHoy=ettActiveMonthly(ettList);
+    const lblUltimoRC=ultimoRC?(()=>{const [y,m]=ultimoRC.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});})():'';
     const counts={activo:0,baja:0,vacaciones:0,inactivo:0};
     staff.forEach(p=>{counts[p.status||'activo']=(counts[p.status||'activo']||0)+1;});
     const activeList=staff.filter(p=>(p.status||'activo')!=='inactivo');
@@ -3205,7 +3185,6 @@ async function renderStaffRoster(container){
       const level=p.level||levelFromRole(p.role||p.position);
       const hours=p.contractedHours||p.weeklyHours||0;
       const salary=monthlySalaryOf(p);
-      const isConvenio=!(p.monthlySalary&&p.monthlySalary>0);
       const myAbs=absences.filter(a=>a.person===p.name).sort((a,b)=>b.start.localeCompare(a.start));
       const myEtt=activeEtt.filter(e=>e.covers===p.name);
       const statusPill={activo:'pill-ok',baja:'pill-cancel',vacaciones:'pill-break',inactivo:'pill-other'}[status];
@@ -3255,7 +3234,7 @@ async function renderStaffRoster(container){
             const rc=costeReal[normNombre(p.name)];
             if(rc)return`<span class="meta-item" style="color:var(--ok-fg);font-weight:500">${fmtMoney(rc.coste)}/mes <span style="font-size:10px;font-weight:400">coste real ${ultimoRC}</span></span>`;
             if(ultimoRC&&status!=='inactivo')return`<span class="meta-item" style="color:var(--alert-amber-fg)">${salary>0?fmtMoney(salary)+'/mes':'Sin salario'} <span style="font-size:10px">sin coste real en ${ultimoRC}</span></span>`;
-            return`<span class="meta-item ${(!levelHasTable(level)&&salary===0)?'salary-missing':''}">${salary>0?fmtMoney(salary)+'/mes':'Salario pendiente'}${salary>0&&isConvenio?' <span style="color:var(--text-tertiary);font-size:10px">(convenio)</span>':''}${(!levelHasTable(level)&&salary===0)?' <span style="font-size:10px">— Nivel V sin tabla</span>':''}</span>`;
+            return`<span class="meta-item" style="color:var(--text-tertiary)">${salary>0?fmtMoney(salary)+'/mes <span style="font-size:10px">(pactado)</span>':'Sin nóminas importadas'}</span>`;
           })()}
           ${p.dni?`<span class="meta-item" style="color:var(--text-tertiary)">${escapeHtml(p.dni)}</span>`:''}
           ${p.contractDate?`<span class="meta-item" style="color:var(--text-tertiary)">Alta: ${new Date(p.contractDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</span>`:''}
@@ -3280,14 +3259,10 @@ async function renderStaffRoster(container){
     container.innerHTML=moduleHeader('Personal','Plantilla')+`<div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-label">Plantilla activa</div><div class="kpi-value">${activeList.length}</div><div class="kpi-sub">${counts.inactivo} desactivadas${activeEtt.length?` · +${activeEtt.length} ETT hoy`:''}</div></div>
       <div class="kpi-card"><div class="kpi-label">Horas contratadas</div><div class="kpi-value">${totalHours}</div><div class="kpi-sub">${(totalHours/40).toFixed(1)} FTE</div></div>
-      <div class="kpi-card"><div class="kpi-label">Coste mensual total</div><div class="kpi-value">${fmtMoney(cb.totalMonthly)}</div><div class="kpi-sub">plantilla + bajas + ETT</div></div>
+      <div class="kpi-card"><div class="kpi-label">Coste mensual real</div><div class="kpi-value">${ultimoRC?fmtMoney(nominaUltimoMes+ettHoy):'—'}</div><div class="kpi-sub">${ultimoRC?`nóminas de ${lblUltimoRC}${ettHoy?' + ETT vigentes':''}`:'sin nóminas importadas'}</div></div>
       <div class="kpi-card"><div class="kpi-label">Ausencias hoy</div><div class="kpi-value ${counts.baja+counts.vacaciones>0?'warn':''}">${counts.baja+counts.vacaciones}</div><div class="kpi-sub">${counts.baja} bajas · ${counts.vacaciones} vacaciones</div></div>
     </div>
     ${alerts.length?renderAlerts(alerts):''}
-    ${(()=>{
-      const pend=activeList.filter(p=>{const l=p.level||levelFromRole(p.role||p.position);return !levelHasTable(l)&&monthlySalaryOf(p)===0;});
-      return pend.length?`<div class="alert alert-amber" style="margin-bottom:14px"><span>⚠️ ${pend.length} persona${pend.length>1?'s':''} en <strong>Nivel V</strong> sin salario indicado (${pend.map(p=>escapeHtml(p.name)).join(', ')}). Ese nivel no figura en la tabla del convenio, así que no computa en los costes hasta que introduzcas el importe con "Editar".</span></div>`:'';
-    })()}
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <button class="btn-primary" id="btnAddPerson" style="max-width:190px">+ Nueva persona</button>
       <button class="btn-action" id="btnToggleInactive">${window.__showInactive?'Ocultar':'Mostrar'} desactivadas</button>
@@ -3381,7 +3356,7 @@ function openPersonModal(idx,staff,container){
           ${['Indefinido','Temporal','Prácticas','Formación','Otro'].map(c=>`<option value="${c}" ${(p.contractType||'')===c?'selected':''}>${c}</option>`).join('')}
         </select></div>
         <div class="form-group"><label>Fecha de alta</label><input type="date" id="pContractDate" value="${p.contractDate||''}"></div>
-        <div class="form-group"><label>Salario mensual (€)<br><span style="font-size:10.5px;color:var(--text-tertiary);font-weight:400">Vacío = se aplica el de convenio</span></label><input type="number" id="pSalary" value="${p.monthlySalary||''}" min="0" step="0.01" placeholder="Automático"></div>
+        <div class="form-group"><label>Salario pactado (€/mes)<br><span style="font-size:10.5px;color:var(--text-tertiary);font-weight:400">Informativo · el coste sale de las nóminas</span></label><input type="number" id="pSalary" value="${p.monthlySalary||''}" min="0" step="0.01" placeholder="Opcional"></div>
         <div class="form-group"><label>Estado</label><select id="pStatus">
           <option value="activo" ${(p.status||'activo')==='activo'?'selected':''}>Activo</option>
           <option value="baja" ${p.status==='baja'?'selected':''}>De baja</option>
@@ -3410,18 +3385,9 @@ function openPersonModal(idx,staff,container){
     const conv=convenioSalary(lvl,h);
     const prev=overlay.querySelector('#pSalaryPreview');
     const lvlLbl=CONVENIO_LEVELS.find(l=>l.n===lvl)?.lbl||'';
-    if(manual>0){
-      prev.innerHTML=levelHasTable(lvl)
-        ? `Se aplicará el salario introducido: <strong>${fmtMoney(manual)}/mes</strong> · el de convenio para ${lvlLbl} y ${h}h sería ${fmtMoney(conv)}`
-        : `Se aplicará el salario introducido: <strong>${fmtMoney(manual)}/mes</strong> · el ${lvlLbl} no figura en la tabla del convenio`;
-      prev.style.color='var(--text-secondary)';
-    } else if(!levelHasTable(lvl)){
-      prev.innerHTML=`⚠️ El <strong>${lvlLbl}</strong> no existe en la tabla del convenio (solo llega al Nivel IV). Debes introducir el salario a mano o esta persona no computará en los costes.`;
-      prev.style.color='var(--alert-amber-fg)';
-    } else {
-      prev.innerHTML=`Se aplicará el salario de convenio: <strong>${fmtMoney(conv)}/mes</strong> (${lvlLbl}, ${h}h)`;
-      prev.style.color='var(--text-secondary)';
-    }
+    const ref=levelHasTable(lvl)?`Referencia del convenio ${CONVENIO_TABLA_YEAR} para ${lvlLbl} y ${h}h: ${fmtMoney(conv)}/mes`:`El ${lvlLbl} no figura en la tabla del convenio`;
+    prev.innerHTML=(manual>0?`Salario pactado: <strong>${fmtMoney(manual)}/mes</strong> · `:'')+ref+' · solo informativo, no se usa en costes';
+    prev.style.color='var(--text-secondary)';
   };
   ['#pLevel','#pHours','#pSalary'].forEach(sel=>overlay.querySelector(sel).addEventListener('input',updatePreview));
   updatePreview();
@@ -3910,6 +3876,71 @@ function parseCostesXLSX(buffer){
   return{porMes,meses:meses.filter(Boolean),filas};
 }
 
+// ── PROFORMAS DE ETT ─────────────────────────────────────────────
+// Excel de la agencia: una hoja por semana (p. ej. "05-09 GENER", "30-31 MARÇ"), con columnas
+// NOM · COGNOMS · CATEGORIA · CONCEPTE · UNITATS · TARIFA · TOTAL €. La agencia ya parte las semanas
+// a caballo entre dos meses, así que el mes se toma del nombre de la hoja. El año, del nombre del archivo.
+const MESES_TXT=[[/GENER|ENERO/,1],[/FEBRER/,2],[/MARC|MARZO/,3],[/ABRIL/,4],[/MAIG|MAYO/,5],[/JUNY|JUNIO/,6],
+  [/JULIOL|JULIO/,7],[/AGOST/,8],[/SET|SEPT/,9],[/OCTUBRE/,10],[/NOVEMBRE|NOVIEMBRE/,11],[/DESEMBRE|DICIEMBRE/,12]];
+function mesesEnTexto(t){
+  const n=String(t||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return [...new Set(MESES_TXT.filter(([re])=>re.test(n)).map(([,m])=>m))];
+}
+function parseEttXLSX(arrayBuffer,fileName){
+  const wb=XLSX.read(arrayBuffer,{type:'array'});
+  const ym=String(fileName||'').match(/20\d{2}/);
+  const year=ym?+ym[0]:new Date().getFullYear();
+  const r2=n=>Math.round(n*100)/100;
+  const porMes={},avisos=[];
+  let hojas=0;
+  wb.SheetNames.forEach(sn=>{
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:''});
+    let h=-1,ci={};
+    for(let i=0;i<rows.length;i++){
+      const t=rows[i].map(c=>String(c).trim().toUpperCase());
+      if(t.includes('UNITATS')&&t.includes('TARIFA')){
+        h=i;
+        ci={nom:t.indexOf('NOM'),cog:t.indexOf('COGNOMS'),cat:t.indexOf('CATEGORIA'),u:t.indexOf('UNITATS'),tar:t.indexOf('TARIFA'),tot:t.findIndex(x=>x.startsWith('TOTAL'))};
+        break;
+      }
+    }
+    if(h<0||ci.nom<0||ci.u<0)return; // hojas auxiliares (p. ej. "Hoja2")
+    const hoja=sn.trim().replace(/\s+/g,' ');
+    const meses=mesesEnTexto(sn);
+    if(meses.length!==1){avisos.push(`Hoja "${hoja}": no se reconoce un único mes en el nombre. No se ha importado.`);return;}
+    const key=`${year}-${String(meses[0]).padStart(2,'0')}`;
+    let total=0,horas=0,pie=null;
+    const personas=[];
+    for(let i=h+1;i<rows.length;i++){
+      const r=rows[i];
+      if(r.some(c=>String(c).toUpperCase().includes('DESPESES')))break;
+      const nom=String(r[ci.nom]||'').trim();
+      const u=r[ci.u],tar=r[ci.tar],tot=ci.tot>=0?r[ci.tot]:'';
+      if(nom&&typeof u==='number'){
+        const coste=typeof tot==='number'?tot:u*(typeof tar==='number'?tar:0);
+        total+=coste;horas+=u;
+        personas.push({nombre:(nom+' '+String(ci.cog>=0?r[ci.cog]:'').trim()).trim(),categoria:String(ci.cat>=0?r[ci.cat]:'').trim(),horas:u,coste:r2(coste)});
+      } else if(!nom&&typeof tot==='number'&&pie===null)pie=tot;
+    }
+    if(!personas.length)return;
+    hojas++;
+    if(pie!==null&&Math.abs(pie-total)>0.01){
+      avisos.push(`Hoja "${hoja}": la suma de las líneas (${total.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €) no coincide con el total de la hoja (${pie.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})} €). Se importa la suma de las líneas: revisa la fórmula del total en la proforma.`);
+    }
+    if(!porMes[key])porMes[key]={total:0,horas:0,semanas:[],personas:{}};
+    const m=porMes[key];
+    m.total=r2(m.total+total);m.horas+=horas;
+    m.semanas.push({hoja,total:r2(total),horas,personas:personas.length,totalHoja:pie!==null?r2(pie):null});
+    personas.forEach(p=>{
+      const k=normNombre(p.nombre)||p.nombre;
+      if(!m.personas[k])m.personas[k]={nombre:p.nombre,categoria:p.categoria,horas:0,coste:0};
+      m.personas[k].horas+=p.horas;m.personas[k].coste=r2(m.personas[k].coste+p.coste);
+    });
+  });
+  if(!hojas)throw new Error('No se ha encontrado ninguna hoja con el formato de proforma (columnas UNITATS, TARIFA y TOTAL €).');
+  return{porMes,avisos,hojas,year};
+}
+
 async function renderStaffCosts(container){
   container.innerHTML=`<div class="loading-state"><div class="spinner"></div><span>Cargando…</span></div>`;
   try{
@@ -3917,8 +3948,27 @@ async function renderStaffCosts(container){
     const realSnap=await getDoc(doc(db,'staff_config','realCosts'));
     const real=realSnap.exists()?(realSnap.data().porMes||{}):{};
     const mesesReales=Object.keys(real).sort();
-    const cb=computeStaffCost(staff,costs,ettList);
-
+    const ettSnap=await getDoc(doc(db,'staff_config','ettReal'));
+    const ettReal=ettSnap.exists()?(ettSnap.data().porMes||{}):{};
+    const ettAvisos=ettSnap.exists()?(ettSnap.data().avisos||[]):[];
+    const mesesEtt=Object.keys(ettReal).sort();
+    const lblMes=mk=>{const [y,m]=mk.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});};
+    const filasEtt=mesesEtt.slice().reverse().map(mk=>{
+      const e=ettReal[mk];
+      const nPers=Object.keys(e.personas||{}).length;
+      return`<div class="order-card">
+        <div class="order-top">
+          <div class="order-who">
+            <span class="order-name">${lblMes(mk)}</span>
+            <span class="order-loc">${(e.semanas||[]).length} hoja${(e.semanas||[]).length!==1?'s':''} · ${String(e.horas).replace('.',',')} h · ${nPers} persona${nPers!==1?'s':''}</span>
+          </div>
+          <div class="order-pills">
+            <span class="pill pill-break" style="font-family:var(--font-mono);font-weight:600">${fmtMoney(e.total)}</span>
+            <button class="btn-del-staff" data-del-ett="${mk}" title="Eliminar este mes">✕</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
     // Resumen de los meses con coste real importado
     const filasMes=mesesReales.slice().reverse().map(mk=>{
       const emp=real[mk]||{};
@@ -3948,14 +3998,12 @@ async function renderStaffCosts(container){
     const sinCoste=ultimoMes?staff.filter(p=>(p.status||'activo')!=='inactivo'
       &&!real[ultimoMes][normNombre(p.name)]).map(p=>p.name):[];
 
-    const mx=Math.max(cb.payrollMonthly,cb.onLeaveMonthly,cb.ettMonthly,1);
-    const row=(l,v,color)=>`<div class="bar-row"><span class="bar-label">${l}</span><div class="bar-fill-wrap"><div class="bar-fill" style="width:${(v/mx*100).toFixed(0)}%;background:${color}"></div></div><span class="bar-val">${fmtMoney(v)}</span></div>`;
     const jornadas=Object.keys(CONVENIO_2025).map(Number).sort((a,b)=>b-a);
 
     container.innerHTML=moduleHeader('Personal','Costes')+`
     <div class="audit-section">
       <h3>Coste real de empresa</h3>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Importa el Excel de nóminas con una fila por empleado y una columna por mes. Estos importes <strong>sustituyen a la estimación de convenio</strong> en la Cuenta de explotación para los meses que tengan datos.</p>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Importa el Excel de nóminas con una fila por empleado y una columna por mes. Son la <strong>única fuente del coste de personal</strong> en la Cuenta de explotación: un mes sin importar figura a cero.</p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="btn-primary" id="btnImportCostes" style="max-width:230px">Importar Excel de costes</button>
         <span id="costesMsg" style="font-size:12px"></span>
@@ -3963,38 +4011,28 @@ async function renderStaffCosts(container){
       ${mesesReales.length?`
         <p class="section-label" style="margin:16px 0 8px">Meses importados</p>
         <div class="orders">${filasMes}</div>
-      `:'<p style="font-size:12px;color:var(--text-tertiary);margin-top:12px">Aún no hay costes reales importados. Mientras tanto se usa la tabla de convenio.</p>'}
+      `:'<p style="font-size:12px;color:var(--alert-red-fg);margin-top:12px">Aún no hay costes reales importados: la Cuenta de explotación muestra el personal a cero.</p>'}
       ${sinFicha.length?`<div class="alert alert-amber" style="margin-top:12px"><span>⚠️ ${sinFicha.length} persona${sinFicha.length>1?'s':''} del Excel sin ficha en la plantilla: ${sinFicha.map(escapeHtml).join(', ')}. Su coste cuenta igual en la Cuenta de explotación.</span></div>`:''}
       ${sinCoste.length?`<div class="alert alert-amber" style="margin-top:12px"><span>⚠️ ${sinCoste.length} persona${sinCoste.length>1?'s':''} activa${sinCoste.length>1?'s':''} en plantilla sin coste en el último mes importado: ${sinCoste.map(escapeHtml).join(', ')}. Revisa si siguen en la empresa.</span></div>`:''}
     </div>
 
-    <div class="stats-grid" style="grid-template-columns:1fr">
-      <div class="stat-card">
-        <h3>Estimación por convenio</h3>
-        <span class="scope-label">Se usa solo en los meses sin coste real importado</span>
-        <div class="bar-chart">
-          ${row('Plantilla activa',cb.payrollMonthly,'var(--text-primary)')}
-          ${row(`Bajas (${cb.leavePct}% del coste)`,cb.onLeaveMonthly,'var(--alert-amber-border)')}
-          ${row('ETT (suma, no sustituye)',cb.ettMonthly,'var(--break-fg)')}
-        </div>
-        <p style="font-size:13px;font-weight:600;margin-top:12px">Total estimado: ${fmtMoney(cb.totalMonthly)}/mes</p>
+    <div class="audit-section">
+      <h3>Coste real de ETT · proformas</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Importa el Excel de proformas de la agencia (una hoja por semana). Se suma el total de cada línea y se asigna al mes que indica el nombre de la hoja; el año se toma del nombre del archivo. Al reimportar se sustituyen los meses que vengan en el archivo. En la Cuenta de explotación, los meses con proforma usan este importe; los que no tienen, el cálculo por contratos de la pestaña ETT.</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn-primary" id="btnImportEtt" style="max-width:230px">Importar Excel de ETT</button>
+        <span id="ettMsg" style="font-size:12px"></span>
       </div>
+      ${ettAvisos.length?`<div class="alert alert-amber" style="margin-top:12px"><span>⚠️ Avisos de la última importación:<br>${ettAvisos.map(escapeHtml).join('<br>')}</span></div>`:''}
+      ${mesesEtt.length?`
+        <p class="section-label" style="margin:16px 0 8px">Meses importados</p>
+        <div class="orders">${filasEtt}</div>
+      `:'<p style="font-size:12px;color:var(--text-tertiary);margin-top:12px">Aún no hay proformas importadas.</p>'}
     </div>
 
     <div class="audit-section">
-      <h3>Parámetros de coste</h3>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Coste asumido durante una baja (%)</label>
-          <input type="number" id="staffLeavePct" value="${cb.leavePct}" min="0" max="100" step="5">
-        </div>
-      </div>
-      <button class="btn-primary" id="btnSaveStaffCosts" style="max-width:220px">Guardar</button>
-      <p id="staffCostMsg" style="font-size:12px;margin-top:10px"></p>
-    </div>
-
-    <div class="audit-section">
-      <h3>Tabla salarial del convenio · Restauración Colectiva · Barcelona 2025</h3>
+      <h3>Tabla salarial del convenio · Restauración Colectiva · Barcelona ${CONVENIO_TABLA_YEAR}</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Solo informativa: no interviene en ningún cálculo de costes.${CONVENIO_TABLA_YEAR<new Date().getFullYear()?` <span style="color:var(--alert-amber-fg)">Pendiente de actualizar a ${new Date().getFullYear()}.</span>`:''}</p>
       <div class="sched-wrap" style="padding:0;border:none">
         <table class="sched-table" style="font-size:12px">
           <thead><tr><th class="sched-name">Jornada</th>${CONVENIO_LEVELS.filter(l=>l.n<=4).map(l=>`<th style="text-align:right">${l.lbl}</th>`).join('')}</tr></thead>
@@ -4014,7 +4052,37 @@ async function renderStaffCosts(container){
         Responsable de centro ${CONVENIO_COMPLEMENTS.respCentro.toFixed(2)} €
       </div>
     </div>
-    <input type="file" id="costesFileInput" accept=".xlsx,.xls" hidden>`;
+    <input type="file" id="costesFileInput" accept=".xlsx,.xls" hidden>
+    <input type="file" id="ettFileInput" accept=".xlsx,.xls" hidden>`;
+
+    const ettInput=container.querySelector('#ettFileInput');
+    const btnEtt=container.querySelector('#btnImportEtt');
+    if(btnEtt)btnEtt.addEventListener('click',()=>ettInput.click());
+    if(ettInput)ettInput.addEventListener('change',async e=>{
+      const file=e.target.files[0];
+      if(!file)return;
+      const msg=container.querySelector('#ettMsg');
+      msg.textContent='Procesando…';msg.style.color='var(--text-secondary)';
+      try{
+        const buf=await file.arrayBuffer();
+        const {porMes,avisos,hojas,year}=parseEttXLSX(buf,file.name);
+        const meses=Object.keys(porMes);
+        await setDoc(doc(db,'staff_config','ettReal'),{porMes:{...ettReal,...porMes},avisos,archivo:file.name,updatedAt:Timestamp.now()});
+        msg.textContent=`✓ ${hojas} hojas en ${meses.length} meses de ${year}${avisos.length?` · ${avisos.length} aviso${avisos.length>1?'s':''}`:''}`;
+        msg.style.color=avisos.length?'var(--alert-amber-fg)':'var(--ok-fg)';
+        setTimeout(()=>renderStaffCosts(container),1200);
+      }catch(err){msg.textContent='Error: '+err.message;msg.style.color='var(--alert-red-fg)';}
+      ettInput.value='';
+    });
+    container.querySelectorAll('[data-del-ett]').forEach(b=>{
+      b.addEventListener('click',async()=>{
+        const mk=b.dataset.delEtt;
+        if(!confirm(`¿Eliminar la proforma de ETT de ${lblMes(mk)}?\n\nLa Cuenta de explotación volverá a calcular la ETT de ese mes por contratos.`))return;
+        const copia={...ettReal};delete copia[mk];
+        await setDoc(doc(db,'staff_config','ettReal'),{porMes:copia,updatedAt:Timestamp.now()},{merge:true});
+        renderStaffCosts(container);
+      });
+    });
 
     const fileInput=container.querySelector('#costesFileInput');
     const btnImp=container.querySelector('#btnImportCostes');
@@ -4037,23 +4105,11 @@ async function renderStaffCosts(container){
     container.querySelectorAll('[data-del-mes]').forEach(b=>{
       b.addEventListener('click',async()=>{
         const mk=b.dataset.delMes;
-        if(!confirm(`¿Eliminar los costes reales de ${mk}?\n\nLa Cuenta de explotación volverá a estimar ese mes por convenio.`))return;
+        if(!confirm(`¿Eliminar los costes reales de ${mk}?\n\nLa Cuenta de explotación mostrará el personal de ese mes a cero.`))return;
         const copia={...real};delete copia[mk];
         await setDoc(doc(db,'staff_config','realCosts'),{porMes:copia,updatedAt:Timestamp.now()});
         renderStaffCosts(container);
       });
-    });
-    const btn=container.querySelector('#btnSaveStaffCosts');
-    if(btn)btn.addEventListener('click',async()=>{
-      const msg=container.querySelector('#staffCostMsg');
-      const leavePct=parseFloat(container.querySelector('#staffLeavePct').value)||0;
-      btn.disabled=true;btn.textContent='Guardando…';
-      try{
-        await setDoc(doc(db,'pnl_config','costs'),{leaveCostPct:leavePct},{merge:true});
-        msg.textContent='✓ Guardado';msg.style.color='var(--ok-fg)';
-        setTimeout(()=>renderStaffCosts(container),700);
-      }catch(e){msg.textContent='Error: '+e.message;msg.style.color='var(--alert-red-fg)';}
-      btn.disabled=false;btn.textContent='Guardar';
     });
   }catch(e){
     container.innerHTML=`<div class="empty-state"><p>Error al cargar: ${escapeHtml(e.message)}</p></div>`;
@@ -4516,7 +4572,38 @@ function pnlLine(label,value,revenue,opts={}){
   </div>`;
 }
 
-function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchases,realCosts){
+// Fracción de cada mes natural cubierta por el rango [from,to] → [{key:'YYYY-MM',frac}]
+function monthFractions(from,to){
+  const out=[];
+  if(!from||!to||to<from)return out;
+  const cur=new Date(from.getFullYear(),from.getMonth(),1);
+  while(cur<=to){
+    const y=cur.getFullYear(),m=cur.getMonth();
+    const mStart=new Date(y,m,1),mEnd=new Date(y,m+1,1);
+    const a=from>mStart?from:mStart,b=to<mEnd?to:mEnd;
+    const dias=new Date(y,m+1,0).getDate();
+    const cubiertos=Math.min(dias,Math.max(0,Math.round((b-a)/86400000)));
+    if(cubiertos>0)out.push({key:`${y}-${String(m+1).padStart(2,'0')}`,frac:cubiertos/dias});
+    cur.setMonth(m+1);
+  }
+  return out;
+}
+// Coste de ETT en el rango: cada contrato prorrateado por los días que solapan con el período
+function ettCostInRange(ettList,from,to){
+  if(!Array.isArray(ettList)||!from||!to)return 0;
+  let total=0;
+  ettList.forEach(e=>{
+    if(e.status==='inactivo'||!e.monthlyCost||!e.start)return;
+    const s=startOfDay(new Date(e.start+'T12:00:00'));
+    const en=e.end?endOfDay(new Date(e.end+'T12:00:00')):to;
+    const a=s>from?s:from,b=en<to?en:to;
+    if(b<=a)return;
+    monthFractions(a,b).forEach(({frac})=>{total+=e.monthlyCost*frac;});
+  });
+  return total;
+}
+
+function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchases,realCosts,ettReal){
   const inRange=d=>!from||!to||(d&&d>=from&&d<=to);
   const cateringActive=cateringOrders.filter(o=>o.orderStatus!=='CANCELADO'&&inRange(toDate(o.deliveryAt)));
   const cateringRevenue=cateringActive.reduce((s,o)=>s+(o.priceTotal||0),0);
@@ -4551,18 +4638,12 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
     const c=e.category||'Otros';
     extrasByCategory[c]=(extrasByCategory[c]||0)+(e.amount||0);
   });
-  // ── Meses del rango e importes manuales (se calculan antes de los ingresos) ──
-  let months=1;
-  if(from&&to){
-    months=Math.max(1,(to.getFullYear()-from.getFullYear())*12+(to.getMonth()-from.getMonth())+1);
-  }
+  // ── Meses del rango (con su fracción si el período no cubre el mes entero) e importes manuales ──
+  const fracs=monthFractions(from,to);
+  const months=fracs.reduce((s2,f)=>s2+f.frac,0);          // meses equivalentes del período
   const manual=costs.manual||{};   // { 'YYYY-MM': {mmpp, iuo, refunds} }
-  const monthKeysInRange=[];
-  if(from&&to){
-    const cur=new Date(from.getFullYear(),from.getMonth(),1);
-    while(cur<=to){monthKeysInRange.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`);cur.setMonth(cur.getMonth()+1);}
-  }
-  const sumManual=field=>monthKeysInRange.reduce((s,k)=>s+(manual[k]&&manual[k][field]?+manual[k][field]:0),0);
+  const monthKeysInRange=fracs.map(f=>f.key);
+  const sumManual=field=>fracs.reduce((s2,{key,frac})=>s2+(manual[key]&&manual[key][field]?(+manual[key][field])*frac:0),0);
   const manualMmpp=sumManual('mmpp');
   const manualIuo=sumManual('iuo');
   const manualRefunds=sumManual('refunds'); // abonos por errores de TPV (Proppos)
@@ -4573,23 +4654,36 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const refunds=manualRefunds;
   const revenue=cateringRevenue+comedor.billed+cafeteria.billed+extrasRevenue+transfersOut+refunds;
 
-  const sc=computeStaffCost(staff,costs,ettList);
-  // Coste real de nóminas por mes: sustituye a la estimación de convenio donde exista
+  // Personal: SOLO coste real de nóminas importado (Personal → Costes). Ya no se estima por convenio:
+  // un mes sin nóminas importadas queda a cero y se avisa. Las ETT se suman aparte, por días de contrato.
   const real=realCosts||{};
-  let realTotal=0,mesesConReal=0;
-  monthKeysInRange.forEach(k=>{
-    if(real[k]){
-      realTotal+=Object.values(real[k]).reduce((s2,e)=>s2+(e.coste||0),0);
-      mesesConReal++;
-    }
+  let realTotal=0;
+  const mesesSinNomina=[];
+  fracs.forEach(({key,frac})=>{
+    if(real[key])realTotal+=Object.values(real[key]).reduce((s2,e)=>s2+(e.coste||0),0)*frac;
+    else mesesSinNomina.push(key);
   });
-  const mesesSinReal=Math.max(0,months-mesesConReal);
-  const labourSource=mesesConReal===0?'convenio':(mesesSinReal===0?'real':'mixto');
-  const labourCost=-(realTotal+sc.totalMonthly*mesesSinReal);
-  const labourPayroll=-(sc.payrollMonthly*mesesSinReal);
-  const labourLeave=-(sc.onLeaveMonthly*mesesSinReal);
-  const labourEtt=-(sc.ettMonthly*mesesSinReal);
+  const mesesConReal=fracs.length-mesesSinNomina.length;
+  const mesesSinReal=mesesSinNomina.length;
+  const labourSource=!fracs.length?'none':mesesConReal===0?'none':(mesesSinReal===0?'real':'parcial');
+  // ETT: proforma importada si existe para el mes; si no, prorrateo por días de los contratos de la pestaña ETT
+  const proformas=ettReal||{};
+  let ettCost=0,mesesEttProforma=0;
+  fracs.forEach(({key,frac})=>{
+    if(proformas[key]){ettCost+=(proformas[key].total||0)*frac;mesesEttProforma++;return;}
+    const [y,m]=key.split('-');
+    const ms=new Date(+y,+m-1,1),me=endOfMonth(ms);
+    ettCost+=ettCostInRange(ettList,from>ms?from:ms,to<me?to:me);
+  });
+  const ettSource=!fracs.length||mesesEttProforma===0?'contratos':(mesesEttProforma===fracs.length?'proforma':'mixto');
   const labourReal=-realTotal;
+  const labourEtt=-ettCost;
+  const labourCost=labourReal+labourEtt;
+  // Referencia para el forecast: media de los 3 últimos meses con nóminas importadas
+  const ultimosReales=Object.keys(real).sort().slice(-3);
+  const labourRefMonthly=ultimosReales.length
+    ?ultimosReales.reduce((s2,k)=>s2+Object.values(real[k]).reduce((s3,e)=>s3+(e.coste||0),0),0)/ultimosReales.length:0;
+  const fracSinNomina=fracs.filter(f=>!real[f.key]).reduce((s2,f)=>s2+f.frac,0);
 
   // MMPP: importe real. Prioridad: importe manual de esta pantalla → compras reales del Forecast.
   // No se estima por porcentaje: si no hay dato real, la línea queda a cero y se avisa.
@@ -4609,7 +4703,7 @@ function computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extra
   const transfers=-transfersIn;
 
   const unitProfit=grossProfit+labourCost+iuo+transfers;
-  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,extrasPendienteImporte,extrasNoCobradosN:extrasNoCobrados.length,mmpp,costOfSales,grossProfit,labourCost,labourPayroll,labourLeave,labourEtt,labourReal,labourSource,mesesConReal,mesesSinReal,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn,unitProfit,months,
+  return{revenue,cateringRevenue,cateringPax,comedor,cafeteria,extrasRevenue,extrasByCategory,extrasPendienteImporte,extrasNoCobradosN:extrasNoCobrados.length,mmpp,costOfSales,grossProfit,labourCost,labourEtt,ettSource,mesesEttProforma,labourReal,labourSource,mesesConReal,mesesSinReal,mesesSinNomina,labourRefMonthly,fracSinNomina,iuo,iuoFromPct,iuoFixed,transfers,transfersOut,transfersIn,unitProfit,months,
     hasManualMmpp,hasManualIuo,monthKeysInRange,mmppSource,forecastPurchases,refunds,
     pax:cateringPax+comedor.tickets+cafeteria.tickets};
 }
@@ -4633,6 +4727,8 @@ async function renderPnl(container){
     const pnlEvents=await loadEvents();
     const realCostSnap=await getDoc(doc(db,'staff_config','realCosts'));
     const realCosts=realCostSnap.exists()?(realCostSnap.data().porMes||{}):{};
+    const ettRealSnap=await getDoc(doc(db,'staff_config','ettReal'));
+    const ettReal=ettRealSnap.exists()?(ettRealSnap.data().porMes||{}):{};
     const [impSnap,revMetaSnap]=await Promise.all([
       getDoc(doc(db,'catering_config','importInfo')),
       getDoc(doc(db,'pnl_config','revenue'))
@@ -4652,8 +4748,24 @@ async function renderPnl(container){
       const rr=getRangeForType(r.type,r.refDate||new Date());
       from=rr.from;to=rr.to;
     }
+    if(r.type==='all'){
+      // Antes "Todo" no tenía fechas: se restaba un solo mes de personal e IUO frente a todo el histórico
+      const fechas=[];
+      cateringOrders.forEach(o=>{const d=toDate(o.deliveryAt);if(d&&o.orderStatus!=='CANCELADO')fechas.push(d);});
+      revenueRows.forEach(x=>{if(x.date)fechas.push(new Date(x.date+'T12:00:00'));});
+      extras.forEach(x=>{if(x.date)fechas.push(new Date(x.date+'T12:00:00'));});
+      [...Object.keys(realCosts),...Object.keys(costs.manual||{})].forEach(k=>{
+        const [y,m]=k.split('-');if(y&&m){fechas.push(new Date(+y,+m-1,1));fechas.push(endOfMonth(new Date(+y,+m-1,1)));}
+      });
+      const valid=fechas.filter(d=>!isNaN(d));
+      if(valid.length){
+        from=startOfDay(new Date(Math.min(...valid)));
+        to=endOfDay(new Date(Math.max(...valid)));
+      }
+    }
     const showNav=(r.type!=='all'&&r.type!=='custom');
-    const periodLabel=showNav?buildPeriodLabel(r.type,r.refDate):'Todo el histórico';
+    const fmtD=d=>d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+    const periodLabel=showNav?buildPeriodLabel(r.type,r.refDate):(r.type==='all'&&from&&to?`Todo el histórico (${fmtD(from)} – ${fmtD(to)})`:'Todo el histórico');
 
     let cFrom=null,cTo=null,cLabel='',cShowNav=false;
     if(r.compare){
@@ -4686,8 +4798,8 @@ async function renderPnl(container){
       (r.compare&&cFrom&&cTo)?sumForecastPurchases(cFrom,cTo):Promise.resolve(0)
     ]);
 
-    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchCur,realCosts);
-    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList,extras,fcPurchCmp,realCosts):null;
+    const cur=computePnl(cateringOrders,revenueRows,staff,costs,from,to,ettList,extras,fcPurchCur,realCosts,ettReal);
+    const cmp=(r.compare&&cFrom&&cTo)?computePnl(cateringOrders,revenueRows,staff,costs,cFrom,cTo,ettList,extras,fcPurchCmp,realCosts,ettReal):null;
 
     const varOf=(a,b)=>b?((a-b)/Math.abs(b)*100):0;
     const varTxt=(a,b)=>{if(!b)return'';const v=varOf(a,b);return`${v>=0?'+':''}${v.toFixed(1)}%`;};
@@ -4772,7 +4884,8 @@ async function renderPnl(container){
       // Previsión de MMPP: el gasto previsto si existe, si no el objetivo sobre la venta prevista
       const fcMmpp=fcPurchases>0?-fcPurchases:-(fcRevenue*((costs.mmppPct!==undefined?costs.mmppPct:35)/100));
       const fcGross=fcRevenue+fcMmpp;
-      const fcLabour=cur.labourCost; // el coste de personal previsto es el mismo estructural
+      // Personal previsto: nóminas reales del período y, en la parte sin nóminas, la media de los 3 últimos meses importados
+      const fcLabour=cur.labourCost-(cur.labourRefMonthly*cur.fracSinNomina);
       const fcIuo=cur.iuo;
       fcAgg={revenue:fcRevenue,catering:fcCatering,comedor:fcComedor,cafeteria:fcCafeteria,extra:fcExtra,
         mmpp:fcMmpp,grossProfit:fcGross,labourCost:fcLabour,iuo:fcIuo,unitProfit:fcGross+fcLabour+fcIuo,
@@ -4814,11 +4927,9 @@ async function renderPnl(container){
       <div class="pnl-section-head cost">Costes</div>
       ${L('MMPP (Materias primas)'+(cur.mmppSource==='manual'?' · importe manual':cur.mmppSource==='forecast'?' · compras reales de Forecast':' · sin datos'),cur.mmpp,cmp?cmp.mmpp:0,{fcVal:fcAgg?fcAgg.mmpp:undefined})}
       ${L('Gross Profit (Margen bruto)',cur.grossProfit,cmp?cmp.grossProfit:0,{bold:true,fcVal:fcAgg?fcAgg.grossProfit:undefined})}
-      ${L('Labour Cost (Personal)'+(cur.labourSource==='real'?' · nóminas reales':cur.labourSource==='mixto'?` · ${cur.mesesConReal} mes${cur.mesesConReal>1?'es':''} real, ${cur.mesesSinReal} estimado`:' · estimado por convenio'),cur.labourCost,cmp?cmp.labourCost:0,{fcVal:fcAgg?fcAgg.labourCost:undefined})}
-      ${cur.labourReal!==0?L('Nóminas reales',cur.labourReal,cmp?cmp.labourReal:0,{indent:true}):''}
-      ${cur.labourPayroll!==0?L('Plantilla activa (estimada)',cur.labourPayroll,cmp?cmp.labourPayroll:0,{indent:true}):''}
-      ${cur.labourLeave!==0||(cmp&&cmp.labourLeave!==0)?L('Bajas',cur.labourLeave,cmp?cmp.labourLeave:0,{indent:true}):''}
-      ${cur.labourEtt!==0||(cmp&&cmp.labourEtt!==0)?L('ETT (adicional)',cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true}):''}
+      ${L('Labour Cost (Personal)'+(cur.labourSource==='real'?' · nóminas reales':cur.labourSource==='parcial'?` · ${cur.mesesSinReal} mes${cur.mesesSinReal>1?'es':''} sin nóminas`:' · sin nóminas importadas')+(fcAgg&&cur.fracSinNomina>0&&cur.labourRefMonthly>0?' · forecast con media de 3 meses':''),cur.labourCost,cmp?cmp.labourCost:0,{fcVal:fcAgg?fcAgg.labourCost:undefined})}
+      ${cur.labourReal!==0||(cmp&&cmp.labourReal!==0)?L('Nóminas reales',cur.labourReal,cmp?cmp.labourReal:0,{indent:true}):''}
+      ${cur.labourEtt!==0||(cmp&&cmp.labourEtt!==0)?L('ETT'+(cur.ettSource==='proforma'?' · proformas':cur.ettSource==='mixto'?` · ${cur.mesesEttProforma} mes${cur.mesesEttProforma>1?'es':''} con proforma, resto por contratos`:' · por días de contrato'),cur.labourEtt,cmp?cmp.labourEtt:0,{indent:true}):''}
       ${L(cur.hasManualIuo?'IUO (Gastos indirectos) · importe real':'IUO (Gastos indirectos) · estimado',cur.iuo,cmp?cmp.iuo:0,{fcVal:fcAgg?fcAgg.iuo:undefined})}
       ${cur.iuoFromPct!==0?L(`Variable (${costs.iuoPct||0}% de ingresos)`,cur.iuoFromPct,cmp?cmp.iuoFromPct:0,{indent:true}):''}
       ${cur.iuoFixed!==0?L('Fijo mensual',cur.iuoFixed,cmp?cmp.iuoFixed:0,{indent:true}):''}
@@ -4829,15 +4940,16 @@ async function renderPnl(container){
 
     <div class="audit-section" style="margin-top:14px">
       <h3>Origen de cada dato</h3>
-      <div class="audit-row"><span class="audit-req"><strong>Catering</strong> — importe sin IVA de pedidos no cancelados, del módulo Catering (importación CSV/Holded)</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Catering</strong> — importe sin IVA de pedidos no cancelados, del módulo Catering (importación CSV/Holded).</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Comedor / Cafetería</strong> — facturado de los CSV importados con los botones de la barra superior</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Facturación extra</strong> — solo los registros marcados como <strong>Cobrado</strong> en el módulo Facturación. Los pendientes y facturados no suman hasta que se cobran</span></div>
       <div class="audit-row"><span class="audit-req"><strong>MMPP</strong> — importe real: primero el introducido en la tabla de costes por mes; si no hay, la suma del gasto real registrado en Forecast → Compras. Nunca se estima por porcentaje</span></div>
-      <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — coste real de nóminas importado en Personal → Costes para los meses que lo tengan; en el resto, estimación por la tabla de convenio. Las bajas al ${costs.leaveCostPct!==undefined?costs.leaveCostPct:100}% y las ETT según registros vigentes</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Personal</strong> — solo coste real de nóminas importado en Personal → Costes. Los meses sin nóminas importadas quedan a cero. Las ETT se suman aparte: importe de las proformas importadas en Personal → Costes y, en los meses sin proforma, prorrateo por días de los contratos de la pestaña ETT</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Abonos por errores de TPV (Proppos)</strong> — importe introducido a mano por mes. Suma a los ingresos porque es un importe que nos devuelven. En el futuro se podrá importar</span></div>
       <div class="audit-row"><span class="audit-req"><strong>Traspasos entre centros</strong> — de los registros de Facturación con esa categoría: los <strong>emitidos</strong> son facturación real y entran en Ingresos; los <strong>recibidos</strong> son compra y entran en Costes</span></div>
+      ${fcAgg?`<div class="audit-row"><span class="audit-req"><strong>Forecast · Personal</strong> — ${cur.fracSinNomina>0&&cur.labourRefMonthly>0?`nóminas reales donde existen y, para la parte del período sin nóminas, <strong>media de los 3 últimos meses importados</strong> (${fmtMoney(cur.labourRefMonthly)}/mes)`:cur.fracSinNomina>0?'sin nóminas importadas todavía: no hay base para estimarlo':'nóminas reales del período'}. Más las ETT (proformas o contratos)</span></div>`:''}
       <div class="audit-row"><span class="audit-req"><strong>IUO</strong> — parte variable como % de ingresos más una parte fija mensual, ambas configurables abajo</span></div>
-      <div class="audit-row"><span class="audit-req"><strong>Prorrateo</strong> — los costes mensuales (personal, IUO fijo) se multiplican por ${cur.months} mes${cur.months>1?'es':''} para cubrir el período seleccionado</span></div>
+      <div class="audit-row"><span class="audit-req"><strong>Prorrateo</strong> — los importes mensuales (nóminas, IUO fijo, importes manuales) se aplican en proporción a los días de cada mes que cubre el período: ${cur.months.toLocaleString('es-ES',{maximumFractionDigits:2})} mes${cur.months===1?'':'es'} equivalentes</span></div>
     </div>
 
     <div class="kpi-grid" style="margin-top:16px">
@@ -4848,9 +4960,8 @@ async function renderPnl(container){
     </div>
 
     ${cur.mmppSource==='none'?`<div class="alert alert-red" style="margin-top:16px"><span>⚠️ <strong>Sin datos de compras</strong> para este período. Introduce el gasto real en Forecast → Compras, o el importe mensual en la tabla de abajo. La línea de MMPP está a cero, así que el margen que ves está incompleto.</span></div>`:''}
-    <div class="alert alert-amber" style="margin-top:16px">
-      <span>⚠️ Cifras <strong>orientativas</strong>: el personal usa la tabla salarial del convenio de Barcelona 2025, prorrateada sobre ${cur.months} mes${cur.months>1?'es':''} del período. El IUO es un parámetro configurable; el MMPP sale siempre de importes reales.</span>
-    </div>
+    ${cur.mesesSinReal?`<div class="alert alert-red" style="margin-top:16px"><span>⚠️ <strong>Sin nóminas importadas</strong> para ${cur.mesesSinNomina.map(k=>{const [y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-ES',{month:'short',year:'numeric'});}).join(', ')}. El coste de personal de ${cur.mesesSinReal>1?'esos meses':'ese mes'} está a cero, así que el resultado está incompleto. Impórtalas en Personal → Costes.</span></div>`:''}
+    ${cmp&&cmp.mesesSinReal?`<div class="alert alert-amber" style="margin-top:10px"><span>⚠️ El período de comparación tiene ${cmp.mesesSinReal} mes${cmp.mesesSinReal>1?'es':''} sin nóminas importadas: su coste de personal está incompleto.</span></div>`:''}
 
     <div class="audit-section" style="margin-top:14px">
       <h3>Importes reales por mes</h3>
@@ -4959,8 +5070,8 @@ function bindPnlControls(container){
     renderPnl(container);
   });
   const f=container.querySelector('#pnlFrom'),t=container.querySelector('#pnlTo');
-  if(f)f.addEventListener('change',()=>{pnlRange.from=new Date(f.value+'T00:00:00');renderPnl(container);});
-  if(t)t.addEventListener('change',()=>{pnlRange.to=new Date(t.value+'T23:59:59');renderPnl(container);});
+  if(f)f.addEventListener('change',()=>{pnlRange.from=new Date(f.value+'T00:00:00');syncCompareToLastYear();renderPnl(container);});
+  if(t)t.addEventListener('change',()=>{pnlRange.to=new Date(t.value+'T23:59:59.999');syncCompareToLastYear();renderPnl(container);});
   const ct=container.querySelector('#pnlCompareToggle');
   if(ct)ct.addEventListener('change',()=>{
     pnlRange.compare=ct.checked;
